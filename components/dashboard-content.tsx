@@ -35,108 +35,45 @@ import {
 const kpis = [
   {
     title: "Total Documentos",
-    value: "2,847",
-    change: "+12.5%",
+    value: "0",
+    change: "0%",
     trend: "up",
     icon: FileText,
-    description: "vs mes anterior",
+    description: "Sin información disponible",
   },
   {
-    title: "Proyectos Activos",
-    value: "34",
-    change: "+3",
+    title: "Valorizaciones",
+    value: "0",
+    change: "0%",
     trend: "up",
     icon: FolderKanban,
-    description: "en todos los clientes",
+    description: "Sin información disponible",
   },
   {
-    title: "Facturas Procesadas",
-    value: "S/ 4.2M",
-    change: "+8.2%",
+    title: "Cuentas por Cobrar",
+    value: "S/ 0.00",
+    change: "0%",
     trend: "up",
     icon: DollarSign,
-    description: "este trimestre",
+    description: "Sin información disponible",
   },
   {
-    title: "Pendientes de Revisión",
-    value: "23",
-    change: "-5",
-    trend: "down",
+    title: "Cuentas por Pagar",
+    value: "S/ 0.00",
+    change: "0%",
+    trend: "up",
     icon: Clock,
-    description: "documentos",
+    description: "Sin información disponible",
   },
 ]
 
-const recentActivity = [
-  {
-    id: 1,
-    action: "Factura procesada con IA",
-    document: "F001-00847",
-    client: "Repsol",
-    user: "María García",
-    time: "Hace 5 min",
-    status: "processing",
-  },
-  {
-    id: 2,
-    action: "Documento aprobado",
-    document: "OC-2024-1234",
-    client: "TDP",
-    user: "Carlos Martínez",
-    time: "Hace 12 min",
-    status: "completed",
-  },
-  {
-    id: 3,
-    action: "Proyecto creado",
-    document: "Mantenimiento Offshore",
-    client: "BPO",
-    user: "Juan Delgado",
-    time: "Hace 1 hora",
-    status: "new",
-  },
-  {
-    id: 4,
-    action: "Reporte generado",
-    document: "Reporte-Q4-Financiero.pdf",
-    client: "Tralsa",
-    user: "Ana Rodríguez",
-    time: "Hace 2 horas",
-    status: "completed",
-  },
-  {
-    id: 5,
-    action: "XML procesado",
-    document: "lote-facturas-047.xml",
-    client: "Repsol",
-    user: "Sistema IA",
-    time: "Hace 3 horas",
-    status: "completed",
-  },
-]
+const recentActivity: any[] = []
 
-const revenueData = [
-  { month: "Ene", repsol: 245000, tdp: 189000, bpo: 156000, tralsa: 98000 },
-  { month: "Feb", repsol: 278000, tdp: 198000, bpo: 167000, tralsa: 112000 },
-  { month: "Mar", repsol: 312000, tdp: 215000, bpo: 178000, tralsa: 125000 },
-  { month: "Abr", repsol: 289000, tdp: 234000, bpo: 189000, tralsa: 134000 },
-  { month: "May", repsol: 345000, tdp: 256000, bpo: 195000, tralsa: 145000 },
-  { month: "Jun", repsol: 367000, tdp: 278000, bpo: 212000, tralsa: 156000 },
-]
+const revenueData: any[] = []
 
-const projectsByClient = [
-  { name: "Repsol", value: 12, color: "#f97316" },
-  { name: "TDP", value: 8, color: "#3b82f6" },
-  { name: "BPO", value: 9, color: "#10b981" },
-  { name: "Tralsa", value: 5, color: "#a855f7" },
-]
+const projectsByClient: any[] = []
 
-const documentsByType = [
-  { type: "Facturas", count: 847, percentage: 35 },
-  { type: "Contratos", count: 423, percentage: 18 },
-  { type: "Reportes", count: 612, percentage: 25 },
-  { type: "Órdenes de Compra", count: 534, percentage: 22 },
-]
+const documentsByType: any[] = []
 
 export function DashboardContent() {
   return (
@@ -146,7 +83,7 @@ export function DashboardContent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Resumen de operaciones marítimas y gestión documental
+            Dashboard financiero en preparación. Los indicadores se alimentarán desde Tesorería, Valorizaciones y Conciliación Bancaria.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -218,7 +155,7 @@ export function DashboardContent() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+                <AreaChart data={[]}>
                   <defs>
                     <linearGradient id="colorRepsol" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
@@ -259,24 +196,7 @@ export function DashboardContent() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex items-center justify-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-orange-500" />
-                <span className="text-sm text-muted-foreground">Repsol</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500" />
-                <span className="text-sm text-muted-foreground">TDP</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span className="text-sm text-muted-foreground">BPO</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-purple-500" />
-                <span className="text-sm text-muted-foreground">Tralsa</span>
-              </div>
-            </div>
+            <div className="mt-4 text-center text-sm text-muted-foreground">Sin información disponible</div>
           </CardContent>
         </Card>
 
@@ -291,7 +211,7 @@ export function DashboardContent() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={projectsByClient}
+                    data={[]}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -313,18 +233,7 @@ export function DashboardContent() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {projectsByClient.map((client) => (
-                <div key={client.name} className="flex items-center gap-2">
-                  <div
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: client.color }}
-                  />
-                  <span className="text-xs text-muted-foreground">{client.name}</span>
-                  <span className="ml-auto text-xs font-medium">{client.value}</span>
-                </div>
-              ))}
-            </div>
+            <div className="mt-4 text-center text-sm text-muted-foreground">Sin información disponible</div>
           </CardContent>
         </Card>
       </div>
@@ -343,22 +252,7 @@ export function DashboardContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {documentsByType.map((doc) => (
-                <div key={doc.type} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{doc.type}</span>
-                    <span className="text-muted-foreground">{doc.count} archivos</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${doc.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="text-center text-sm text-muted-foreground py-8">Sin información disponible</div>
           </CardContent>
         </Card>
 
@@ -376,46 +270,7 @@ export function DashboardContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50"
-                >
-                  <div className="mt-0.5 rounded-md bg-muted p-2">
-                    {activity.action.includes("IA") ? (
-                      <Sparkles className="h-4 w-4 text-primary" />
-                    ) : (
-                      <FileText className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{activity.action}</p>
-                      <Badge
-                        variant={
-                          activity.status === "completed"
-                            ? "default"
-                            : activity.status === "processing"
-                            ? "secondary"
-                            : "outline"
-                        }
-                        className="text-xs"
-                      >
-                        {activity.status === "completed" ? "Completado" : 
-                         activity.status === "processing" ? "Procesando" : "Nuevo"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.document} • {activity.client}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.user} • {activity.time}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="text-center text-sm text-muted-foreground py-8">No existen movimientos registrados</div>
           </CardContent>
         </Card>
       </div>
