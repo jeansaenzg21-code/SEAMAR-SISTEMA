@@ -1,5 +1,10 @@
+import { AppShell } from "@/components/app-shell"
 import { ValuationsContent } from "@/components/valuations-content"
 
 export default function ValuationsPage() {
-  return <ValuationsContent />
+  return (
+    <AppShell>
+      <ValuationsContent />
+    </AppShell>
+  )
 }

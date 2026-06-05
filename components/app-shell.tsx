@@ -31,13 +31,20 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
-
+import {
+  CheckCircle,
+  MessageSquareWarning,
+} from "lucide-react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Clientes", href: "/clients", icon: Users },
   { name: "Proveedores", href: "/providers", icon: Users },
   { name: "Proyectos", href: "/projects", icon: FolderKanban },
   { name: "Documentos", href: "/documents", icon: FileText },
+
+  { name: "Valorizaciones", href: "/valuations", icon: Activity },
+  { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
+  { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
 ]
 
 const aiSection = [
