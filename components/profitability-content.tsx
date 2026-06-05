@@ -42,93 +42,19 @@ import {
   Area,
 } from "recharts"
 
-const clientProfitability = [
-  {
-    id: "repsol",
-    name: "Repsol",
-    color: "bg-orange-500",
-    chartColor: "#f97316",
-    revenue: 2450000,
-    costs: 1862000,
-    profit: 588000,
-    margin: 24.0,
-    projects: 12,
-    trend: 8.5,
-    status: "high",
-  },
-  {
-    id: "tdp",
-    name: "TDP",
-    color: "bg-blue-500",
-    chartColor: "#3b82f6",
-    revenue: 1370000,
-    costs: 1041200,
-    profit: 328800,
-    margin: 24.0,
-    projects: 8,
-    trend: 12.3,
-    status: "high",
-  },
-  {
-    id: "bpo",
-    name: "BPO",
-    color: "bg-emerald-500",
-    chartColor: "#10b981",
-    revenue: 1097000,
-    costs: 911510,
-    profit: 185490,
-    margin: 16.9,
-    projects: 9,
-    trend: -2.1,
-    status: "medium",
-  },
-  {
-    id: "tralsa",
-    name: "Tralsa",
-    color: "bg-purple-500",
-    chartColor: "#a855f7",
-    revenue: 770000,
-    costs: 616000,
-    profit: 154000,
-    margin: 20.0,
-    projects: 5,
-    trend: 5.8,
-    status: "medium",
-  },
-]
+const clientProfitability: any[] = []
 
-const monthlyProfitability = [
-  { mes: "Ene", ingresos: 688000, costos: 512000, utilidad: 176000 },
-  { mes: "Feb", ingresos: 755000, costos: 567000, utilidad: 188000 },
-  { mes: "Mar", ingresos: 830000, costos: 615000, utilidad: 215000 },
-  { mes: "Abr", ingresos: 846000, costos: 638000, utilidad: 208000 },
-  { mes: "May", ingresos: 941000, costos: 689000, utilidad: 252000 },
-  { mes: "Jun", ingresos: 1013000, costos: 734000, utilidad: 279000 },
-]
+const monthlyProfitability: any[] = []
 
-const marginTrend = [
-  { mes: "Ene", margen: 25.6 },
-  { mes: "Feb", margen: 24.9 },
-  { mes: "Mar", margen: 25.9 },
-  { mes: "Abr", margen: 24.6 },
-  { mes: "May", margen: 26.8 },
-  { mes: "Jun", margen: 27.5 },
-]
+const marginTrend: any[] = []
 
-const topProjects = [
-  { name: "Mantenimiento Plataforma Offshore", client: "Repsol", clientColor: "bg-orange-500", profit: 112500, margin: 25.0 },
-  { name: "Optimización de Combustible", client: "TDP", clientColor: "bg-blue-500", profit: 98000, margin: 28.6 },
-  { name: "Auditoría de Seguridad", client: "Repsol", clientColor: "bg-orange-500", profit: 38000, margin: 40.0 },
-  { name: "Sistema de Rastreo", client: "Tralsa", clientColor: "bg-purple-500", profit: 35000, margin: 19.4 },
-  { name: "Sistema de Gestión de Carga", client: "BPO", clientColor: "bg-emerald-500", profit: 27200, margin: 8.0 },
-]
+const topProjects: any[] = []
 
 export function ProfitabilityContent() {
-  const totalRevenue = clientProfitability.reduce((acc, c) => acc + c.revenue, 0)
-  const totalCosts = clientProfitability.reduce((acc, c) => acc + c.costs, 0)
-  const totalProfit = clientProfitability.reduce((acc, c) => acc + c.profit, 0)
-  const averageMargin = (totalProfit / totalRevenue) * 100
-
+  const totalRevenue = 0
+const totalCosts = 0
+const totalProfit = 0
+const averageMargin = 0
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -141,7 +67,7 @@ export function ProfitabilityContent() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Rentabilidad por Cliente</h1>
               <p className="text-muted-foreground">
-                Vista ejecutiva de ingresos, costos y márgenes de utilidad
+                Indicadores de rentabilidad preparados para integrarse con Tesorería, Valorizaciones y Conciliación Bancaria.
               </p>
             </div>
           </div>
@@ -178,7 +104,7 @@ export function ProfitabilityContent() {
                 <p className="text-2xl font-bold">S/ {(totalRevenue / 1000000).toFixed(2)}M</p>
                 <p className="text-xs text-success mt-1 flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3" />
-                  +12.5% vs año anterior
+                  Sin información disponible
                 </p>
               </div>
               <div className="rounded-md bg-primary/10 p-3">
@@ -195,7 +121,7 @@ export function ProfitabilityContent() {
                 <p className="text-2xl font-bold">S/ {(totalCosts / 1000000).toFixed(2)}M</p>
                 <p className="text-xs text-warning mt-1 flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3" />
-                  +9.8% vs año anterior
+                  Sin información disponible
                 </p>
               </div>
               <div className="rounded-md bg-warning/10 p-3">
@@ -212,7 +138,7 @@ export function ProfitabilityContent() {
                 <p className="text-2xl font-bold text-success">S/ {(totalProfit / 1000000).toFixed(2)}M</p>
                 <p className="text-xs text-success mt-1 flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3" />
-                  +18.2% vs año anterior
+                  Sin información disponible
                 </p>
               </div>
               <div className="rounded-md bg-success/10 p-3">
@@ -229,7 +155,7 @@ export function ProfitabilityContent() {
                 <p className="text-2xl font-bold">{averageMargin.toFixed(1)}%</p>
                 <p className="text-xs text-success mt-1 flex items-center gap-1">
                   <ArrowUpRight className="h-3 w-3" />
-                  +2.1 pts vs año anterior
+                  Sin información disponible
                 </p>
               </div>
               <div className="rounded-md bg-primary/10 p-3">
@@ -251,7 +177,7 @@ export function ProfitabilityContent() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyProfitability}>
+                <AreaChart data={[]}>
                   <defs>
                     <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -292,16 +218,7 @@ export function ProfitabilityContent() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex items-center justify-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-blue-500" />
-                <span className="text-sm text-muted-foreground">Ingresos</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span className="text-sm text-muted-foreground">Utilidad</span>
-              </div>
-            </div>
+            <div className="mt-4 text-center text-sm text-muted-foreground">Sin información disponible</div>
           </CardContent>
         </Card>
 
@@ -314,7 +231,7 @@ export function ProfitabilityContent() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={marginTrend}>
+                <LineChart data={[]}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="mes" stroke="var(--muted-foreground)" fontSize={12} />
                   <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(value) => `${value}%`} domain={[20, 30]} />
@@ -361,35 +278,15 @@ export function ProfitabilityContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clientProfitability.map((client) => (
-                  <TableRow key={client.id} className="hover:bg-muted/50">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("h-3 w-3 rounded-full", client.color)} />
-                        <span className="font-medium">{client.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">S/ {(client.revenue / 1000).toFixed(0)}k</TableCell>
-                    <TableCell className="text-right font-medium text-success">S/ {(client.profit / 1000).toFixed(0)}k</TableCell>
-                    <TableCell className="text-right">{client.margin.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={cn(
-                          "flex items-center justify-end gap-1",
-                          client.trend > 0 ? "text-success" : "text-destructive"
-                        )}
-                      >
-                        {client.trend > 0 ? (
-                          <ArrowUpRight className="h-3 w-3" />
-                        ) : (
-                          <ArrowDownRight className="h-3 w-3" />
-                        )}
-                        {Math.abs(client.trend).toFixed(1)}%
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+  <TableRow>
+    <TableCell
+      colSpan={5}
+      className="text-center text-muted-foreground"
+    >
+      No existen datos disponibles
+    </TableCell>
+  </TableRow>
+</TableBody>
             </Table>
           </CardContent>
         </Card>
@@ -401,29 +298,7 @@ export function ProfitabilityContent() {
             <CardDescription>Proyectos con mayor utilidad</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topProjects.map((project, index) => (
-                <div
-                  key={project.name}
-                  className="flex items-center gap-4 rounded-lg border border-border bg-muted/30 p-4"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-bold">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{project.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className={cn("h-2 w-2 rounded-full", project.clientColor)} />
-                      <span className="text-xs text-muted-foreground">{project.client}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">S/ {(project.profit / 1000).toFixed(0)}k</p>
-                    <p className="text-xs text-muted-foreground">{project.margin.toFixed(1)}% margen</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="text-center text-sm text-muted-foreground py-8">No existen datos disponibles</div>
           </CardContent>
         </Card>
       </div>
@@ -437,7 +312,7 @@ export function ProfitabilityContent() {
         <CardContent>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={clientProfitability} layout="vertical" barSize={32}>
+              <BarChart data={[]} layout="vertical" barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis type="number" stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(value) => `S/${value / 1000}k`} />
                 <YAxis type="category" dataKey="name" stroke="var(--muted-foreground)" fontSize={12} width={80} />
