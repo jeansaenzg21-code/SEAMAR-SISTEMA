@@ -48,14 +48,14 @@ const getClientColor = (name: string) => {
 
 export function ProvidersContent() {
   const [open, setOpen] = useState(false)
-  const [providers, setProviders] = useState<Provider[]>([])
+  const [providers, setProviders] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const cargarProveedores = async () => {
   try {
     const response = await fetch("/api/proveedores")
     const data = await response.json()
 
-    setProviders(data)
+    setProviders(Array.isArray(data) ? data : [])
   } catch (error) {
     console.error(error)
   }

@@ -236,12 +236,12 @@ export function Sidebar() {
             >
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  JD
+                  SS
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-1 flex-col items-start text-left">
                 <span className="text-sm font-medium text-sidebar-foreground">
-                  Juan Delgado
+                  Sheran Saenz
                 </span>
                 <span className="text-xs text-muted-foreground">Administrador</span>
               </div>

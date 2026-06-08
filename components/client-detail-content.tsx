@@ -244,7 +244,7 @@ if (!client) {
         <div className="flex items-center gap-4 flex-1">
           <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-xl font-bold text-white">
-              {client.razon_social.charAt(0)}
+              {(client?.razon_social || "C").charAt(0)}
             </span>
           </div>
           <div>
@@ -287,8 +287,8 @@ if (!client) {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-  {projects.filter((p) => p.estado === "EN_CURSO").length
-  }
+  {(Array.isArray(projects) ? projects : []).filter((p) => p.estado === "EN_CURSO").length}
+
 </p>
                 <p className="text-sm text-muted-foreground">Proyectos Activos</p>
               </div>
@@ -760,7 +760,7 @@ if (!client) {
 
     <div className="grid gap-4 lg:grid-cols-3">
 
-  {projects.map((project) => (
+  {(Array.isArray(projects) ? projects : []).map((project) => (
 
     <Card
       key={project.id}
