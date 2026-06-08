@@ -41,7 +41,6 @@ const navigation = [
   { name: "Proveedores", href: "/providers", icon: Users },
   { name: "Proyectos", href: "/projects", icon: FolderKanban },
   { name: "Documentos", href: "/documents", icon: FileText },
-
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
