@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  FolderKanban,
-  FileText,
-  Upload,
+
   BarChart3,
   PieChart,
   Users,
@@ -39,8 +37,6 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Clientes", href: "/clients", icon: Users },
   { name: "Proveedores", href: "/providers", icon: Users },
-  { name: "Proyectos", href: "/projects", icon: FolderKanban },
-  { name: "Documentos", href: "/documents", icon: FileText },
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
@@ -55,23 +51,18 @@ const analytics = [
   { name: "Rentabilidad", href: "/analytics/profitability", icon: PieChart },
 ]
 
-const clients = [
-  { name: "Repsol", id: "repsol", color: "bg-orange-500" },
-  { name: "TDP", id: "tdp", color: "bg-blue-500" },
-  { name: "BPO", id: "bpo", color: "bg-emerald-500" },
-  { name: "Tralsa", id: "tralsa", color: "bg-purple-500" },
-]
 
 export function Sidebar() {
   const pathname = usePathname()
   const [expandedSections, setExpandedSections] = useState({
-    analytics: true,
-    clients: true,
-  })
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
-  }
+  analytics: true,
+})
+const toggleSection = (section: keyof typeof expandedSections) => {
+  setExpandedSections((prev) => ({
+    ...prev,
+    [section]: !prev[section],
+  }))
+}
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">
@@ -189,40 +180,7 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Clients Section */}
-        <div className="pt-4">
-          <button
-            onClick={() => toggleSection("clients")}
-            className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground"
-          >
-            Clientes
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 transition-transform",
-                expandedSections.clients ? "" : "-rotate-90"
-              )}
-            />
-          </button>
-          {expandedSections.clients && (
-            <div className="space-y-1">
-              {clients.map((client) => (
-                <Link
-                  key={client.id}
-                  href={`/clients/${client.id}`}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    pathname === `/clients/${client.id}`
-                      ? "bg-sidebar-accent text-sidebar-primary"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  )}
-                >
-                  <div className={cn("h-2 w-2 rounded-full", client.color)} />
-                  {client.name}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+       
       </nav>
 
       {/* User Section */}
