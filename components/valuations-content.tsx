@@ -37,37 +37,11 @@ type Valuation = {
   status: Status
   date: string
   end_date: string
-  cesionario: string
+  encargado: string
   archivo_nombre?: string
 }
 
-const initialValuations: Valuation[] = [
-  {
-    id: 1,
-    client: "Repsol",
-    orden_servicio: "OS-000112",
-    type: "service",
-    description: "Valorización por mantenimiento de equipos marítimos",
-    amount: 125000,
-    status: "under_review",
-    date: "2024-03-15",
-    end_date: "2024-03-30",
-    cesionario: "María García",
-    archivo_nombre: "reporte-servicio.pdf",
-  },
-  {
-    id: 2,
-    client: "TDP",
-    orden_servicio: "OS-000113",
-    type: "maintenance",
-    description: "Evaluación de flota operativa",
-    amount: 89500,
-    status: "observed",
-    date: "2024-03-14",
-    end_date: "2024-03-28",
-    cesionario: "Carlos Rodríguez",
-  },
-]
+
 
 function StatusBadge({ status }: { status: Status }) {
   const label = {
@@ -94,7 +68,7 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 export function ValuationsContent() {
-  const [valuations, setValuations] = useState<Valuation[]>(initialValuations)
+  const [valuations, setValuations] = useState<Valuation[]>([])
   const [statusFilter, setStatusFilter] = useState("all")
   const [clientFilter, setClientFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -108,7 +82,7 @@ export function ValuationsContent() {
   const [amount, setAmount] = useState("")
   const [fecha, setFecha] = useState("")
   const [fechaFin, setFechaFin] = useState("")
-  const [cesionario, setCesionario] = useState("")
+  const [encargado, setEncargado] = useState("")
   const [archivo, setArchivo] = useState<File | null>(null)
 
   const filteredValuations = valuations.filter((v) => {
@@ -135,7 +109,7 @@ export function ValuationsContent() {
     setAmount("")
     setFecha("")
     setFechaFin("")
-    setCesionario("")
+    setEncargado("")
     setArchivo(null)
   }
 
@@ -158,7 +132,7 @@ export function ValuationsContent() {
                 amount: Number(amount),
                 date: fecha,
                 end_date: fechaFin,
-                cesionario,
+                encargado,
                 archivo_nombre: archivo?.name || item.archivo_nombre,
               }
             : item
@@ -177,7 +151,7 @@ export function ValuationsContent() {
         status: "draft",
         date: fecha,
         end_date: fechaFin,
-        cesionario,
+        encargado,
         archivo_nombre: archivo?.name,
       }
 
@@ -198,7 +172,7 @@ export function ValuationsContent() {
     setAmount(String(item.amount))
     setFecha(item.date)
     setFechaFin(item.end_date)
-    setCesionario(item.cesionario)
+    setEncargado(item.encargado)
     setArchivo(null)
     setIsNewModalOpen(true)
   }
@@ -222,7 +196,7 @@ export function ValuationsContent() {
       "Descripción",
       "Monto",
       "Estado",
-      "Cesionario",
+      "Encargado",
       "Fecha de Inicio",
       "Fecha de Fin",
     ]
@@ -235,7 +209,7 @@ export function ValuationsContent() {
       item.description,
       `S/ ${item.amount.toLocaleString("es-PE")}`,
       item.status,
-      item.cesionario,
+      item.encargado,
       item.date,
       item.end_date,
     ]
@@ -400,11 +374,11 @@ export function ValuationsContent() {
                   </div>
 
                   <div className="grid gap-2 col-span-2">
-                    <Label>Cesionario</Label>
+                    <Label>{encargado}Encargado{encargado}</Label>
                     <Input
-                      placeholder="Ingrese cesionario"
-                      value={cesionario}
-                      onChange={(e) => setCesionario(e.target.value)}
+                      placeholder="Ingrese Encargado"
+                      value={encargado}
+                      onChange={(e) => setEncargado(e.target.value)}
                     />
                   </div>
 
@@ -469,7 +443,7 @@ export function ValuationsContent() {
                     <th className="px-4 py-3 text-left font-medium">Tipo</th>
                     <th className="px-4 py-3 text-left font-medium">Monto</th>
                     <th className="px-4 py-3 text-left font-medium">Estado</th>
-                    <th className="px-4 py-3 text-left font-medium">Cesionario</th>
+                    <th className="px-4 py-3 text-left font-medium">Encargado</th>
                     <th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
                     <th className="px-4 py-3 text-left font-medium">Fecha Fin</th>
                     <th className="px-4 py-3 text-left font-medium">Acciones</th>
@@ -491,7 +465,7 @@ export function ValuationsContent() {
                       <td className="px-4 py-4">
                         <StatusBadge status={item.status} />
                       </td>
-                      <td className="px-4 py-4">{item.cesionario}</td>
+                      <td className="px-4 py-4">{item.encargado}</td>
                       <td className="px-4 py-4">{item.date}</td>
                       <td className="px-4 py-4">{item.end_date || "-"}</td>
                       <td className="px-4 py-4">
