@@ -41,7 +41,6 @@ const navigation = [
   { name: "Proveedores", href: "/providers", icon: Users },
   { name: "Proyectos", href: "/projects", icon: FolderKanban },
   { name: "Documentos", href: "/documents", icon: FileText },
-
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
@@ -236,12 +235,12 @@ export function Sidebar() {
             >
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  JD
+                  SS
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-1 flex-col items-start text-left">
                 <span className="text-sm font-medium text-sidebar-foreground">
-                  Juan Delgado
+                  Sheran Saenz
                 </span>
                 <span className="text-xs text-muted-foreground">Administrador</span>
               </div>

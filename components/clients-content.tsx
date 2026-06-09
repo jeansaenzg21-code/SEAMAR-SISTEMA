@@ -48,14 +48,14 @@ const getClientColor = (name: string) => {
 
 export function ClientsContent() {
   const [open, setOpen] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
+  const [clients, setClients] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const cargarClientes = async () => {
   try {
     const response = await fetch("/api/clientes")
     const data = await response.json()
 
-    setClients(data)
+    setClients(Array.isArray(data) ? data : [])
   } catch (error) {
     console.error(error)
   }
