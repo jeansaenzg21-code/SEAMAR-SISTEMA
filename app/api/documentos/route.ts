@@ -267,13 +267,33 @@ try {
 
   } catch (error: any) {
 
-    console.error(error);
+  console.error(error);
 
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    });
+  if (error?.status === 503) {
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Gemini está temporalmente ocupado. Intente nuevamente en unos segundos."
+      },
+      {
+        status: 503
+      }
+    );
 
   }
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: error.message
+    },
+    {
+      status: 500
+    }
+  );
+
+}
 
 }

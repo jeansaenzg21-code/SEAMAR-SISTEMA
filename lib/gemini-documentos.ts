@@ -24,15 +24,25 @@ export async function procesarPdf(
   const base64 =
     buffer.toString("base64");
 
-  const response =
-    await ai.models.generateContent({
+  let ultimoError: any;
 
-      model: "gemini-2.5-flash",
+  for (
+    let intento = 1;
+    intento <= 3;
+    intento++
+  ) {
 
-      contents: [
+    try {
 
-        {
-          text: `
+      const response =
+        await ai.models.generateContent({
+
+          model: "gemini-2.5-flash",
+
+          contents: [
+
+            {
+              text: `
 Analiza este documento financiero peruano.
 
 Primero detecta el tipo de documento.
@@ -59,21 +69,54 @@ Si es VALORIZACION extrae:
 - periodo
 - fechaEjecucion (formato YYYY-MM-DD)
 `
-        },
+            },
 
-        {
-          inlineData: {
-            mimeType: "application/pdf",
-            data: base64
-          }
-        }
+            {
+              inlineData: {
+                mimeType:
+                  "application/pdf",
+                data: base64
+              }
+            }
 
-      ]
+          ]
 
-    });
+        });
 
-  return parsearJsonGemini(
-    response.text ?? "{}"
-  );
+      return parsearJsonGemini(
+        response.text ?? "{}"
+      );
+
+    } catch (error: any) {
+
+      ultimoError = error;
+
+      console.log(
+        `Gemini intento ${intento} falló`
+      );
+
+      if (
+        error?.status !== 503
+      ) {
+        throw error;
+      }
+
+      if (intento < 3) {
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              3000
+            )
+        );
+
+      }
+
+    }
+
+  }
+
+  throw ultimoError;
 
 }
