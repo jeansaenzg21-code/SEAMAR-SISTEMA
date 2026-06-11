@@ -35,8 +35,6 @@ import {
 } from "lucide-react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Clientes", href: "/clients", icon: Users },
-  { name: "Proveedores", href: "/providers", icon: Users },
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
@@ -50,12 +48,34 @@ const analytics = [
   { name: "Centro de Costos", href: "/analytics/cost-centers", icon: BarChart3 },
   { name: "Rentabilidad", href: "/analytics/profitability", icon: PieChart },
 ]
+const clientsSection = [
+  {
+    name: "Clientes",
+    href: "/clients",
+  },
+  {
+    name: "Cuentas por Cobrar",
+    href: "/accounts-receivable",
+  },
+]
 
+const providersSection = [
+  {
+    name: "Proveedores",
+    href: "/providers",
+  },
+  {
+    name: "Cuentas por Pagar",
+    href: "/accounts-payable",
+  },
+]
 
 export function Sidebar() {
   const pathname = usePathname()
   const [expandedSections, setExpandedSections] = useState({
   analytics: true,
+  clients: true,
+  providers: true,
 })
 const toggleSection = (section: keyof typeof expandedSections) => {
   setExpandedSections((prev) => ({
@@ -141,6 +161,89 @@ const toggleSection = (section: keyof typeof expandedSections) => {
             })}
           </div>
         </div>
+
+        <div className="pt-4">
+  <button
+    onClick={() => toggleSection("clients")}
+    className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground"
+  >
+    Clientes
+
+    <ChevronDown
+      className={cn(
+        "h-4 w-4 transition-transform",
+        expandedSections.clients ? "" : "-rotate-90"
+      )}
+    />
+  </button>
+
+  {expandedSections.clients && (
+    <div className="space-y-1">
+      {clientsSection.map((item) => {
+        const isActive = pathname === item.href
+
+        return (
+          <Link
+            key={item.name}
+            href={item.href}
+            className={cn(
+              "ml-4 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-sidebar-accent text-sidebar-primary"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            )}
+          >
+            <Users className="h-4 w-4" />
+            {item.name}
+          </Link>
+        )
+      })}
+    </div>
+  )}
+</div>
+
+
+
+
+<div className="pt-4">
+  <button
+    onClick={() => toggleSection("providers")}
+    className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground"
+  >
+    Proveedores
+
+    <ChevronDown
+      className={cn(
+        "h-4 w-4 transition-transform",
+        expandedSections.providers ? "" : "-rotate-90"
+      )}
+    />
+  </button>
+
+  {expandedSections.providers && (
+    <div className="space-y-1">
+      {providersSection.map((item) => {
+        const isActive = pathname === item.href
+
+        return (
+          <Link
+            key={item.name}
+            href={item.href}
+            className={cn(
+              "ml-4 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-sidebar-accent text-sidebar-primary"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            )}
+          >
+            <Users className="h-4 w-4" />
+            {item.name}
+          </Link>
+        )
+      })}
+    </div>
+  )}
+</div>
 
         {/* Analytics Section */}
         <div className="pt-4">
