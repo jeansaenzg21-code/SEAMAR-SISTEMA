@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Search, MessageSquare, Check, AlertTriangle, Clock } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -20,41 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 type ObservationStatus = "pending" | "in_progress" | "resolved"
 
-const observations = [
-  {
-    id: "OBS-001",
-    valuation: "VAL-2026-002",
-    client: "TDP",
-    observation: "Falta documentación de respaldo para validar las fechas del servicio.",
-    createdBy: "Ana López",
-    createdDate: "2026-06-05",
-    status: "pending" as ObservationStatus,
-    assignedTo: "Carlos Rodríguez",
-  },
-  {
-    id: "OBS-002",
-    valuation: "VAL-2026-001",
-    client: "Repsol",
-    observation: "El monto valorizado no coincide con la orden de servicio registrada.",
-    createdBy: "Juan Martínez",
-    createdDate: "2026-06-04",
-    status: "in_progress" as ObservationStatus,
-    assignedTo: "María García",
-    response: "Se está revisando la orden de servicio con el área operativa.",
-  },
-  {
-    id: "OBS-003",
-    valuation: "VAL-2026-003",
-    client: "Tralza",
-    observation: "La descripción del servicio requiere mayor detalle técnico.",
-    createdBy: "Ana López",
-    createdDate: "2026-06-01",
-    status: "resolved" as ObservationStatus,
-    assignedTo: "Juan Martínez",
-    response: "Se actualizó la descripción técnica del servicio valorizado.",
-    resolvedDate: "2026-06-03",
-  },
-]
+
 
 const statusStyles = {
   pending: {
@@ -75,12 +41,88 @@ const statusStyles = {
 }
 
 export function ObservationsContent() {
+  const [observations, setObservations] = useState<any[]>([])
+useEffect(() => {
+
+  cargarObservaciones()
+
+}, [])
+
+const cargarObservaciones =
+  async () => {
+
+    try {
+
+      const response =
+        await fetch(
+          "/api/valorizaciones"
+        )
+
+      const data =
+        await response.json()
+
+      const observedData =
+        data
+          .filter(
+            (v: any) =>
+              v.estado ===
+              "OBSERVADO"
+          )
+          .map(
+            (v: any) => ({
+
+              id:
+                `OBS-${v.id}`,
+
+              valuation:
+                v.id,
+
+              client:
+                v.proveedor,
+
+              observation:
+  v.observacion_sistema ||
+  "Sin observación registrada",
+
+              createdBy:
+                "Sistema",
+
+              createdDate:
+                v.fecha_observacion
+                  ?.split("T")[0]
+                || "",
+
+              status:
+                "pending" as ObservationStatus,
+
+              assignedTo:
+                v.encargado || "-",
+
+              response:
+                v.respuesta_observacion
+
+            })
+          )
+
+      setObservations(
+        observedData
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+    }
+
+}
+
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
   const [selectedObservation, setSelectedObservation] =
     useState<(typeof observations)[0] | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [response, setResponse] = useState("")
 
   const filteredObservations = observations.filter((o) => {
     if (activeTab !== "all" && o.status !== activeTab) return false
@@ -168,7 +210,7 @@ export function ObservationsContent() {
 
           <TabsContent value={activeTab} className="space-y-4">
             {filteredObservations.map((observation) => {
-              const statusConfig = statusStyles[observation.status]
+              const statusConfig = statusStyles[observation.status as ObservationStatus]
               const StatusIcon = statusConfig.icon
 
               return (
@@ -277,12 +319,10 @@ export function ObservationsContent() {
                 <div>
                   <Label htmlFor="response">Tu respuesta</Label>
                   <Textarea
-                    id="response"
-                    placeholder="Ingrese la respuesta a esta observación..."
-                    className="mt-2"
-                    rows={4}
-                    defaultValue={selectedObservation?.response}
-                  />
+  placeholder="Ingrese la respuesta a esta observación..."
+  value={response}
+  onChange={(e) => setResponse(e.target.value)}
+/>
                   <div className="space-y-2 mt-3">
   <Label htmlFor="observation-file">Adjuntar documento</Label>
 
@@ -320,9 +360,41 @@ export function ObservationsContent() {
                   <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
                     Guardar borrador
                   </Button>
-                  <Button onClick={() => setIsDetailModalOpen(false)}>
-                    Marcar como resuelto
-                  </Button>
+                  <Button onClick={() => {
+  if (!selectedObservation) return
+
+  const data = localStorage.getItem("fincontrol_valuations")
+  if (!data) return
+
+  const valuations = JSON.parse(data)
+
+  const updatedValuations = valuations.map((item: any) =>
+    String(item.id) === String(selectedObservation.valuation)
+      ? {
+    ...item,
+    status: "under_review",
+    respuesta_observacion: response,
+    archivo_respuesta_nombre: attachedFile?.name || "",
+  }
+      : item
+  )
+
+  localStorage.setItem(
+    "fincontrol_valuations",
+    JSON.stringify(updatedValuations)
+  )
+
+  setObservations((prev) =>
+    prev.filter((item) => String(item.valuation) !== String(selectedObservation.valuation))
+  )
+
+  setIsDetailModalOpen(false)
+  setResponse("")
+setAttachedFile(null)
+}}>
+ 
+  Marcar como resuelto
+</Button>
                 </>
               )}
             </DialogFooter>

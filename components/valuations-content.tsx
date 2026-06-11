@@ -1,7 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Filter, Download, Search, Pencil, Eye, Send } from "lucide-react"
+import { useEffect, useState } from "react"
+import {
+  Plus,
+  Filter,
+  Download,
+  Search,
+  Pencil,
+  Eye,
+  Send,
+  RefreshCw
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +47,7 @@ type Valuation = {
   date: string
   encargado: string
   archivo_nombre?: string
+  observacion_sistema?: string
 }
 
 
@@ -80,9 +90,100 @@ export function ValuationsContent() {
   const [description, setDescription] = useState("")
   const [amount, setAmount] = useState("")
   const [fecha, setFecha] = useState("")
-  const [fechaFin, setFechaFin] = useState("")
   const [encargado, setEncargado] = useState("")
   const [archivo, setArchivo] = useState<File | null>(null)
+  useEffect(() => {
+  cargarValorizaciones()
+}, [])
+
+const cargarValorizaciones = async () => {
+  try {
+    const response = await fetch("/api/valorizaciones")
+    const data = await response.json()
+
+    const valorizaciones = data.map((item: any) => ({
+  id: item.id,
+
+  client: item.proveedor || "",
+
+  orden_servicio:
+    item.numero_orden_servicio || "",
+
+  type:
+    item.negocio_operacion || "",
+
+  description:
+    item.descripcion || "",
+
+  amount:
+    Number(item.monto || 0),
+
+  status:
+    item.estado === "BORRADOR"
+      ? "draft"
+      : item.estado === "EN_REVISION"
+      ? "under_review"
+      : item.estado === "OBSERVADO"
+      ? "observed"
+      : item.estado === "APROBADO"
+      ? "approved"
+      : "draft",
+
+  date:
+    item.fecha_ejecucion
+      ?.split("T")[0] || "",
+
+  encargado:
+    item.encargado || "",
+
+  archivo_nombre:
+    item.archivo_nombre || "",
+
+  observacion_sistema:
+    item.observacion_sistema || "",
+}))
+
+    setValuations(valorizaciones)
+  } catch (error) {
+    console.error(error)
+  }
+}
+const sincronizarOneDrive = async () => {
+
+  try {
+    
+
+    const response =
+      await fetch(
+        "/api/sincronizar-valorizaciones",
+        {
+          method: "POST"
+        }
+      );
+
+    const data =
+      await response.json();
+
+    console.log(data);
+
+    await cargarValorizaciones();
+
+    alert(
+      `Sincronización completada.
+Nuevos archivos: ${data.nuevos}`
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "Error al sincronizar"
+    );
+
+  }
+
+}
 
   const filteredValuations = valuations.filter((v) => {
     if (statusFilter !== "all" && v.status !== statusFilter) return false
@@ -100,66 +201,62 @@ export function ValuationsContent() {
   })
 
   const limpiarFormulario = () => {
-    setEditingValuation(null)
-    setClient("")
-    setType("")
-    setOrdenServicio("")
-    setDescription("")
-    setAmount("")
-    setFecha("")
-    setFechaFin("")
-    setEncargado("")
-    setArchivo(null)
+  setEditingValuation(null)
+  setClient("")
+  setType("")
+  setOrdenServicio("")
+  setDescription("")
+  setAmount("")
+  setFecha("")
+  setEncargado("")
+  setArchivo(null)
+}
+
+  const guardarValorizacion = async () => {
+  if (!client || !description || !amount) {
+    alert("Completa los campos principales")
+    return
   }
 
-  const guardarValorizacion = () => {
-    if (!client || !type || !description || !amount) {
-      alert("Completa los campos principales")
+  try {
+    const response = await fetch("/api/valorizaciones", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cliente: client,
+        nombre_proyecto: type,
+        numero_orden_servicio: ordenServicio,
+        descripcion: description,
+        monto: Number(amount),
+        moneda: "PEN",
+        periodo: fecha,
+        encargado,
+        archivo_nombre: archivo?.name || null,
+        archivo_onedrive_id: null,
+        archivo_url: null,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!data.success) {
+      alert(data.message)
       return
     }
 
-    if (editingValuation) {
-      setValuations((prev) =>
-        prev.map((item) =>
-          item.id === editingValuation.id
-            ? {
-                ...item,
-                client,
-                type,
-                orden_servicio: ordenServicio,
-                description,
-                amount: Number(amount),
-                date: fecha,
-                end_date: fechaFin,
-                encargado,
-                archivo_nombre: archivo?.name || item.archivo_nombre,
-              }
-            : item
-        )
-      )
+    await cargarValorizaciones()
 
-      alert("Valorización actualizada correctamente")
-    } else {
-      const nuevaValorizacion: Valuation = {
-        id: valuations.length + 1,
-        client,
-        type,
-        orden_servicio: ordenServicio,
-        description,
-        amount: Number(amount),
-        status: "draft",
-        date: fecha,
-        encargado,
-        archivo_nombre: archivo?.name,
-      }
-
-      setValuations([nuevaValorizacion, ...valuations])
-      alert("Valorización creada correctamente")
-    }
+    alert("Valorización registrada correctamente")
 
     limpiarFormulario()
     setIsNewModalOpen(false)
+  } catch (error) {
+    console.error(error)
+    alert("Error al registrar valorización")
   }
+}
 
   const editarValorizacion = (item: Valuation) => {
     setEditingValuation(item)
@@ -174,29 +271,112 @@ export function ValuationsContent() {
     setIsNewModalOpen(true)
   }
 
-  const enviarRevision = (item: Valuation) => {
-    setValuations((prev) =>
-      prev.map((v) =>
-        v.id === item.id ? { ...v, status: "under_review" } : v
-      )
-    )
+  const enviarRevision = async (
+  item: Valuation
+) => {
 
-    alert("Valorización enviada a revisión")
+  try {
+    if (item.observacion_sistema) {
+
+  const enviarAObservaciones =
+    confirm(
+      `Se detectó la siguiente observación:\n\n${item.observacion_sistema}\n\n¿Desea enviar la valorización a Observaciones?`
+    );
+
+  if (!enviarAObservaciones) {
+    return;
   }
+
+  const response =
+    await fetch(
+      `/api/valorizaciones/${item.id}/estado`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          estado: "OBSERVADO",
+        }),
+      }
+    );
+
+  const data =
+    await response.json();
+
+  if (!data.success) {
+    alert("No se pudo actualizar");
+    return;
+  }
+
+  await cargarValorizaciones();
+
+  alert(
+    "Valorización enviada a Observaciones"
+  );
+
+  return;
+}
+
+    const response =
+      await fetch(
+        `/api/valorizaciones/${item.id}/estado`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            estado: "EN_REVISION",
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!data.success) {
+
+      alert(
+        "No se pudo enviar a revisión"
+      );
+
+      return;
+
+    }
+
+    await cargarValorizaciones();
+
+    alert(
+      "Valorización enviada a revisión"
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "Error al actualizar estado"
+    );
+
+  }
+
+}
 
   const descargarExcel = (item: Valuation) => {
     const encabezados = [
-      "ID Valorización",
-      "Cliente",
-      "N° Orden de Servicio",
-      "Tipo",
-      "Descripción",
-      "Monto",
-      "Estado",
-      "Encargado",
-      "Fecha de Inicio",
-      "Fecha de Fin",
-    ]
+  "ID Valorización",
+  "Cliente",
+  "N° Orden de Servicio",
+  "Tipo",
+  "Descripción",
+  "Monto",
+  "Estado",
+  "Encargado",
+  "Fecha"
+]
 
     const datos = [
       `VAL-2026-${String(item.id).padStart(3, "0")}`,
@@ -279,10 +459,25 @@ export function ValuationsContent() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="border-border">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
+
+  <Button
+    variant="ghost"
+    size="icon"
+    title="Sincronizar OneDrive"
+    onClick={sincronizarOneDrive}
+  >
+    <RefreshCw
+      className="h-4 w-4 text-blue-500"
+    />
+  </Button>
+
+  <Button
+    variant="outline"
+    className="border-border"
+  >
+    <Download />
+    Exportar
+  </Button>
 
             <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
               <DialogTrigger asChild>
@@ -360,17 +555,10 @@ export function ValuationsContent() {
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label>Fecha de Fin</Label>
-                    <Input
-                      type="date"
-                      value={fechaFin}
-                      onChange={(e) => setFechaFin(e.target.value)}
-                    />
-                  </div>
+                
 
                   <div className="grid gap-2 col-span-2">
-                    <Label>{encargado}Encargado{encargado}</Label>
+                    <Label>Encargado</Label>
                     <Input
                       placeholder="Ingrese Encargado"
                       value={encargado}
@@ -441,7 +629,6 @@ export function ValuationsContent() {
                     <th className="px-4 py-3 text-left font-medium">Estado</th>
                     <th className="px-4 py-3 text-left font-medium">Encargado</th>
                     <th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
-                    <th className="px-4 py-3 text-left font-medium">Fecha Fin</th>
                     <th className="px-4 py-3 text-left font-medium">Acciones</th>
                   </tr>
                 </thead>

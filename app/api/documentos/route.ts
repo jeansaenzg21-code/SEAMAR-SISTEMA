@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { leerExcel } from "@/lib/excel-reader";
+import pool from "@/lib/mysql";
+import { buscarOSPorNumero } from "@/lib/onedrive";
+import { guardarValorizacion } from "@/lib/valorizaciones";
 
 export const runtime = "nodejs";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
+function parsearJsonGemini(
+  texto: string
+) {
+
+  const limpio =
+    texto
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+  return JSON.parse(limpio);
+
+}
 
 export async function POST(req: Request) {
 
@@ -27,12 +44,86 @@ export async function POST(req: Request) {
     // Convertir archivo a base64
     const bytes = await file.arrayBuffer();
 
-    const base64 = Buffer.from(bytes).toString("base64");
+const buffer = Buffer.from(bytes);
+
+const base64 = buffer.toString("base64");
     console.log(
   "GEMINI KEY:",
   process.env.GEMINI_API_KEY?.slice(0, 10)
 )
 
+if (
+  file.name.toLowerCase().endsWith(".xlsx") ||
+  file.name.toLowerCase().endsWith(".xls")
+) {
+
+  const contenidoExcel =
+    await leerExcel(buffer);
+
+  const response =
+    await ai.models.generateContent({
+
+      model: "gemini-2.5-flash",
+
+      contents: `
+Analiza este archivo Excel.
+
+Puede ser:
+- valorizacion
+- orden_servicio
+- factura
+- sunat
+- afp
+- recibo_honorarios
+
+Devuelve SOLO JSON válido.
+
+Si es valorizacion extrae:
+- tipoDocumento
+- proveedor
+- ruc
+- negocioOperacion
+- numeroOrdenServicio
+- descripcion
+- monto
+- moneda
+- periodo
+- fechaEjecucion (formato YYYY-MM-DD)
+
+${contenidoExcel}
+`
+
+    });
+try {
+
+  const json =
+  parsearJsonGemini(
+    response.text ?? "{}"
+  );
+
+  if (
+    json.tipoDocumento?.toLowerCase() ===
+    "valorizacion"
+  ) {
+
+    await guardarValorizacion(json);
+
+  }
+
+} catch (e) {
+
+  console.error(
+    "Error procesando valorización",
+    e
+  );
+
+}
+  return NextResponse.json({
+    success: true,
+    data: response.text
+  });
+
+}
     // Gemini analiza PDF
     const response = await ai.models.generateContent({
 
@@ -52,11 +143,34 @@ export async function POST(req: Request) {
             - sunat
             - recibo_honorarios
             - afp
+            - valorizacion
+            - orden_servicio
 
 
             Devuelve SOLO JSON válido.
+            Si es VALORIZACION extrae:
+- tipoDocumento
+- proveedor
+- ruc
+- negocioOperacion
+- numeroOrdenServicio
+- descripcion
+- monto
+- moneda
+- periodo
+- fechaEjecucion (formato YYYY-MM-DD)
+            
+            Si es ORDEN_SERVICIO extrae:
+- tipoDocumento
+- proveedor
+- ruc
+- numeroOrdenServicio
+- descripcionServicio
+- montoReferencial
+- fechaEmision
+
             Si es FACTURA extrae:
-            -ipoDocumento
+            - tipoDocumento
             - numeroFactura
             - empresaEmisora
             - rucEmisor
@@ -117,6 +231,31 @@ export async function POST(req: Request) {
       ]
 
     });
+
+    try {
+
+  const json =
+    parsearJsonGemini(
+      response.text ?? "{}"
+    );
+
+  if (
+    json.tipoDocumento?.toLowerCase() ===
+    "valorizacion"
+  ) {
+
+    await guardarValorizacion(json);
+
+  }
+
+} catch (e) {
+
+  console.error(
+    "Error procesando valorización",
+    e
+  );
+
+}
 
     return NextResponse.json({
 

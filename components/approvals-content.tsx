@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Search, Check, X, Eye, Clock, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -28,30 +28,11 @@ type Approval = {
   submittedBy: string
   submittedDate: string
   priority: "high" | "medium" | "low"
+  respuesta_observacion?: string
+archivo_respuesta_nombre?: string
 }
 
-const initialApprovals: Approval[] = [
-  {
-    id: "VAL-2026-001",
-    client: "Repsol",
-    description: "Valorización por mantenimiento offshore",
-    amount: "S/ 125,000",
-    status: "under_review",
-    submittedBy: "María García",
-    submittedDate: "2026-06-05",
-    priority: "high",
-  },
-  {
-    id: "VAL-2026-002",
-    client: "BPO",
-    description: "Evaluación de plataforma marítima",
-    amount: "S/ 320,000",
-    status: "under_review",
-    submittedBy: "Juan Martínez",
-    submittedDate: "2026-06-04",
-    priority: "medium",
-  },
-]
+const initialApprovals: Approval[] = []
 
 function StatusBadge({ status }: { status: Status }) {
   const labels = {
@@ -75,14 +56,76 @@ function StatusBadge({ status }: { status: Status }) {
 
 export function ApprovalsContent() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [approvals, setApprovals] = useState(initialApprovals)
+  const [approvals, setApprovals] = useState<Approval[]>([])
+  useEffect(() => {
+
+  async function cargarAprobaciones() {
+
+    const response =
+      await fetch(
+        "/api/valorizaciones"
+      );
+
+    const data =
+      await response.json();
+
+    const approvalsData =
+      data
+        .filter(
+          (v: any) =>
+            v.estado ===
+            "EN_REVISION"
+        )
+        .map((v: any) => ({
+
+          id: v.id,
+
+          client:
+            v.proveedor,
+
+          description:
+            v.descripcion,
+
+          amount:
+            `S/ ${v.monto}`,
+
+          status:
+            "under_review",
+
+          submittedBy:
+            v.encargado ??
+            "-",
+
+          submittedDate:
+            v.fecha_revision,
+
+          priority:
+            "medium",
+
+          respuesta_observacion:
+            v.respuesta_observacion,
+
+          archivo_respuesta_nombre:
+            v.archivo_respuesta_nombre
+
+        }));
+
+    setApprovals(
+      approvalsData
+    );
+
+  }
+
+  cargarAprobaciones();
+
+}, []);
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null)
   const [isApproveOpen, setIsApproveOpen] = useState(false)
   const [isObserveOpen, setIsObserveOpen] = useState(false)
   const [observation, setObservation] = useState("")
 
   const filteredApprovals = approvals.filter((item) =>
-    item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(item.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -91,32 +134,82 @@ export function ApprovalsContent() {
   const observed = approvals.filter((item) => item.status === "observed")
   const approved = approvals.filter((item) => item.status === "approved")
 
-  const approveItem = () => {
-    if (!selectedApproval) return
+  const approveItem = async () => {
 
-    setApprovals((prev) =>
-      prev.map((item) =>
-        item.id === selectedApproval.id ? { ...item, status: "approved" } : item
+  if (!selectedApproval) return
+
+  try {
+
+    const response =
+      await fetch(
+        `/api/valorizaciones/${selectedApproval.id}/estado`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            estado: "APROBADO",
+          }),
+        }
       )
-    )
 
-    setIsApproveOpen(false)
-    setSelectedApproval(null)
+    const data =
+      await response.json()
+
+    if (!data.success) {
+
+      alert("No se pudo aprobar")
+
+      return
+
+    }
+
+    alert("Valorización aprobada")
+
+    location.reload()
+
+  } catch (error) {
+
+    console.error(error)
+
+    alert("Error al aprobar")
+
   }
+
+}
 
   const observeItem = () => {
-    if (!selectedApproval) return
+  if (!selectedApproval) return
 
-    setApprovals((prev) =>
-      prev.map((item) =>
-        item.id === selectedApproval.id ? { ...item, status: "observed" } : item
-      )
-    )
+  const data = localStorage.getItem("fincontrol_valuations")
+  if (!data) return
 
-    setObservation("")
-    setIsObserveOpen(false)
-    setSelectedApproval(null)
-  }
+  const valuations = JSON.parse(data)
+
+  const updatedValuations = valuations.map((item: any) =>
+    String(item.id) === String(selectedApproval.id)
+      ? {
+          ...item,
+          status: "observed",
+          observacion: observation,
+        }
+      : item
+  )
+
+  localStorage.setItem(
+    "fincontrol_valuations",
+    JSON.stringify(updatedValuations)
+  )
+
+  setApprovals((prev) =>
+    prev.filter((item) => String(item.id) !== String(selectedApproval.id))
+  )
+
+  setObservation("")
+  setIsObserveOpen(false)
+  setSelectedApproval(null)
+}
 
   const renderCard = (item: Approval) => (
     <Card key={item.id} className="bg-card border-border">
@@ -257,7 +350,25 @@ export function ApprovalsContent() {
               <DialogDescription>
                 ¿Deseas aprobar la valorización {selectedApproval?.id}?
               </DialogDescription>
+       
             </DialogHeader>
+            {selectedApproval?.respuesta_observacion && (
+  <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+    <p className="text-sm font-medium text-green-400">
+      Respuesta a observación
+    </p>
+
+    <p className="text-sm mt-1">
+      {selectedApproval.respuesta_observacion}
+    </p>
+
+    {selectedApproval.archivo_respuesta_nombre && (
+      <p className="text-xs text-muted-foreground mt-2">
+        Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
+      </p>
+    )}
+  </div>
+)}
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsApproveOpen(false)}>
                 Cancelar

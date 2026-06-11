@@ -25,8 +25,9 @@ import {
   TrendingUp,
   Plus,
   DollarSignIcon,
+  ArrowUpRight
 } from "lucide-react"
-import Link from "next/link"
+import Link from "next/link"  
 import { useEffect, useState } from "react"
 import {
   DropdownMenu,
@@ -87,6 +88,8 @@ const [projectForm, setProjectForm] =
     nombre: "",
   })
   const [projects, setProjects] = useState<any[]>([])
+
+  const recentProjects = projects
 const validarFormulario = () => {
   const nuevosErrores = {
     razon_social: "",
@@ -263,7 +266,8 @@ if (!client) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats Cards */}
+<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-card border-border">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -327,9 +331,9 @@ if (!client) {
         </Card>
       </div>
 
-      {/* Main Content */} 
+      {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-3">
-      {/* Contact Info */} 
+      {/* Contact Info */}
       <Card className="bg-card border-border lg:col-span-1">
   <CardHeader>
   <div className="flex items-center justify-between">
@@ -369,7 +373,18 @@ if (!client) {
     </DropdownMenu>
   </div>
 </CardHeader>
+<CardContent className="space-y-4">
+  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+    <div
+      className="h-full bg-primary rounded-full"
+      style={{ width: "0%" }}
+    />
+  </div>
 
+  <div className="flex justify-end text-sm text-muted-foreground">
+    0%
+  </div>
+</CardContent>
   <CardContent className="space-y-4 pb-6">
     {editMode && (
   <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
@@ -490,7 +505,7 @@ if (!client) {
   errors.correo
     ? "border-red-500"
     : ""
-    
+   
 }
 
   />
@@ -637,13 +652,13 @@ if (!client) {
 )}
  </CardContent>
 </Card>
-        {/* Estado de Cobranza */} 
-        <Card className="bg-card border-border lg:col-span-2"> 
-          <CardHeader> <CardTitle>Estado de Cobranza</CardTitle> 
-          <CardDescription> 
-            Resumen de cuentas por cobrar 
-          </CardDescription> 
-        </CardHeader> 
+        {/* Estado de Cobranza */}
+        <Card className="bg-card border-border lg:col-span-2">
+          <CardHeader> <CardTitle>Estado de Cobranza</CardTitle>
+          <CardDescription>
+            Resumen de cuentas por cobrar
+          </CardDescription>
+        </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-3 mb-6">
 
@@ -724,8 +739,8 @@ if (!client) {
     <span>S/ {cobranza.total.toLocaleString()}</span>
   </div>
 </div>
-        </CardContent> 
-      </Card> 
+        </CardContent>
+      </Card>
     </div>
 
 
@@ -735,15 +750,15 @@ if (!client) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Proyectos</CardTitle>
-              <CardDescription>Proyectos asociados al cliente</CardDescription>
+              <CardTitle>Proyectos Registrados</CardTitle>
+<CardDescription>Proyectos activos y recientemente completados</CardDescription>
             </div>
-            
+           
 
 
 
               <Button variant="outline" size="sm">Ver Todos</Button>
-            
+           
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -758,150 +773,50 @@ if (!client) {
 
   ) : (
 
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
 
-  {(Array.isArray(projects) ? projects : []).map((project) => (
+  {(Array.isArray(recentProjects) ? recentProjects : []).map((project) => (
 
-    <Card
-      key={project.id}
-      className="bg-card border-border"
-    >
-
-      <CardHeader className="pb-2">
-
-        <div className="flex items-center justify-between">
-
-          <CardTitle className="text-base">
-            {project.nombre}
-          </CardTitle>
-
-          <div className="flex items-center gap-2">
-
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium
-              ${
-                project.estado === "EN_CURSO"
-                  ? "bg-green-500/15 text-green-500"
-                  : project.estado ===
-                    "FINALIZADO"
-                  ? "bg-blue-500/15 text-blue-500"
-                  : "bg-red-500/15 text-red-500"
-              }`}
-            >
-              {project.estado ===
-              "EN_CURSO"
-                ? "Activo"
-                : project.estado ===
-                  "FINALIZADO"
-                ? "Finalizado"
-                : "Cancelado"}
-            </span>
-
-            <DropdownMenu>
-
-              <DropdownMenuTrigger
-                asChild
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent
-                align="end"
-              >
-                <DropdownMenuItem
-  onClick={() =>
-    cambiarEstadoProyecto(
-      project.id,
-      "EN_CURSO"
-    )
-  }
+    <div
+  key={project.id}
+  className="rounded-lg border border-border bg-card p-6"
 >
-  Activo
-</DropdownMenuItem>
+  <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center gap-3">
+      <h3 className="text-lg font-semibold">
+        {project.nombre}
+      </h3>
 
-                <DropdownMenuItem
-  onClick={() =>
-    cambiarEstadoProyecto(
-      project.id,
-      "FINALIZADO"
-    )
-  }
->
-  Finalizado
-</DropdownMenuItem>
+      <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-xs font-medium text-cyan-400">
+        {project.estado === "EN_CURSO"
+          ? "Activo"
+          : project.estado === "FINALIZADO"
+          ? "Finalizado"
+          : "Cancelado"}
+      </span>
+    </div>
 
-                <DropdownMenuItem
-  onClick={() =>
-    cambiarEstadoProyecto(
-      project.id,
-      "CANCELADO"
-    )
-  }
->
-  Cancelado
-</DropdownMenuItem>
-              </DropdownMenuContent>
+   <div className="flex items-center gap-6">
+  <span className="text-sm text-muted-foreground">
+    0%
+  </span>
 
-            </DropdownMenu>
-
-          </div>
-
-        </div>
-
-      </CardHeader>
-
-      <CardContent>
-
-        <div className="space-y-3 text-sm">
-
-  <div className="flex justify-between">
-    <span className="text-muted-foreground">
-      Inicio
-    </span>
-
-    <span className="font-medium">
-      {new Date(
-        project.fecha_inicio
-      ).toLocaleDateString("es-PE")}
-    </span>
-  </div>
-
-  <div className="flex justify-between">
-    <span className="text-muted-foreground">
-      Fin
-    </span>
-
-    <span className="font-medium">
-      {project.fecha_fin
-        ? new Date(
-            project.fecha_fin
-          ).toLocaleDateString("es-PE")
-        : "En curso"}
-    </span>
-  </div>
-
-</div>
-
-
-      </CardContent>
-
-      <div className="flex justify-end border-t border-border pt-4">
-  <Button
-    variant="ghost"
-    size="sm"
-    className="text-primary hover:text-primary"
-  >
-    Ver detalles 
+  <Link href={`/projects/${project.id}`}>
+  <Button variant="ghost" size="sm">
+    Ver
+    <ArrowUpRight className="ml-2 h-4 w-4" />
   </Button>
+</Link>
 </div>
+  </div>
 
-    </Card>
+  <div className="mt-4 h-2 w-full rounded-full bg-muted overflow-hidden">
+    <div
+      className="h-full rounded-full bg-cyan-400"
+      style={{ width: "0%" }}
+    />
+  </div>
+</div>
 
   ))}
 

@@ -6,7 +6,7 @@ export async function GET() {
     const token = await getAccessToken();
 
     const response = await fetch(
-      "https://graph.microsoft.com/v1.0/users/trainee.soporte@paredescano.com",
+      "https://graph.microsoft.com/v1.0/users/trainee.soporte@paredescano.com/drive/items/01JGBJAHCF5PBYX3LAG5D26BVOZDA6IQDJ/children",
       {
         headers: {
           Authorization: `Bearer ${token}`,
