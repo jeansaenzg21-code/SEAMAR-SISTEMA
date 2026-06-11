@@ -15,7 +15,8 @@ export async function PATCH(
 
     const {
   estado,
-  observacion
+  observacion,
+  observation_status
 } = body;
 
     await pool.query(
@@ -39,35 +40,33 @@ export async function PATCH(
     ELSE fecha_observacion
   END,
 
-  observaciones =
-    CASE
-      WHEN ? = 'OBSERVADO'
-      THEN ?
-      ELSE observaciones
-    END,
+observation_status =
+  CASE
+    WHEN ? = 'OBSERVADO'
+    THEN 'pending'
+    ELSE observation_status
+  END,
 
     fecha_aprobacion =
-      CASE
-        WHEN ? = 'APROBADO'
-        THEN NOW()
-        ELSE fecha_aprobacion
-      END
+  CASE
+    WHEN ? = 'APROBADO'
+    THEN NOW()
+    ELSE fecha_aprobacion
+  END,
+
+observation_status =
+  COALESCE(?, observation_status)
 
   WHERE id = ?
   `,
   [
   estado,
-
   estado,
-
   estado,
-
   estado,
-
   observacion,
-
   estado,
-
+  observation_status,
   id
 ]
 );

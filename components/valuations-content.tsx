@@ -5,7 +5,6 @@ import {
   Plus,
   Filter,
   Download,
-  Search,
   Pencil,
   Eye,
   Send,
@@ -33,6 +32,16 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Calendar } from "lucide-react"
+import { MoreVertical } from "lucide-react"
+import { FileText } from "lucide-react"
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type Status = "draft" | "under_review" | "observed" | "approved" | "invoiced"
 
@@ -48,6 +57,7 @@ type Valuation = {
   encargado: string
   archivo_nombre?: string
   observacion_sistema?: string
+archivo_url?: string
 }
 
 
@@ -92,6 +102,7 @@ export function ValuationsContent() {
   const [fecha, setFecha] = useState("")
   const [encargado, setEncargado] = useState("")
   const [archivo, setArchivo] = useState<File | null>(null)
+  const [selectedPeriod, setSelectedPeriod] = useState("")
   useEffect(() => {
   cargarValorizaciones()
 }, [])
@@ -225,18 +236,27 @@ Nuevos archivos: ${data.nuevos}`
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        cliente: client,
-        nombre_proyecto: type,
-        numero_orden_servicio: ordenServicio,
-        descripcion: description,
-        monto: Number(amount),
-        moneda: "PEN",
-        periodo: fecha,
-        encargado,
-        archivo_nombre: archivo?.name || null,
-        archivo_onedrive_id: null,
-        archivo_url: null,
-      }),
+  proveedor: client,
+  ruc: null,
+  negocio_operacion: type,
+  numero_orden_servicio: ordenServicio,
+  descripcion: description,
+  monto: Number(amount),
+
+  estado: "BORRADOR",
+
+  moneda: "PEN",
+  periodo: fecha,
+  fecha_ejecucion: fecha,
+  encargado,
+  archivo_nombre: archivo?.name || null,
+  archivo_onedrive_id: null,
+  archivo_url: null,
+  respaldo_nombre: archivo?.name || null,
+  respaldo_onedrive_id: null,
+  respaldo_url: null,
+  
+}),
     })
 
     const data = await response.json()
@@ -273,6 +293,7 @@ Nuevos archivos: ${data.nuevos}`
 
   const enviarRevision = async (
   item: Valuation
+
 ) => {
 
   try {
@@ -319,7 +340,7 @@ Nuevos archivos: ${data.nuevos}`
   return;
 }
 
-    const response =
+        const response =
       await fetch(
         `/api/valorizaciones/${item.id}/estado`,
         {
@@ -338,32 +359,23 @@ Nuevos archivos: ${data.nuevos}`
       await response.json();
 
     if (!data.success) {
-
-      alert(
-        "No se pudo enviar a revisión"
-      );
-
+      alert("No se pudo enviar a revisión");
       return;
-
     }
 
     await cargarValorizaciones();
 
-    alert(
-      "Valorización enviada a revisión"
-    );
+    alert("Valorización enviada a revisión");
 
   } catch (error) {
-
     console.error(error);
-
-    alert(
-      "Error al actualizar estado"
-    );
-
+    alert("Error al enviar a revisión");
   }
+};
 
-}
+  
+
+
 
   const descargarExcel = (item: Valuation) => {
     const encabezados = [
@@ -408,7 +420,7 @@ Nuevos archivos: ${data.nuevos}`
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Valorizaciones</h1>
@@ -419,15 +431,7 @@ Nuevos archivos: ${data.nuevos}`
 
         <div className="flex flex-col md:flex-row gap-4 justify-between">
           <div className="flex flex-1 gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar valorizaciones..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-secondary border-border"
-              />
-            </div>
+
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-44 bg-secondary border-border">
@@ -456,6 +460,12 @@ Nuevos archivos: ${data.nuevos}`
                 <SelectItem value="BPO">BPO</SelectItem>
               </SelectContent>
             </Select>
+            <input
+  type="month"
+  value={selectedPeriod}
+  onChange={(e) => setSelectedPeriod(e.target.value)}
+  className="h-10 w-[180px] rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none [color-scheme:dark]"
+/>
           </div>
 
           <div className="flex gap-3">
@@ -567,9 +577,9 @@ Nuevos archivos: ${data.nuevos}`
                   </div>
 
                   <div className="grid gap-2 col-span-2">
-                    <Label>Descripción</Label>
+                    <Label>Descripción / Nombre del Proyecto</Label>
                     <Textarea
-                      placeholder="Introduzca la descripción de la valorización..."
+                      placeholder="Introduzca la descripción o Nombre del Proyecto..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                     />
@@ -595,10 +605,26 @@ Nuevos archivos: ${data.nuevos}`
                     />
 
                     {(archivo || editingValuation?.archivo_nombre) && (
-                      <p className="text-xs text-muted-foreground">
-                        Archivo: {archivo?.name || editingValuation?.archivo_nombre}
-                      </p>
-                    )}
+  <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+    <p className="mb-2 text-sm font-medium">
+      Documentos adjuntos
+    </p>
+
+    <div className="flex items-center gap-3">
+  <FileText className="h-5 w-5 text-blue-400" />
+
+  <div>
+    <p className="text-sm font-medium">
+      {archivo?.name || editingValuation?.archivo_nombre}
+    </p>
+
+    <p className="text-xs text-muted-foreground">
+      Documento de respaldo
+    </p>
+  </div>
+</div>
+  </div>
+)}
                   </div>
                 </div>
 
@@ -622,14 +648,16 @@ Nuevos archivos: ${data.nuevos}`
                 <thead className="border-b bg-secondary">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">ID</th>
-                    <th className="px-4 py-3 text-left font-medium">Cliente</th>
-                    <th className="px-4 py-3 text-left font-medium">N° O/S</th>
-                    <th className="px-4 py-3 text-left font-medium">Tipo</th>
-                    <th className="px-4 py-3 text-left font-medium">Monto</th>
-                    <th className="px-4 py-3 text-left font-medium">Estado</th>
-                    <th className="px-4 py-3 text-left font-medium">Encargado</th>
-                    <th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
-                    <th className="px-4 py-3 text-left font-medium">Acciones</th>
+<th className="px-4 py-3 text-left font-medium">Cliente</th>
+<th className="px-4 py-3 text-left font-medium">Nombre P.</th>
+<th className="px-4 py-3 text-left font-medium">N° O/S</th>
+<th className="px-4 py-3 text-left font-medium">Tipo</th>
+<th className="px-4 py-3 text-left font-medium">Monto</th>
+<th className="px-4 py-3 text-left font-medium">Estado</th>
+<th className="px-4 py-3 text-left font-medium">Encargado</th>
+<th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
+<th className="px-4 py-3 text-left font-medium">Documentos</th>
+<th className="px-4 py-3 text-left font-medium">Acciones</th>
                   </tr>
                 </thead>
 
@@ -640,8 +668,15 @@ Nuevos archivos: ${data.nuevos}`
                         VAL-2026-{String(item.id).padStart(3, "0")}
                       </td>
                       <td className="px-4 py-4">{item.client}</td>
-                      <td className="px-4 py-4">{item.orden_servicio}</td>
-                      <td className="px-4 py-4">{item.type}</td>
+
+<td className="px-4 py-4 max-w-[220px]">
+  <p className="line-clamp-2 text-sm font-medium">
+    {item.description || "Sin proyecto"}
+  </p>
+</td>
+
+<td className="px-4 py-4">{item.orden_servicio}</td>
+<td className="px-4 py-4">{item.type}</td>
                       <td className="px-4 py-4">
                         S/ {item.amount.toLocaleString("es-PE")}
                       </td>
@@ -651,44 +686,60 @@ Nuevos archivos: ${data.nuevos}`
                       <td className="px-4 py-4">{item.encargado}</td>
                       <td className="px-4 py-4">{item.date}</td>
                       <td className="px-4 py-4">
-                        <div className="flex gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() =>
-                              alert(
-                                `Valorización: VAL-2026-${String(item.id).padStart(3, "0")}\nCliente: ${item.client}\nMonto: S/ ${item.amount}\nServicio: ${item.description}`
-                              )
-                            }
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+  {item.archivo_url ? (
+    <a
+      href={item.archivo_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-400 text-xs hover:underline"
+    >
+      Ver documento
+    </a>
+  ) : (
+    <span className="text-muted-foreground text-xs">
+      Sin adjunto
+    </span>
+  )}
+</td>
+                      <td className="px-4 py-4">
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button size="icon" variant="outline">
+        <MoreVertical className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
 
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => editarValorizacion(item)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem
+        onClick={() =>
+          alert(
+            `Valorización: VAL-2026-${String(item.id).padStart(3, "0")}\nCliente: ${item.client}\nMonto: S/ ${item.amount}\nServicio: ${item.description}`
+          )
+        }
+      >
+        Ver
+      </DropdownMenuItem>
 
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => enviarRevision(item)}
-                          >
-                            <Send className="h-4 w-4" />
-                          </Button>
+      <DropdownMenuItem
+        onClick={() => editarValorizacion(item)}
+      >
+        Editar
+      </DropdownMenuItem>
 
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => descargarExcel(item)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+      <DropdownMenuItem
+        onClick={() => enviarRevision(item)}
+      >
+        Enviar a revisión
+      </DropdownMenuItem>
+
+      <DropdownMenuItem
+        onClick={() => descargarExcel(item)}
+      >
+        Descargar
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</td>
                     </tr>
                   ))}
                 </tbody>

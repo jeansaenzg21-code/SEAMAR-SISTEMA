@@ -93,7 +93,7 @@ const cargarObservaciones =
                 || "",
 
               status:
-                "pending" as ObservationStatus,
+  (v.observation_status || "pending") as ObservationStatus,
 
               assignedTo:
                 v.encargado || "-",
@@ -273,12 +273,34 @@ const cargarObservaciones =
                           </p>
 
                           <Button
-                            variant="outline"
+                            variant="outline" 
                             size="sm"
-                            onClick={() => {
-                              setSelectedObservation(observation)
-                              setIsDetailModalOpen(true)
-                            }}
+                           onClick={async () => {
+  if (observation.status === "pending") {
+    await fetch(
+  `/api/valorizaciones/${observation.valuation}/estado`,
+  {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      observation_status: "in_progress",
+    }),
+  }
+)
+    setObservations((prev) =>
+      prev.map((o) =>
+        o.id === observation.id
+          ? { ...o, status: "in_progress" }
+          : o
+      )
+    )
+  }
+
+  setSelectedObservation(observation)
+  setIsDetailModalOpen(true)
+}}
                           >
                             {observation.status === "resolved"
                               ? "Ver detalles"
@@ -372,7 +394,7 @@ const cargarObservaciones =
     String(item.id) === String(selectedObservation.valuation)
       ? {
     ...item,
-    status: "under_review",
+    status: "resolved",
     respuesta_observacion: response,
     archivo_respuesta_nombre: attachedFile?.name || "",
   }

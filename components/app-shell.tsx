@@ -11,7 +11,6 @@ import {
   Users,
   Settings,
   Bell,
-  Search,
   ChevronDown,
   Anchor,
   Sparkles,
@@ -97,16 +96,7 @@ const toggleSection = (section: keyof typeof expandedSections) => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="h-9 bg-sidebar-accent pl-9 text-sm border-sidebar-border focus-visible:ring-sidebar-ring"
-          />
-        </div>
-      </div>
+      
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
@@ -357,11 +347,13 @@ export function Header() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col pl-64">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <div className="flex min-h-screen overflow-x-hidden">
+  <Sidebar />
+  <div className="flex flex-1 min-w-0 flex-col pl-64 overflow-x-hidden">
+    <Header />
+    <main className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+      {children}
+    </main>
       </div>
     </div>
   )

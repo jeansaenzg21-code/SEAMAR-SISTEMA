@@ -69,13 +69,7 @@ export function ApprovalsContent() {
     const data =
       await response.json();
 
-    const approvalsData =
-      data
-        .filter(
-          (v: any) =>
-            v.estado ===
-            "EN_REVISION"
-        )
+    const approvalsData = data
         .map((v: any) => ({
 
           id: v.id,
@@ -90,7 +84,15 @@ export function ApprovalsContent() {
             `S/ ${v.monto}`,
 
           status:
-            "under_review",
+  v.estado === "BORRADOR"
+    ? "draft"
+    : v.estado === "EN_REVISION"
+    ? "under_review"
+    : v.estado === "OBSERVADO"
+    ? "observed"
+    : v.estado === "APROBADO"
+    ? "approved"
+    : "draft",
 
           submittedBy:
             v.encargado ??
@@ -187,20 +189,21 @@ export function ApprovalsContent() {
 
   const valuations = JSON.parse(data)
 
-  const updatedValuations = valuations.map((item: any) =>
-    String(item.id) === String(selectedApproval.id)
-      ? {
-          ...item,
-          status: "observed",
-          observacion: observation,
-        }
-      : item
-  )
+    const updatedValuations = valuations.map((item: any) =>
+      String(item.id) === String(selectedApproval.id)
+        ? {
+            ...item,
+            status: "observed",
+            observation_status: "pending",
+            observacion: observation,
+          }
+        : item
+    )
 
-  localStorage.setItem(
-    "fincontrol_valuations",
-    JSON.stringify(updatedValuations)
-  )
+    localStorage.setItem(
+      "fincontrol_valuations",
+      JSON.stringify(updatedValuations)
+    )
 
   setApprovals((prev) =>
     prev.filter((item) => String(item.id) !== String(selectedApproval.id))
