@@ -10,6 +10,74 @@ export const runtime = "nodejs";
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
+
+async function guardarDocumento(
+  json: any,
+  file: File
+) {
+
+  try {
+
+    await pool.query(
+      `
+      INSERT INTO documentos (
+
+        nombre_archivo,
+
+        tipo_documento,
+
+        empresa_detectada,
+
+        fecha_documento,
+
+        fecha_vencimiento,
+
+        monto,
+
+        estado_procesamiento
+
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+
+        file.name,
+
+        json.tipoDocumento || null,
+
+        json.empresaEmisora ||
+        json.proveedor ||
+        json.empresa ||
+        null,
+
+        json.fechaEmision ||
+        json.fechaPago ||
+        null,
+
+        json.fechaVencimiento ||
+        null,
+
+        json.montoTotal ||
+        json.monto ||
+        json.importePagado ||
+        null,
+
+        "PROCESADO"
+
+      ]
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Error guardando documento",
+      error
+    );
+
+  }
+
+}
+
 function parsearJsonGemini(
   texto: string
 ) {
@@ -101,6 +169,11 @@ try {
     response.text ?? "{}"
   );
 
+  await guardarDocumento(
+  json,
+  file
+);
+
   if (
     json.tipoDocumento?.toLowerCase() ===
     "valorizacion"
@@ -127,7 +200,7 @@ try {
     // Gemini analiza PDF
     const response = await ai.models.generateContent({
 
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
 
       contents: [
 
@@ -238,6 +311,11 @@ try {
     parsearJsonGemini(
       response.text ?? "{}"
     );
+
+    await guardarDocumento(
+  json,
+  file
+);
 
   if (
     json.tipoDocumento?.toLowerCase() ===
