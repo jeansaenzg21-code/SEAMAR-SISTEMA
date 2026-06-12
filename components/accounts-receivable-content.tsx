@@ -37,6 +37,8 @@ type CuentaPorCobrar = {
   estado: "PENDIENTE" | "VENCIDO" | "FACTURADO"
   fecha_emision: string
   fecha_vencimiento: string
+
+  archivo_url: string
 }
 
 
@@ -110,9 +112,14 @@ const sincronizarOneDrive = async () => {
     await cargarCuentasPorCobrar();
 
     alert(
-      `Sincronización completada.
-Nuevos archivos: ${data.nuevos}`
-    );
+`Sincronización completada.
+
+Nuevas CxC: ${data.nuevos}
+
+Clientes no encontrados: ${data.clientesNoEncontrados}
+
+Proyectos no encontrados: ${data.proyectosNoEncontrados}`
+);
 
   } catch (error) {
 
@@ -313,7 +320,7 @@ Nuevos archivos: ${data.nuevos}`
   {item.proyecto}
 </td>
 
-<td className="px-4 py-4">
+<td className="px-4 py-4 font-medium">
   {item.numero_factura}
 </td>
 
@@ -330,26 +337,33 @@ Nuevos archivos: ${data.nuevos}`
 </td>
 
 <td className="px-4 py-4">
-  {item.fecha_emision}
+  {item.fecha_emision
+    ? new Date(item.fecha_emision)
+        .toLocaleDateString("es-PE")
+    : "-"}
 </td>
 
 <td className="px-4 py-4">
-  {item.fecha_vencimiento}
+  {item.fecha_vencimiento
+    ? new Date(item.fecha_vencimiento)
+        .toLocaleDateString("es-PE")
+    : "-"}
 </td>
                     
                       <td className="px-4 py-4">
                         <div className="flex gap-2">
                           <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() =>
-                              alert(
-                                `Código: ${item.codigo}\nCliente: ${item.cliente}\nMonto: S/ ${item.monto}\nFactura: ${item.numero_factura}`
-                              )
-                            }
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+  size="icon"
+  variant="outline"
+  onClick={() =>
+    window.open(
+      item.archivo_url,
+      "_blank"
+    )
+  }
+>
+  <Eye className="h-4 w-4" />
+</Button>
 
                           
                           <Button
