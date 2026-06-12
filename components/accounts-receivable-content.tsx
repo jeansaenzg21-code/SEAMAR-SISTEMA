@@ -74,22 +74,52 @@ export function AccountsReceivableContent() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [clientFilter, setClientFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+
+  const [clientes, setClientes] = useState<any[]>([])
  
   useEffect(() => {
   cargarCuentasPorCobrar()
+  cargarClientes()
 }, [])
 
 const cargarCuentasPorCobrar = async () => {
-  try {
-    const response = await fetch("/api/cuentas-por-cobrar")
-    const data = await response.json()
 
-    
+  try {
+
+    const response =
+      await fetch("/api/cuentas-por-cobrar")
+
+    const data =
+      await response.json()
 
     setAccountsReceivable(data)
+
   } catch (error) {
+
     console.error(error)
+
   }
+
+}
+
+const cargarClientes = async () => {
+
+  try {
+
+    const response =
+      await fetch("/api/clientes")
+
+    const data =
+      await response.json()
+
+    setClientes(data)
+
+  } catch (error) {
+
+    console.error(error)
+
+  }
+
 }
 const sincronizarOneDrive = async () => {
 
@@ -252,12 +282,23 @@ Proyectos no encontrados: ${data.proyectosNoEncontrados}`
                 <SelectValue placeholder="Cliente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Clientes</SelectItem>
-                <SelectItem value="Repsol">Repsol</SelectItem>
-                <SelectItem value="TDP">TDP</SelectItem>
-                <SelectItem value="Tralza">Tralza</SelectItem>
-                <SelectItem value="BPO">BPO</SelectItem>
-              </SelectContent>
+
+  <SelectItem value="all">
+    Todos los clientes
+  </SelectItem>
+
+  {clientes.map((cliente) => (
+
+    <SelectItem
+      key={cliente.id}
+      value={cliente.razon_social}
+    >
+      {cliente.razon_social}
+    </SelectItem>
+
+  ))}
+
+</SelectContent>
             </Select>
           </div>
 

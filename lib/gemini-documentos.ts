@@ -166,21 +166,23 @@ Si es AFP extrae:
         `Gemini intento ${intento} falló`
       );
 
-      if (
-        error?.status !== 503
-      ) {
-        throw error;
-      }
+      if (error?.status === 429) {
+  throw error;
+}
+
+if (error?.status !== 503) {
+  throw error;
+}
 
       if (intento < 3) {
 
         await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              3000
-            )
-        );
+  resolve =>
+    setTimeout(
+      resolve,
+      60000
+    )
+);
 
       }
 

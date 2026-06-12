@@ -251,19 +251,32 @@ return NextResponse.json({
   proyectosNoEncontrados
 });
 
-  } catch (error) {
+  } catch (error: any) {
 
-    console.error(error);
+  console.error(error);
+
+  if (error?.status === 429) {
 
     return NextResponse.json(
       {
-        success: false
+        success: false,
+        error:
+          "Se alcanzó el límite diario de Gemini."
       },
       {
-        status: 500
+        status: 429
       }
     );
 
   }
 
-}
+  return NextResponse.json(
+    {
+      success: false
+    },
+    {
+      status: 500
+    }
+  );
+
+  }}
