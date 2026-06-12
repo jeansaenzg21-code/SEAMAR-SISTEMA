@@ -37,6 +37,8 @@ type CuentaPorCobrar = {
   estado: "PENDIENTE" | "VENCIDO" | "FACTURADO"
   fecha_emision: string
   fecha_vencimiento: string
+
+  archivo_url: string
 }
 
 
@@ -72,22 +74,52 @@ export function AccountsReceivableContent() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [clientFilter, setClientFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+
+  const [clientes, setClientes] = useState<any[]>([])
  
   useEffect(() => {
   cargarCuentasPorCobrar()
+  cargarClientes()
 }, [])
 
 const cargarCuentasPorCobrar = async () => {
-  try {
-    const response = await fetch("/api/cuentas-por-cobrar")
-    const data = await response.json()
 
-    
+  try {
+
+    const response =
+      await fetch("/api/cuentas-por-cobrar")
+
+    const data =
+      await response.json()
 
     setAccountsReceivable(data)
+
   } catch (error) {
+
     console.error(error)
+
   }
+
+}
+
+const cargarClientes = async () => {
+
+  try {
+
+    const response =
+      await fetch("/api/clientes")
+
+    const data =
+      await response.json()
+
+    setClientes(data)
+
+  } catch (error) {
+
+    console.error(error)
+
+  }
+
 }
 const sincronizarOneDrive = async () => {
 
@@ -110,9 +142,14 @@ const sincronizarOneDrive = async () => {
     await cargarCuentasPorCobrar();
 
     alert(
-      `Sincronización completada.
-Nuevos archivos: ${data.nuevos}`
-    );
+`Sincronización completada.
+
+Nuevas CxC: ${data.nuevos}
+
+Clientes no encontrados: ${data.clientesNoEncontrados}
+
+Proyectos no encontrados: ${data.proyectosNoEncontrados}`
+);
 
   } catch (error) {
 
@@ -245,12 +282,23 @@ Nuevos archivos: ${data.nuevos}`
                 <SelectValue placeholder="Cliente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Clientes</SelectItem>
-                <SelectItem value="Repsol">Repsol</SelectItem>
-                <SelectItem value="TDP">TDP</SelectItem>
-                <SelectItem value="Tralza">Tralza</SelectItem>
-                <SelectItem value="BPO">BPO</SelectItem>
-              </SelectContent>
+
+  <SelectItem value="all">
+    Todos los clientes
+  </SelectItem>
+
+  {clientes.map((cliente) => (
+
+    <SelectItem
+      key={cliente.id}
+      value={cliente.razon_social}
+    >
+      {cliente.razon_social}
+    </SelectItem>
+
+  ))}
+
+</SelectContent>
             </Select>
           </div>
 
@@ -313,7 +361,7 @@ Nuevos archivos: ${data.nuevos}`
   {item.proyecto}
 </td>
 
-<td className="px-4 py-4">
+<td className="px-4 py-4 font-medium">
   {item.numero_factura}
 </td>
 
@@ -330,26 +378,33 @@ Nuevos archivos: ${data.nuevos}`
 </td>
 
 <td className="px-4 py-4">
-  {item.fecha_emision}
+  {item.fecha_emision
+    ? new Date(item.fecha_emision)
+        .toLocaleDateString("es-PE")
+    : "-"}
 </td>
 
 <td className="px-4 py-4">
-  {item.fecha_vencimiento}
+  {item.fecha_vencimiento
+    ? new Date(item.fecha_vencimiento)
+        .toLocaleDateString("es-PE")
+    : "-"}
 </td>
                     
                       <td className="px-4 py-4">
                         <div className="flex gap-2">
                           <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() =>
-                              alert(
-                                `Código: ${item.codigo}\nCliente: ${item.cliente}\nMonto: S/ ${item.monto}\nFactura: ${item.numero_factura}`
-                              )
-                            }
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+  size="icon"
+  variant="outline"
+  onClick={() =>
+    window.open(
+      item.archivo_url,
+      "_blank"
+    )
+  }
+>
+  <Eye className="h-4 w-4" />
+</Button>
 
                           
                           <Button

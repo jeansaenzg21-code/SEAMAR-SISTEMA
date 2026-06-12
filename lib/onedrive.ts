@@ -35,13 +35,33 @@ export async function listarOrdenesServicio() {
 
   return response.json();
 }
+
+export async function listarDocumentos() {
+
+  const token = await getAccessToken();
+
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.DOCUMENTOS}/children`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return response.json();
+
+}
+
 export async function buscarOSPorNumero(
   numeroOS: string
 ) {
 
-  const data = await listarOrdenesServicio();
+  const data =
+    await listarOrdenesServicio();
 
-  const archivos = data.value || [];
+  const archivos =
+    data.value || [];
 
   return archivos.find((archivo: any) =>
     archivo.name.includes(numeroOS)

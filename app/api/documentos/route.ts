@@ -11,12 +11,52 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
+function convertirFechaMysql(
+  fecha?: string | null
+) {
+
+  if (!fecha) return null;
+
+  const partes =
+    fecha.split("/");
+
+  if (partes.length !== 3)
+    return fecha;
+
+  const [dia, mes, anio] =
+    partes;
+
+  return `${anio}-${mes}-${dia}`;
+
+}
+
 async function guardarDocumento(
   json: any,
   file: File
 ) {
 
   try {
+
+    const [rows]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM documentos
+        WHERE nombre_archivo = ?
+        `,
+        [file.name]
+      );
+
+    if (rows.length > 0) {
+
+      console.log(
+        "Documento ya procesado:",
+        file.name
+      );
+
+      return;
+
+    }
 
     await pool.query(
       `
@@ -50,12 +90,14 @@ async function guardarDocumento(
         json.empresa ||
         null,
 
-        json.fechaEmision ||
-        json.fechaPago ||
-        null,
+        convertirFechaMysql(
+  json.fechaEmision ||
+  json.fechaPago
+),
 
-        json.fechaVencimiento ||
-        null,
+        convertirFechaMysql(
+  json.fechaVencimiento
+),
 
         json.montoTotal ||
         json.monto ||
@@ -200,7 +242,7 @@ try {
     // Gemini analiza PDF
     const response = await ai.models.generateContent({
 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
 
       contents: [
 

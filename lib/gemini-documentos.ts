@@ -68,6 +68,77 @@ Si es VALORIZACION extrae:
 - moneda
 - periodo
 - fechaEjecucion (formato YYYY-MM-DD)
+
+Si es FACTURA extrae:
+- tipoDocumento
+- numeroFactura
+- empresaEmisora
+- rucEmisor
+- empresaCliente
+- rucCliente
+- fechaEmision
+- fechaVencimiento
+- subtotal
+- igv
+- montoTotal
+- detraccion
+- ordenCompra
+
+- proyecto
+
+- descripcionServicio
+
+proyecto:
+Extrae solamente el nombre corto del proyecto o trabajo ejecutado.
+
+Ejemplo:
+"MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS"
+
+descripcionServicio:
+Extrae la descripción completa del servicio facturado.
+
+Si es ORDEN_SERVICIO extrae:
+- tipoDocumento
+- proveedor
+- ruc
+- numeroOrdenServicio
+- descripcionServicio
+- montoReferencial
+- fechaEmision (formato YYYY-MM-DD)
+
+Si es SUNAT extrae:
+- tipoDocumento
+- empresa
+- ruc
+- periodo
+- tributo
+- fechaPago (formato YYYY-MM-DD)
+- importePagado
+- numeroOperacion
+- banco
+
+Si es RECIBO POR HONORARIOS extrae:
+- tipoDocumento
+- numeroRecibo
+- persona
+- ruc
+- empresaCliente
+- fechaEmision (formato YYYY-MM-DD)
+- concepto
+- monto
+- retencion
+- montoNeto
+
+Si es AFP extrae:
+- tipoDocumento
+- afp
+- empresa
+- ruc
+- periodo
+- fechaPago (formato YYYY-MM-DD)
+- montoPensiones
+- montoRetribuciones
+- numeroPlanilla
 `
             },
 
@@ -95,21 +166,23 @@ Si es VALORIZACION extrae:
         `Gemini intento ${intento} falló`
       );
 
-      if (
-        error?.status !== 503
-      ) {
-        throw error;
-      }
+      if (error?.status === 429) {
+  throw error;
+}
+
+if (error?.status !== 503) {
+  throw error;
+}
 
       if (intento < 3) {
 
         await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              3000
-            )
-        );
+  resolve =>
+    setTimeout(
+      resolve,
+      60000
+    )
+);
 
       }
 
