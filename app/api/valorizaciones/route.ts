@@ -137,7 +137,36 @@ export async function POST(request: Request) {
   ]
 );
 
+const insertResult = result as any;
+const valorizacionId = insertResult.insertId;
 
+const observacionesSistema: string[] = [];
+
+if (!archivo_nombre) {
+  observacionesSistema.push("Falta adjuntar el documento principal de valorización.");
+}
+
+if (!respaldo_nombre) {
+  observacionesSistema.push("Falta adjuntar el documento de respaldo.");
+}
+
+if (observacionesSistema.length > 0) {
+  await pool.query(
+    `
+    INSERT INTO valorizacion_observaciones (
+      valorizacion_id,
+      observacion,
+      tipo,
+      estado
+    )
+    VALUES (?, ?, 'SISTEMA', 'PENDIENTE')
+    `,
+    [
+      valorizacionId,
+      observacionesSistema.join(" "),
+    ]
+  );
+}
     return NextResponse.json({
       success: true,
       message: "Valorización registrada correctamente",

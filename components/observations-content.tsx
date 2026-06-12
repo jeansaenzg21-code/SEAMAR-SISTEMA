@@ -81,8 +81,9 @@ const cargarObservaciones =
                 v.proveedor,
 
               observation:
-  v.observacion_sistema ||
-  "Sin observación registrada",
+  v.observacion_sistema && v.observacion_sistema.trim() !== ""
+    ? v.observacion_sistema
+    : "Orden de servicio no encontrada",
 
               createdBy:
                 "Sistema",

@@ -80,6 +80,7 @@ function StatusBadge({ status }: { status: Status }) {
   }
 
   return (
+    
     <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status]}`}>
       {label[status]}
     </span>
@@ -87,9 +88,50 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 export function ValuationsContent() {
-  const [valuations, setValuations] = useState<Valuation[]>([])
+  
+  const enviarAObservado = async (item: Valuation) => {
+  try {
+    const response = await fetch(
+      `/api/valorizaciones/${item.id}/estado`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          estado: "OBSERVADO",
+          observacion: "Corrección solicitada desde Valorizaciones",
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!data.success) {
+      alert("No se pudo enviar a observaciones")
+      return
+    }
+
+    await cargarValorizaciones()
+    setIsViewOpen(false)
+
+    alert("Valorización enviada a Observaciones")
+  } catch (error) {
+    console.error(error)
+    alert("Error al enviar a observaciones")
+  }
+}
+ const getAvanceValorizacion = (status: string) => {
+  if (status === "draft") return 10
+  if (status === "under_review") return 40
+  if (status === "observed") return 40
+  if (status === "approved") return 100
+  return 0
+} 
+const [valuations, setValuations] = useState<Valuation[]>([])
   const [statusFilter, setStatusFilter] = useState("all")
   const [clientFilter, setClientFilter] = useState("all")
+  const [clienteFiltro, setClienteFiltro] = useState("TODOS")
   const [searchQuery, setSearchQuery] = useState("")
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
@@ -106,7 +148,25 @@ export function ValuationsContent() {
   useEffect(() => {
   cargarValorizaciones()
 }, [])
+const [selectedValuation, setSelectedValuation] =
+  useState<Valuation | null>(null)
+const [clientes, setClientes] = useState<any[]>([])
 
+useEffect(() => {
+  const cargarClientes = async () => {
+    try {
+      const res = await fetch("/api/clientes")
+      const data = await res.json()
+      setClientes(data)
+    } catch (error) {
+      console.error("Error al cargar clientes:", error)
+    }
+  }
+
+  cargarClientes()
+}, [])
+const [isViewOpen, setIsViewOpen] =
+  useState(false)
 const cargarValorizaciones = async () => {
   try {
     const response = await fetch("/api/valorizaciones")
@@ -297,48 +357,43 @@ Nuevos archivos: ${data.nuevos}`
 ) => {
 
   try {
-    if (item.observacion_sistema) {
+    const observacionAutomatica =
+  item.observacion_sistema ||
+  (!item.archivo_nombre
+    ? "Falta adjuntar el documento principal de valorización"
+    : "")
 
-  const enviarAObservaciones =
-    confirm(
-      `Se detectó la siguiente observación:\n\n${item.observacion_sistema}\n\n¿Desea enviar la valorización a Observaciones?`
-    );
+if (observacionAutomatica) {
+  const enviarAObservaciones = confirm(
+    `Se detectó la siguiente observación:\n\n${observacionAutomatica}\n\n¿Desea enviar la valorización a Observaciones?`
+  )
 
-  if (!enviarAObservaciones) {
-    return;
-  }
+  if (!enviarAObservaciones) return
 
-  const response =
-    await fetch(
-      `/api/valorizaciones/${item.id}/estado`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          estado: "OBSERVADO",
-        }),
-      }
-    );
+  const response = await fetch(`/api/valorizaciones/${item.id}/estado`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      estado: "OBSERVADO",
+      observacion: observacionAutomatica,
+    }),
+  })
 
-  const data =
-    await response.json();
+  const data = await response.json()
 
   if (!data.success) {
-    alert("No se pudo actualizar");
-    return;
+    alert("No se pudo enviar a Observaciones")
+    return
   }
 
-  await cargarValorizaciones();
-
-  alert(
-    "Valorización enviada a Observaciones"
-  );
-
-  return;
+  await cargarValorizaciones()
+  alert("Valorización enviada a Observaciones")
+  return
 }
+    
+
 
         const response =
       await fetch(
@@ -450,15 +505,17 @@ Nuevos archivos: ${data.nuevos}`
 
             <Select value={clientFilter} onValueChange={setClientFilter}>
               <SelectTrigger className="w-44 bg-secondary border-border">
-                <SelectValue placeholder="Cliente" />
+                <SelectValue placeholder="Clientes" />
+                <SelectContent>
+  <SelectItem value="TODOS">Clientes</SelectItem>
+
+  {clientes.map((cliente) => (
+  <SelectItem key={cliente.id} value={cliente.razon_social}>
+    {cliente.razon_social}
+  </SelectItem>
+))}
+</SelectContent>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Clientes</SelectItem>
-                <SelectItem value="Repsol">Repsol</SelectItem>
-                <SelectItem value="TDP">TDP</SelectItem>
-                <SelectItem value="Tralza">Tralza</SelectItem>
-                <SelectItem value="BPO">BPO</SelectItem>
-              </SelectContent>
             </Select>
             <input
   type="month"
@@ -515,11 +572,12 @@ Nuevos archivos: ${data.nuevos}`
                         <SelectValue placeholder="Seleccionar cliente" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Repsol">Repsol</SelectItem>
-                        <SelectItem value="TDP">TDP</SelectItem>
-                        <SelectItem value="Tralza">Tralza</SelectItem>
-                        <SelectItem value="BPO">BPO</SelectItem>
-                      </SelectContent>
+  {clientes.map((cliente) => (
+    <SelectItem key={cliente.id} value={cliente.razon_social}>
+      {cliente.razon_social}
+    </SelectItem>
+  ))}
+</SelectContent>
                     </Select>
                   </div>
 
@@ -711,14 +769,13 @@ Nuevos archivos: ${data.nuevos}`
 
     <DropdownMenuContent align="end">
       <DropdownMenuItem
-        onClick={() =>
-          alert(
-            `Valorización: VAL-2026-${String(item.id).padStart(3, "0")}\nCliente: ${item.client}\nMonto: S/ ${item.amount}\nServicio: ${item.description}`
-          )
-        }
-      >
-        Ver
-      </DropdownMenuItem>
+  onClick={() => {
+    setSelectedValuation(item)
+    setIsViewOpen(true)
+  }}
+>
+  Ver
+</DropdownMenuItem>
 
       <DropdownMenuItem
         onClick={() => editarValorizacion(item)}
@@ -747,7 +804,152 @@ Nuevos archivos: ${data.nuevos}`
             </div>
           </CardContent>
         </Card>
-      </div>
+            </div>
+
+      {selectedValuation && (
+        <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  VAL-2026-{String(selectedValuation.id).padStart(3, "0")}
+                </p>
+
+                <DialogTitle className="text-xl">
+                  {selectedValuation.description || "Sin proyecto"}
+                </DialogTitle>
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <StatusBadge status={selectedValuation.status} />
+                  <span>{selectedValuation.client}</span>
+                  <span>·</span>
+                  <span>{selectedValuation.date}</span>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="grid grid-cols-3 gap-3 border-y py-6">
+              <div className="rounded-lg border p-4 text-center">
+                <p className="text-xs text-muted-foreground">MONTO</p>
+                <p className="text-lg font-bold">
+                  S/ {Number(selectedValuation.amount).toLocaleString("es-PE")}
+                </p>
+              </div>
+
+              <div className="rounded-lg border p-4 text-center">
+                <p className="text-xs text-muted-foreground">AVANCE</p>
+                <p className="text-lg font-bold">
+  {getAvanceValorizacion(selectedValuation.status)}%
+</p>
+              </div>
+
+              <div className="rounded-lg border p-4 text-center">
+                <p className="text-xs text-muted-foreground">RESP.</p>
+                <p className="text-lg font-bold">
+                  {selectedValuation.encargado || "Sin responsable"}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+                DOCUMENTOS ADJUNTOS
+              </p>
+
+              {selectedValuation.archivo_url ? (
+                <a
+                  href={selectedValuation.archivo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded-lg border bg-muted/30 p-4 hover:bg-muted/50"
+                >
+                  <span className="text-sm font-medium">
+                    {selectedValuation.archivo_nombre || "Documento adjunto"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Ver documento
+                  </span>
+                </a>
+              ) : (
+                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Sin documentos adjuntos
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-4">
+              <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+                LÍNEA DE APROBACIÓN
+              </p>
+
+              <div className="border-l pl-4 space-y-5">
+                <div>
+                  <p className="font-semibold">A. Rivas · SEAMAR</p>
+                  <p className="text-sm text-muted-foreground">
+                    Creación de borrador
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedValuation.date}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold">
+                    {selectedValuation.encargado || "Responsable"} · SEAMAR
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Envió a cliente para revisión
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    En revisión
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold">Cliente · {selectedValuation.client}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Pendiente de aprobación
+                  </p>
+                  <p className="text-xs text-muted-foreground">—</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+                OBSERVACIONES
+              </p>
+
+              <div className="rounded-lg border bg-muted/30 p-4">
+                {selectedValuation.observacion_sistema ? (
+                  <p className="text-sm">
+                    {selectedValuation.observacion_sistema}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No hay observaciones registradas.
+                  </p>
+                )}
+
+                <div className="mt-4 flex gap-2">
+                  <Input placeholder="Responder observación..." />
+                  <Button variant="outline">Enviar</Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 border-t bg-background pt-4">
+  <Button
+    variant="outline"
+    className="w-full"
+    onClick={() => enviarAObservado(selectedValuation)}
+  >
+    Solicitar corrección
+  </Button>
+</div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

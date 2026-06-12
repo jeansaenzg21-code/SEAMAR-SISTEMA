@@ -5,89 +5,96 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-
   try {
-
     const { id } = await params;
 
-    const body =
-      await req.json();
+    const body = await req.json();
 
-    const {
-  estado,
-  observacion,
-  observation_status
-} = body;
+    const { estado, observacion } = body;
+
+    const observacionFinal =
+      observacion && observacion.trim() !== ""
+        ? observacion
+        : "Orden de servicio no encontrada";
 
     await pool.query(
-  `
-  UPDATE valorizaciones
-  SET
+      `
+      UPDATE valorizaciones
+      SET
+        estado = ?,
 
-    estado = ?,
+        fecha_revision =
+          CASE
+            WHEN ? = 'EN_REVISION'
+            THEN NOW()
+            ELSE fecha_revision
+          END,
 
-    fecha_revision =
-      CASE
-        WHEN ? = 'EN_REVISION'
-        THEN NOW()
-        ELSE fecha_revision
-      END,
+        fecha_observacion =
+          CASE
+            WHEN ? = 'OBSERVADO'
+            THEN NOW()
+            ELSE fecha_observacion
+          END,
 
-    fecha_observacion =
-  CASE
-    WHEN ? = 'OBSERVADO'
-    THEN NOW()
-    ELSE fecha_observacion
-  END,
+        observaciones =
+          CASE
+            WHEN ? = 'OBSERVADO'
+            THEN ?
+            ELSE observaciones
+          END,
 
-observation_status =
-  CASE
-    WHEN ? = 'OBSERVADO'
-    THEN 'pending'
-    ELSE observation_status
-  END,
+        fecha_aprobacion =
+          CASE
+            WHEN ? = 'APROBADO'
+            THEN NOW()
+            ELSE fecha_aprobacion
+          END
 
-    fecha_aprobacion =
-  CASE
-    WHEN ? = 'APROBADO'
-    THEN NOW()
-    ELSE fecha_aprobacion
-  END,
+      WHERE id = ?
+      `,
+      [
+        estado,
+        estado,
+        estado,
+        estado,
+        observacionFinal,
+        estado,
+        id,
+      ]
+    );
 
-observation_status =
-  COALESCE(?, observation_status)
-
-  WHERE id = ?
-  `,
-  [
-  estado,
-  estado,
-  estado,
-  estado,
-  observacion,
-  estado,
-  observation_status,
-  id
-]
-);
+    if (estado === "OBSERVADO") {
+      await pool.query(
+        `
+        INSERT INTO valorizacion_observaciones (
+          valorizacion_id,
+          observacion,
+          tipo,
+          estado
+        )
+        VALUES (?, ?, 'SISTEMA', 'PENDIENTE')
+        `,
+        [
+          id,
+          observacionFinal,
+        ]
+      );
+    }
 
     return NextResponse.json({
-      success: true
+      success: true,
     });
-
   } catch (error) {
-
     console.error(error);
 
     return NextResponse.json(
       {
-        success: false
+        success: false,
       },
       {
-        status: 500
+        status: 500,
       }
     );
-
   }
-
 }

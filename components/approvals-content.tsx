@@ -92,7 +92,7 @@ export function ApprovalsContent() {
     ? "observed"
     : v.estado === "APROBADO"
     ? "approved"
-    : "draft",
+    : "draft",  
 
           submittedBy:
             v.encargado ??
@@ -126,6 +126,9 @@ export function ApprovalsContent() {
   const [isObserveOpen, setIsObserveOpen] = useState(false)
   const [observation, setObservation] = useState("")
 
+
+const [isViewOpen, setIsViewOpen] =
+  useState(false)
   const filteredApprovals = approvals.filter((item) =>
     String(item.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -141,7 +144,8 @@ export function ApprovalsContent() {
   if (!selectedApproval) return
 
   try {
-
+const [selectedApproval, setSelectedApproval] = useState<any>(null)
+const [isViewOpen, setIsViewOpen] = useState(false)
     const response =
       await fetch(
         `/api/valorizaciones/${selectedApproval.id}/estado`,
@@ -219,8 +223,10 @@ export function ApprovalsContent() {
       <CardContent className="p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <h3 className="font-semibold">{item.id}</h3>
+            <div className="flex items-center gap-3"> 
+              <h3 className="font-semibold">
+  VAL-{new Date(item.submittedDate).getFullYear()}-{String(item.id).padStart(3, "0")}
+</h3>
               <StatusBadge status={item.status} />
             </div>
 
@@ -235,9 +241,16 @@ export function ApprovalsContent() {
           </div>
 
           <div className="flex gap-2">
-            <Button size="icon" variant="outline" onClick={() => alert(`${item.id}\n${item.description}`)}>
-              <Eye className="h-4 w-4" />
-            </Button>
+            <Button
+  size="icon"
+  variant="outline"
+  onClick={() => {
+    setSelectedApproval(item)
+    setIsViewOpen(true)
+  }}
+>
+  <Eye className="h-4 w-4" />
+</Button>
 
             {item.status === "under_review" && (
               <>
@@ -351,7 +364,9 @@ export function ApprovalsContent() {
             <DialogHeader>
               <DialogTitle>Aprobar valorización</DialogTitle>
               <DialogDescription>
-                ¿Deseas aprobar la valorización {selectedApproval?.id}?
+                ¿Deseas aprobar la valorización VAL- VAL-{selectedApproval?.submittedDate
+  ? new Date(selectedApproval.submittedDate).getFullYear()
+  : new Date().getFullYear()}-{String(selectedApproval?.id || "").padStart(3, "0")}
               </DialogDescription>
        
             </DialogHeader>
@@ -404,6 +419,149 @@ export function ApprovalsContent() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+  <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+    <DialogHeader>
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+  VAL-{selectedApproval?.submittedDate
+    ? new Date(selectedApproval.submittedDate).getFullYear()
+    : new Date().getFullYear()}-{String(selectedApproval?.id || "").padStart(3, "0")}
+</p>
+
+        <DialogTitle className="text-xl">
+          {selectedApproval?.description || "Sin proyecto"}
+        </DialogTitle>
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{selectedApproval?.client}</span>
+          <span>·</span>
+          <span>{selectedApproval?.submittedDate}</span>
+        </div>
+      </div>
+    </DialogHeader>
+
+    <div className="grid grid-cols-3 gap-3 border-y py-6">
+      <div className="rounded-lg border p-4 text-center">
+        <p className="text-xs text-muted-foreground">MONTO</p>
+        <p className="text-lg font-bold">
+          {selectedApproval?.amount
+  ? `S/ ${Number(String(selectedApproval.amount).replace("S/", "").trim()).toLocaleString("es-PE")}`
+  : "Sin monto"}
+        </p>
+      </div>
+
+      <div className="rounded-lg border p-4 text-center">
+        <p className="text-xs text-muted-foreground">PRIORIDAD</p>
+        <p className="text-lg font-bold">
+          {selectedApproval?.priority || "—"}
+        </p>
+      </div>
+
+      <div className="rounded-lg border p-4 text-center">
+        <p className="text-xs text-muted-foreground">ENVIADO POR</p>
+        <p className="text-lg font-bold">
+          {selectedApproval?.submittedBy || "—"}
+        </p>
+      </div>
+    </div>
+
+    <div className="space-y-3">
+      <p className="text-xs font-se mibold tracking-widest text-muted-foreground">
+        DOCUMENTOS ADJUNTOS
+      </p>
+
+      <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+        Sin documentos adjuntos
+      </div>
+    </div>
+
+    <div className="space-y-4 pt-4">
+      <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+        LÍNEA DE APROBACIÓN
+      </p>
+
+      <div className="border-l pl-4 space-y-5">
+        <div>
+          <p className="font-semibold">Sistema · SEAMAR</p>
+          <p className="text-sm text-muted-foreground">
+            Valorización enviada a aprobación
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {selectedApproval?.submittedDate || "—"}
+          </p>
+        </div>
+
+        <div>
+          <p className="font-semibold">
+            {selectedApproval?.submittedBy || "Responsable"} · SEAMAR
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Revisión pendiente
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Estado: {selectedApproval?.status || "—"}
+          </p>
+        </div>
+
+        <div>
+          <p className="font-semibold">
+            Aprobador · {selectedApproval?.client || "Cliente"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Pendiente de decisión final
+          </p>
+          <p className="text-xs text-muted-foreground">—</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="space-y-3 pt-4">
+      <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+        OBSERVACIONES
+      </p>
+
+      <div className="rounded-lg border bg-muted/30 p-4">
+        {selectedApproval?.respuesta_observacion ? (
+          <div className="rounded-md border border-green-500/20 bg-green-500/10 p-3">
+            <p className="text-sm font-medium text-green-400">
+              Respuesta a observación
+            </p>
+
+            <p className="text-sm mt-1">
+              {selectedApproval.respuesta_observacion}
+            </p>
+
+            {selectedApproval.archivo_respuesta_nombre && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No hay observaciones registradas.
+          </p>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <Input placeholder="Responder observación..." />
+          <Button variant="outline">Enviar</Button>
+        </div>
+      </div>
+    </div>
+
+    <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
+      <Button className="flex-1 bg-green-600 hover:bg-green-700">
+        Aprobar
+      </Button>
+
+      <Button variant="outline" className="flex-1">
+        Solicitar corrección
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
       </div>
     </div>
   )
