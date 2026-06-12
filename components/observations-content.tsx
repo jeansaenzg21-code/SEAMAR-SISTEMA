@@ -381,7 +381,7 @@ const cargarObservaciones =
               {selectedObservation?.status !== "resolved" && (
                 <>
                   <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
-                    Guardar borrador
+                    Guardar borrador.
                   </Button>
                   <Button onClick={() => {
   if (!selectedObservation) return
@@ -416,7 +416,7 @@ const cargarObservaciones =
 setAttachedFile(null)
 }}>
  
-  Marcar como resuelto
+  Marcar como resuelto.
 </Button>
                 </>
               )}

@@ -143,11 +143,11 @@ const valorizacionId = insertResult.insertId;
 const observacionesSistema: string[] = [];
 
 if (!archivo_nombre) {
-  observacionesSistema.push("Falta adjuntar el documento principal de valorización.");
+  observacionesSistema.push("Falta adjuntar el documento principal de valorización");
 }
 
 if (!respaldo_nombre) {
-  observacionesSistema.push("Falta adjuntar el documento de respaldo.");
+  observacionesSistema.push("Falta adjuntar el documento de respaldo");
 }
 
 if (observacionesSistema.length > 0) {

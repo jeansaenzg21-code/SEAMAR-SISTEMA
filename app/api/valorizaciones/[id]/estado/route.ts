@@ -15,7 +15,7 @@ export async function PATCH(
     const observacionFinal =
       observacion && observacion.trim() !== ""
         ? observacion
-        : "Orden de servicio no encontrada";
+        : "Orden de servicio no fue encontrada";
 
     await pool.query(
       `

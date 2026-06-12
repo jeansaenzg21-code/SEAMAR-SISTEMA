@@ -165,13 +165,13 @@ const [isViewOpen, setIsViewOpen] = useState(false)
 
     if (!data.success) {
 
-      alert("No se pudo aprobar")
+      alert("No se pudo aprobar.")
 
       return
 
     }
 
-    alert("Valorización aprobada")
+    alert("Valorización aprobada.")
 
     location.reload()
 

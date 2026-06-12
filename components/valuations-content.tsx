@@ -154,14 +154,16 @@ const [clientes, setClientes] = useState<any[]>([])
 
 useEffect(() => {
   const cargarClientes = async () => {
-    try {
-      const res = await fetch("/api/clientes")
-      const data = await res.json()
-      setClientes(data)
-    } catch (error) {
-      console.error("Error al cargar clientes:", error)
-    }
+  try {
+    const res = await fetch("/api/clientes")
+    const data = await res.json()
+
+    setClientes(Array.isArray(data) ? data : [])
+  } catch (error) {
+    console.error(error)
+    setClientes([])
   }
+}
 
   cargarClientes()
 }, [])
@@ -509,11 +511,16 @@ if (observacionAutomatica) {
                 <SelectContent>
   <SelectItem value="TODOS">Clientes</SelectItem>
 
-  {clientes.map((cliente) => (
-  <SelectItem key={cliente.id} value={cliente.razon_social}>
-    {cliente.razon_social}
-  </SelectItem>
-))}
+  {Array.isArray(clientes) &&
+  clientes.map((cliente) => (
+    <SelectItem
+      key={cliente.id}
+      value={cliente.razon_social}
+    >
+      {cliente.razon_social}
+    </SelectItem>
+  ))}
+  
 </SelectContent>
               </SelectTrigger>
             </Select>
