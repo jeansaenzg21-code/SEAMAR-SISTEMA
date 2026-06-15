@@ -1,10 +1,11 @@
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
+import { leerPdf } from "./pdf-reader";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-})
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
-function parsearJsonGemini(
+function parsearJson(
   texto: string
 ) {
 
@@ -21,8 +22,8 @@ export async function procesarPdf(
   buffer: Buffer
 ) {
 
-  const base64 =
-    buffer.toString("base64");
+  const textoPdf =
+  await leerPdf(buffer);
 
   let ultimoError: any;
 
@@ -35,14 +36,11 @@ export async function procesarPdf(
     try {
 
       const response =
-        await ai.models.generateContent({
+  await openai.responses.create({
 
-          model: "gemini-2.5-flash",
+    model: "gpt-5-mini",
 
-          contents: [
-
-            {
-              text: `
+    input: `
 Analiza este documento financiero peruano.
 
 Primero detecta el tipo de documento.
@@ -139,32 +137,24 @@ Si es AFP extrae:
 - montoPensiones
 - montoRetribuciones
 - numeroPlanilla
-`
-            },
 
-            {
-              inlineData: {
-                mimeType:
-                  "application/pdf",
-                data: base64
-              }
-            }
+DOCUMENTO:
 
-          ]
+${textoPdf}
+  `
+            });
 
-        });
-
-      return parsearJsonGemini(
-        response.text ?? "{}"
-      );
+      return parsearJson(
+  response.output_text ?? "{}"
+);
 
     } catch (error: any) {
 
       ultimoError = error;
 
       console.log(
-        `Gemini intento ${intento} falló`
-      );
+  `OpenAI intento ${intento} falló`
+);
 
       if (error?.status === 429) {
   throw error;

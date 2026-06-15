@@ -6,7 +6,7 @@ import {
 } from "@/lib/onedrive";
 import { guardarValorizacion } from "@/lib/valorizaciones";
 
-import { procesarPdf } from "@/lib/gemini-documentos";
+import { procesarPdf } from "@/lib/openai-documentos";
 
 
 

@@ -8,7 +8,7 @@ import pool from "@/lib/mysql";
 
 import {
   procesarPdf
-} from "@/lib/gemini-documentos";
+} from "@/lib/openai-documentos";
 
 
 export async function POST() {
