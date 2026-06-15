@@ -173,6 +173,7 @@ const cargarValorizaciones = async () => {
   try {
     const response = await fetch("/api/valorizaciones")
     const data = await response.json()
+    console.log(data)
 
     const valorizaciones = data.map((item: any) => ({
   id: item.id,
@@ -259,10 +260,21 @@ Nuevos archivos: ${data.nuevos}`
 }
 
   const filteredValuations = valuations.filter((v) => {
-    if (statusFilter !== "all" && v.status !== statusFilter) return false
-    if (clientFilter !== "all" && v.client !== clientFilter) return false
-    if (
-      searchQuery &&
+  if (statusFilter !== "all" && v.status !== statusFilter) return false
+
+  if (
+    clientFilter !== "all" &&
+    clientFilter !== "TODOS" &&
+    v.client !== clientFilter
+  ) return false
+
+  if (
+    selectedPeriod &&
+    !v.date.startsWith(selectedPeriod)
+  ) return false
+
+  if (
+    searchQuery &&
       !String(v.id).includes(searchQuery) &&
       !v.description.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !v.orden_servicio.toLowerCase().includes(searchQuery.toLowerCase())

@@ -54,6 +54,22 @@ Los tipos posibles son:
 - orden_servicio
 
 Devuelve SOLO JSON válido.
+No uses markdown.
+No expliques nada.
+
+Para VALORIZACION responde exactamente con esta estructura:
+{
+  "tipoDocumento": "valorizacion",
+  "proveedor": null,
+  "ruc": null,
+  "negocioOperacion": null,
+  "numeroOrdenServicio": null,
+  "descripcion": null,
+  "monto": null,
+  "moneda": null,
+  "periodo": null,
+  "fechaEjecucion": null
+}
 
 Si es VALORIZACION extrae:
 - tipoDocumento
@@ -66,6 +82,30 @@ Si es VALORIZACION extrae:
 - moneda
 - periodo
 - fechaEjecucion (formato YYYY-MM-DD)
+
+Reglas para numeroOrdenServicio:
+- En documentos de VALORIZACIÓN, busca la columna o etiqueta:
+  "N° de Orden de Servicio (OS)", "Orden de Servicio", "OS", "O/S".
+- Si cerca de esa etiqueta aparece un número, ese número es numeroOrdenServicio.
+- En tablas, si aparece una fila con valores como:
+  "34643 23,000.00 27-Feb-26",
+  el primer número antes del monto es la Orden de Servicio.
+- No confundas numeroOrdenServicio con monto, fecha o factura.
+- Si aparece "34643" asociado a "N° de Orden de Servicio (OS)", devuelve "34643".
+- Devuelve solo el número/código, sin texto adicional.
+- Si no existe, devuelve null.
+
+IMPORTANTE:
+En el documento de valorización, el número de Orden de Servicio puede aparecer como primer valor de la fila de datos.
+
+Ejemplo real:
+"34643 23,000.00 27-Feb-26"
+
+En ese caso:
+- numeroOrdenServicio = "34643"
+- monto = 23000
+- NO tomes 34643 como número de factura.
+- NO devuelvas numeroOrdenServicio como null si existe ese número en la fila.
 
 Si es FACTURA extrae:
 - tipoDocumento

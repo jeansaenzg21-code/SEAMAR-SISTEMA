@@ -65,22 +65,41 @@ export async function PATCH(
     );
 
     if (estado === "OBSERVADO") {
-      await pool.query(
-        `
-        INSERT INTO valorizacion_observaciones (
-          valorizacion_id,
-          observacion,
-          tipo,
-          estado
-        )
-        VALUES (?, ?, 'SISTEMA', 'PENDIENTE')
-        `,
-        [
-          id,
-          observacionFinal,
-        ]
-      );
-    }
+  const [observacionesExistentes]: any = await pool.query(
+    `
+    SELECT id
+    FROM valorizacion_observaciones
+    WHERE valorizacion_id = ?
+      AND tipo = 'SISTEMA'
+      AND observacion = ?
+      AND estado = 'PENDIENTE'
+    LIMIT 1
+    `,
+    [
+      id,
+      observacionFinal,
+    ]
+  );
+
+  if (observacionesExistentes.length === 0) {
+    await pool.query(
+      `
+      INSERT INTO valorizacion_observaciones (
+        valorizacion_id,
+        observacion,
+        tipo,
+        usuario,
+        estado
+      )
+      VALUES (?, ?, 'SISTEMA', 'Sistema', 'PENDIENTE')
+      `,
+      [
+        id,
+        observacionFinal,
+      ]
+    );
+  }
+}
 
     return NextResponse.json({
       success: true,
