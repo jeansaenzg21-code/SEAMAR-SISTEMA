@@ -71,6 +71,8 @@ function StatusBadge({ status }: { status: Status }) {
 
 export function AccountsReceivableContent() {
   const [accountsReceivable, setAccountsReceivable] = useState<CuentaPorCobrar[]>([])
+  const [nuevosIds, setNuevosIds] =
+  useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState("all")
   const [clientFilter, setClientFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -99,7 +101,9 @@ const [documentosDetectados, setDocumentosDetectados] =
   cargarClientes()
 }, [])
 
-const cargarCuentasPorCobrar = async () => {
+const cargarCuentasPorCobrar = async (
+  cantidadNueva = 0
+) => {
 
   try {
 
@@ -109,13 +113,24 @@ const cargarCuentasPorCobrar = async () => {
     const data =
       await response.json()
 
-    setAccountsReceivable(data)
+    setAccountsReceivable(data);
 
-  } catch (error) {
+if (cantidadNueva > 0) {
 
-    console.error(error)
+  const idsNuevos =
+    data
+      .slice(0, cantidadNueva)
+      .map((x: any) => Number(x.id));
 
-  }
+  setNuevosIds(idsNuevos);
+
+}
+
+} catch (error) {
+
+  console.error(error);
+
+}
 
 }
 
@@ -227,11 +242,11 @@ const intervalo =
           false
         );
 
-        await cargarCuentasPorCobrar();
+        await cargarCuentasPorCobrar(
+  sync.cuentas_cobrar
+);
 
-        setResultadoSync(
-          sync
-        );
+setResultadoSync(sync);
 
         setMostrarResumen(
           true
@@ -569,7 +584,21 @@ const modalResumen = (
                   {filteredAccounts.map((item) => (
                     <tr key={item.id} className="border-b border-border">
                       <td className="px-4 py-4 font-medium">
-  {item.codigo}
+
+  <div className="flex items-center gap-2">
+
+    {nuevosIds.includes(
+      Number(item.id)
+    ) && (
+
+      <div className="w-2 h-2 rounded-full bg-blue-500" />
+
+    )}
+
+    {item.codigo}
+
+  </div>
+
 </td>
 
 <td className="px-4 py-4">

@@ -64,6 +64,8 @@ function StatusBadge({ status }: { status: Status }) {
 
 export function AccountsPayableContent() {
   const [accountsPayable, setAccountsPayable] = useState<CuentaPorPagar[]>([])
+  const [nuevosIds, setNuevosIds] =
+  useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState("all")
   const [supplierFilter, setSupplierFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -92,12 +94,24 @@ const [documentosDetectados, setDocumentosDetectados] =
     cargarProveedores()
   }, [])
 
-  const cargarCuentasPorPagar = async () => {
+  const cargarCuentasPorPagar = async (
+  cantidadNueva = 0
+) => {
     try {
       const response = await fetch("/api/cuentas-por-pagar")
       const data = await response.json()
 
       setAccountsPayable(data)
+      if (cantidadNueva > 0) {
+
+  const idsNuevos =
+    data
+      .slice(0, cantidadNueva)
+      .map((x: any) => Number(x.id));
+
+  setNuevosIds(idsNuevos);
+
+}
     } catch (error) {
       console.error(error)
     }
@@ -203,11 +217,11 @@ const [documentosDetectados, setDocumentosDetectados] =
               false
             );
 
-            await cargarCuentasPorPagar();
+            await cargarCuentasPorPagar(
+  sync.cuentas_pagar
+);
 
-            setResultadoSync(
-              sync
-            );
+setResultadoSync(sync);
 
             setMostrarResumen(
               true
@@ -535,9 +549,21 @@ const modalResumen = (
                 <tbody>
                   {filteredAccounts.map((item) => (
                     <tr key={item.id} className="border-b border-border">
-                      <td className="px-4 py-4 font-medium">
-                        {item.codigo}
-                      </td>
+                      <div className="flex items-center gap-2">
+
+  {nuevosIds.includes(
+    Number(item.id)
+  ) && (
+
+    <div
+      className="w-2 h-2 rounded-full bg-blue-500"
+    />
+
+  )}
+
+  {item.codigo}
+
+</div>
 
                       <td className="px-4 py-4">
                         {item.proveedor}
