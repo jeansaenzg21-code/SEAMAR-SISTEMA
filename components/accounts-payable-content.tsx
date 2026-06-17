@@ -549,22 +549,26 @@ const modalResumen = (
                 <tbody>
                   {filteredAccounts.map((item) => (
                     <tr key={item.id} className="border-b border-border">
-                      <div className="flex items-center gap-2">
 
-  {nuevosIds.includes(
-    Number(item.id)
-  ) && (
+  <td className="px-4 py-4 font-medium">
 
-    <div
-      className="w-2 h-2 rounded-full bg-blue-500"
-    />
+    <div className="flex items-center gap-2">
 
-  )}
+      {nuevosIds.includes(
+        Number(item.id)
+      ) && (
 
-  {item.codigo}
+        <div
+          className="w-2 h-2 rounded-full bg-blue-500"
+        />
 
-</div>
+      )}
 
+      {item.codigo}
+
+    </div>
+
+  </td>
                       <td className="px-4 py-4">
                         {item.proveedor}
                       </td>
