@@ -5,14 +5,20 @@ import {
 } from "@/lib/onedrive";
 
 import pool from "@/lib/mysql";
-
+import { NextRequest } from "next/server";
 import {
-  procesarPdf
+  procesarDocumento
 } from "@/lib/openai-documentos";
 
 
-export async function POST() {
+export async function POST(
+  request: NextRequest
+) {
+const body =
+  await request.json();
 
+const sincronizacionId =
+  body.sincronizacionId;
   try {
 const data =
   await listarDocumentos();
@@ -53,22 +59,7 @@ for (const archivo of archivos) {
 
 }
 
-  const [sync]: any =
-await pool.query(
-`
-INSERT INTO sincronizaciones (
-  estado,
-  mensaje
-)
-VALUES (
-  'PROCESANDO',
-  'Iniciando sincronización'
-)
-`
-);
-
-const sincronizacionId =
-sync.insertId;
+  
 
 let nuevos = 0;
 let clientesNoEncontrados = 0;
@@ -102,8 +93,9 @@ for (const archivo of archivosNuevos) {
       archivo.id
     );
     const json =
-  await procesarPdf(
-    archivoCompleto.buffer
+  await procesarDocumento(
+    archivoCompleto.buffer,
+    archivo.name
   );
 
   procesados++;

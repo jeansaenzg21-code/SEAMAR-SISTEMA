@@ -152,23 +152,37 @@ const sincronizarOneDrive = async () => {
 
   try {
 
-    const response =
-      await fetch(
-        "/api/sincronizar-documentos",
-        {
-          method: "POST"
-        }
-      );
+    const inicio =
+  await fetch(
+    "/api/iniciar-sincronizacion",
+    {
+      method: "POST"
+    }
+  );
 
-    const data =
-      await response.json();
+const data =
+  await inicio.json();
 
-setDocumentosDetectados(
-  data.documentosProcesados
+const sincronizacionId =
+  data.sincronizacionId;
+
+  fetch(
+  "/api/sincronizar-documentos",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type":
+        "application/json"
+    },
+    body: JSON.stringify({
+      sincronizacionId
+    })
+  }
 );
 
-    const sincronizacionId =
-  data.sincronizacionId;
+setDocumentosDetectados(
+  data.totalDocumentos || 0
+);
 
 const intervalo =
   setInterval(
@@ -312,17 +326,37 @@ const modalProgreso = (
 
       <div className="bg-card border rounded-xl p-6 w-[550px]">
 
-        <h2 className="text-xl font-bold mb-4">
-          Sincronizando documentos
-        </h2>
+        <div className="flex items-center gap-3 mb-4">
+
+  <RefreshCw
+    className="h-6 w-6 text-blue-500 animate-spin"
+  />
+
+  <h2 className="text-xl font-bold">
+    Sincronizando documentos
+  </h2>
+
+</div>
 
         <p className="mb-2">
           Se detectaron {documentosDetectados} documentos nuevos
         </p>
 
-        <p className="mb-4 text-sm text-muted-foreground">
-          {mensajeProgreso}
-        </p>
+        <p className="text-xs text-muted-foreground mb-3">
+  Analizando documentos y generando movimientos financieros...
+</p>
+
+        <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+
+  <RefreshCw
+    className="h-4 w-4 animate-spin"
+  />
+
+  <span>
+    {mensajeProgreso}
+  </span>
+
+</div>
 
         <div className="w-full bg-secondary rounded-full h-4 overflow-hidden">
 

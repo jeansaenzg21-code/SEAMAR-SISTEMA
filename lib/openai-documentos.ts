@@ -100,9 +100,7 @@ Los tipos posibles son:
 - factura
 - valorizacion
 - orden_servicio
-<<<<<<< HEAD
 - contrato
-=======
 - otro
 
 Si el documento no corresponde claramente a ninguno de los tipos definidos,
@@ -114,7 +112,6 @@ responde únicamente:
 
 No inventes campos.
 No supongas información.
->>>>>>> e8c745088dea28e4bb6af27cc836f067af128ecd
 
 Devuelve SOLO JSON válido.
 No uses markdown.
@@ -377,40 +374,7 @@ Si es ORDEN_SERVICIO extrae:
 - montoReferencial
 - fechaEmision (formato YYYY-MM-DD)
 
-<<<<<<< HEAD
-Si es SUNAT extrae:
-- tipoDocumento
-- empresa
-- ruc
-- periodo
-- tributo
-- fechaPago (formato YYYY-MM-DD)
-- importePagado
-- numeroOperacion
-- banco
 
-Si es RECIBO POR HONORARIOS extrae:
-- tipoDocumento
-- numeroRecibo
-- persona
-- ruc
-- empresaCliente
-- fechaEmision (formato YYYY-MM-DD)
-- concepto
-- monto
-- retencion
-- montoNeto
-
-Si es AFP extrae:
-- tipoDocumento
-- afp
-- empresa
-- ruc
-- periodo
-- fechaPago (formato YYYY-MM-DD)
-- montoPensiones
-- montoRetribuciones
-- numeroPlanilla
 Para CONTRATO u ORDEN DE COMPRA responde exactamente con esta estructura:
 {
   "tipoDocumento": "contrato",
