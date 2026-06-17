@@ -147,15 +147,54 @@ Valores posibles:
 Nunca devolver null.
 Siempre devolver COBRAR o PAGAR. 
 
-Reglas:
+REGLA OBLIGATORIA:
 
-COBRAR:
-Cuando SEAMAR DIVERS INTERNATIONAL S.A.C.
-es quien emite el documento.
+RUC DE SEAMAR:
+20611842458
 
-PAGAR:
-Cuando SEAMAR DIVERS INTERNATIONAL S.A.C.
-es quien recibe el documento.
+Si rucEmisor = 20611842458
+entonces destino = COBRAR.
+
+Si rucCliente = 20611842458
+entonces destino = PAGAR.
+
+Esta regla tiene prioridad absoluta.
+
+No utilizar descripciones,
+productos,
+servicios,
+bancos,
+órdenes de compra
+ni contexto comercial
+para determinar destino.
+
+Determinar destino únicamente
+usando empresaEmisora,
+empresaCliente,
+rucEmisor
+y rucCliente.
+
+REGLAS IMPORTANTES DE CLASIFICACION
+
+1. Si el documento corresponde a un banco
+(BCP, Banco de Crédito del Perú, BBVA, Interbank, Scotiabank u otra entidad financiera):
+
+- empresaEmisora = banco
+- empresaCliente = empresa que recibe el cobro
+- destino = PAGAR
+
+2. Los conceptos:
+- portes
+- mantenimiento de cuenta
+- comisiones bancarias
+- gastos financieros
+- cargos bancarios
+- servicios bancarios
+- movimientos bancarios
+
+siempre deben clasificarse como destino = PAGAR.
+
+3. Nunca clasificar como COBRAR un documento emitido por una entidad financiera.
 
 Para determinar destino:
 

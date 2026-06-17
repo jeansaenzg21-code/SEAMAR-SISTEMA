@@ -98,6 +98,85 @@ for (const archivo of archivosNuevos) {
     archivo.name
   );
 
+  const RUC_SEAMAR =
+  "20611842458";
+
+const rucEmisor =
+  String(
+    json.rucEmisor || ""
+  )
+  .replace(/\D/g, "");
+
+const rucCliente =
+  String(
+    json.rucCliente || ""
+  )
+  .replace(/\D/g, "");
+
+const empresaEmisora =
+  String(
+    json.empresaEmisora || ""
+  )
+  .toUpperCase();
+
+const empresaCliente =
+  String(
+    json.empresaCliente || ""
+  )
+  .toUpperCase();
+
+  const entidadPrincipal =
+  String(
+    json.entidadPrincipal || ""
+  )
+  .toUpperCase();
+
+const esDocumentoBancario =
+
+  empresaEmisora.includes("BANCO") ||
+
+  entidadPrincipal.includes("BANCO") ||
+
+  empresaEmisora.includes("BCP") ||
+
+  entidadPrincipal.includes("BCP") ||
+
+  empresaEmisora.includes("BBVA") ||
+
+  entidadPrincipal.includes("BBVA") ||
+
+  empresaEmisora.includes("INTERBANK") ||
+
+  entidadPrincipal.includes("INTERBANK") ||
+
+  empresaEmisora.includes("SCOTIABANK") ||
+
+  entidadPrincipal.includes("SCOTIABANK");
+
+if (esDocumentoBancario) {
+
+  json.destino = "PAGAR";
+
+}
+
+else if (
+  rucCliente.includes(RUC_SEAMAR) ||
+  empresaCliente.includes("SEAMAR")
+) {
+
+  json.destino = "PAGAR";
+
+}
+
+else if (
+  rucEmisor.includes(RUC_SEAMAR) ||
+  empresaEmisora.includes("SEAMAR")
+) {
+
+  json.destino = "COBRAR";
+
+}
+
   procesados++;
 
 await pool.query(
