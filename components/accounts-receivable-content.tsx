@@ -417,7 +417,7 @@ const modalResumen = (
               variant="outline"
               onClick={() =>
                 window.location.href =
-                "/cuentas-por-pagar"
+                "/accounts-payable"
               }
             >
               Ver cuentas por pagar

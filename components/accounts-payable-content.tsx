@@ -69,6 +69,23 @@ export function AccountsPayableContent() {
   const [searchQuery, setSearchQuery] = useState("")
 
   const [proveedores, setProveedores] = useState<any[]>([])
+  const [mostrarResumen, setMostrarResumen] =
+  useState(false);
+
+const [resultadoSync, setResultadoSync] =
+  useState<any>(null);
+
+const [sincronizando, setSincronizando] =
+  useState(false);
+
+const [progreso, setProgreso] =
+  useState(0);
+
+const [mensajeProgreso, setMensajeProgreso] =
+  useState("");
+
+const [documentosDetectados, setDocumentosDetectados] =
+  useState(0);
 
   useEffect(() => {
     cargarCuentasPorPagar()
@@ -98,32 +115,244 @@ export function AccountsPayableContent() {
   }
 
   const sincronizarOneDrive = async () => {
-    try {
-      const response = await fetch(
-        "/api/sincronizar-cuentas-por-pagar",
+
+  setSincronizando(true);
+
+  setDocumentosDetectados(0);
+
+  setProgreso(0);
+
+  setMensajeProgreso(
+    "Buscando documentos nuevos en OneDrive..."
+  );
+
+  try {
+
+    const inicio =
+      await fetch(
+        "/api/iniciar-sincronizacion",
         {
-          method: "POST",
+          method: "POST"
         }
-      )
+      );
 
-      const data = await response.json()
+    const data =
+      await inicio.json();
 
-      await cargarCuentasPorPagar()
+    const sincronizacionId =
+      data.sincronizacionId;
 
-      alert(
-`Sincronización completada.
+    fetch(
+      "/api/sincronizar-documentos",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          sincronizacionId
+        })
+      }
+    );
 
-Nuevas CxP: ${data.nuevos}
+    setDocumentosDetectados(
+      data.totalDocumentos || 0
+    );
 
-Proveedores no encontrados: ${data.proveedoresNoEncontrados}
+    const intervalo =
+      setInterval(
+        async () => {
 
-Proyectos no encontrados: ${data.proyectosNoEncontrados}`
-      )
-    } catch (error) {
-      console.error(error)
-      alert("Error al sincronizar")
-    }
+          const r =
+            await fetch(
+              `/api/sincronizaciones/${sincronizacionId}`
+            );
+
+          const sync =
+            await r.json();
+
+          const porcentaje =
+            sync.total_documentos > 0
+              ? Math.round(
+                  (
+                    sync.procesados /
+                    sync.total_documentos
+                  ) * 100
+                )
+              : 100;
+
+          setProgreso(
+            porcentaje
+          );
+
+          setMensajeProgreso(
+            sync.mensaje
+          );
+
+          if (
+            sync.estado ===
+            "COMPLETADO"
+          ) {
+
+            clearInterval(
+              intervalo
+            );
+
+            setSincronizando(
+              false
+            );
+
+            await cargarCuentasPorPagar();
+
+            setResultadoSync(
+              sync
+            );
+
+            setMostrarResumen(
+              true
+            );
+
+          }
+
+        },
+        1000
+      );
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "Error al sincronizar"
+    );
+
   }
+
+}
+
+const modalProgreso = (
+  sincronizando && (
+
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+      <div className="bg-card border rounded-xl p-6 w-[550px]">
+
+        <div className="flex items-center gap-3 mb-4">
+
+  <RefreshCw
+    className="h-6 w-6 text-blue-500 animate-spin"
+  />
+
+  <h2 className="text-xl font-bold">
+    Sincronizando documentos
+  </h2>
+
+</div>
+
+        <p className="mb-2">
+          Se detectaron {documentosDetectados} documentos nuevos
+        </p>
+
+        <p className="text-xs text-muted-foreground mb-3">
+  Analizando documentos y generando movimientos financieros...
+</p>
+
+        <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+
+  <RefreshCw
+    className="h-4 w-4 animate-spin"
+  />
+
+  <span>
+    {mensajeProgreso}
+  </span>
+
+</div>
+
+        <div className="w-full bg-secondary rounded-full h-4 overflow-hidden">
+
+          <div
+            className="bg-blue-500 h-4 transition-all"
+            style={{
+              width: `${progreso}%`
+            }}
+          />
+
+        </div>
+
+        <p className="text-center mt-3 font-medium">
+          {progreso}%
+        </p>
+
+      </div>
+
+    </div>
+
+  )
+);
+
+const modalResumen = (
+  mostrarResumen &&
+  resultadoSync && (
+
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+      <div className="bg-card border rounded-xl p-6 w-[500px]">
+
+        <h2 className="text-xl font-bold mb-4">
+          Sincronización completada
+        </h2>
+
+        <p>
+          Documentos procesados:
+          {resultadoSync.total_documentos}
+        </p>
+
+        <p>
+          CxP generadas:
+          {resultadoSync.cuentas_pagar}
+        </p>
+
+        {resultadoSync.cuentas_cobrar > 0 && (
+          <p>
+            CxC generadas:
+            {resultadoSync.cuentas_cobrar}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2 mt-6">
+
+          {resultadoSync.cuentas_cobrar > 0 && (
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                window.location.href =
+                "/accounts-receivable"
+              }
+            >
+              Ver cuentas por cobrar
+            </Button>
+
+          )}
+
+          <Button
+            onClick={() =>
+              setMostrarResumen(false)
+            }
+          >
+            Aceptar
+          </Button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  )
+);
 
   const filteredAccounts = accountsPayable.filter((item) => {
     if (statusFilter !== "all" && item.estado !== statusFilter) return false
@@ -197,6 +426,10 @@ Proyectos no encontrados: ${data.proyectosNoEncontrados}`
   }
 
   return (
+  <>
+    {modalProgreso}
+    {modalResumen}
+
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
         <div>
@@ -388,6 +621,7 @@ Proyectos no encontrados: ${data.proyectosNoEncontrados}`
           </CardContent>
         </Card>
       </div>
-    </div>
+        </div>
+  </>
   )
 }

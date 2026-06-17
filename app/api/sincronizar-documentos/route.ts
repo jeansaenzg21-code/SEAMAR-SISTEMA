@@ -161,22 +161,37 @@ if (json.rucCliente) {
 
   if (clientes.length > 0) {
 
-    clienteId =
-      clientes[0].id;
+  clienteId =
+    clientes[0].id;
 
-  } else {
+} else {
 
-    console.log(
-  "Cliente no encontrado:",
-  json.empresaCliente,
-  json.rucCliente
-);
+  console.log(
+    "Creando cliente automáticamente:",
+    json.empresaCliente
+  );
 
-clientesNoEncontrados++;
+  const [nuevoCliente]: any =
+    await pool.query(
+      `
+      INSERT INTO clientes (
+        razon_social,
+        ruc,
+        estado
+      )
+      VALUES (?, ?, ?)
+      `,
+      [
+        json.empresaCliente,
+        json.rucCliente,
+        "ACTIVO"
+      ]
+    );
 
-continue;
+  clienteId =
+    nuevoCliente.insertId;
 
-  }
+}
 
 }
 
@@ -369,17 +384,32 @@ if (json.rucEmisor) {
 
   } else {
 
-    console.log(
-  "Proveedor no encontrado:",
-  json.empresaEmisora,
-  json.rucEmisor
-);
+  console.log(
+    "Creando proveedor automáticamente:",
+    json.empresaEmisora
+  );
 
-proveedoresNoEncontrados++;
+  const [nuevoProveedor]: any =
+    await pool.query(
+      `
+      INSERT INTO proveedores (
+        razon_social,
+        ruc,
+        estado
+      )
+      VALUES (?, ?, ?)
+      `,
+      [
+        json.empresaEmisora,
+        json.rucEmisor,
+        "ACTIVO"
+      ]
+    );
 
-continue;
+  proveedorId =
+    nuevoProveedor.insertId;
 
-  }
+}
 
 }
 
