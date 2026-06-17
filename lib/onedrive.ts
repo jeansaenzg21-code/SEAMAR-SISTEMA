@@ -114,4 +114,46 @@ export async function descargarArchivo(
     buffer,
   };
 
+ 
+} export async function subirContratoAOneDrive(
+  nombreArchivo: string,
+  buffer: Buffer
+) {
+  const token =
+    await getAccessToken()
+
+  const ruta =
+    `SistemaSeamar/Contratos/${nombreArchivo}`
+
+  const response =
+    await fetch(
+      `https://graph.microsoft.com/v1.0/users/${USER}/drive/root:/Documents/${ruta}:/content`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type":
+            "application/octet-stream",
+        },
+        body: buffer as unknown as BodyInit,
+      }
+    )
+
+  if (!response.ok) {
+    const error =
+      await response.text()
+
+    throw new Error(
+      `Error al subir contrato a OneDrive: ${error}`
+    )
+  }
+
+  const archivo =
+    await response.json()
+
+  return {
+    nombre: archivo.name,
+    itemId: archivo.id,
+    webUrl: archivo.webUrl,
+  }
 }

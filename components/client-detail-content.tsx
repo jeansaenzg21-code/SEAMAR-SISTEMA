@@ -3,6 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { RefreshCw } from "lucide-react"
+import { Briefcase } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +64,7 @@ const cobranza = {
 
 export function ClientDetailContent({ clientId }: ClientDetailProps) {
 
+  const [contrato, setContrato] = useState<File | null>(null)
   const [client, setClient] = useState<Client | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [editedClient, setEditedClient] = useState({
@@ -188,10 +192,7 @@ const cambiarEstadoProyecto =
           `/api/proyectos/${id}/estado`,
           {
             method: "PATCH",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          
             body:
               JSON.stringify({
                 estado,
@@ -255,14 +256,49 @@ if (!client) {
             <p className="text-muted-foreground">Información del cliente</p>
           </div>
         </div>
-        <Button
-  onClick={() =>
-    setOpenProjectModal(true)
-  }
+        <div className="flex items-center gap-2">
+
+  <Button
+  variant="outline"
+  size="icon"
+  onClick={async () => {
+    try {
+      const response = await fetch(
+        "/api/sincronizar-contratos",
+        {
+          method: "POST",
+        }
+      )
+
+      const data = await response.json()
+
+      if (!data.success) {
+        alert("Error al sincronizar contratos")
+        return
+      }
+
+      await cargarProyectos()
+
+      alert("Proyectos sincronizados correctamente")
+    } catch (error) {
+      console.error(error)
+      alert("Error de conexión")
+    }
+  }}
 >
-  <Plus className="mr-2 h-4 w-4" />
-  Nuevo Proyecto
+  <RefreshCw className="h-4 w-4" />
 </Button>
+
+  <Button
+    onClick={() =>
+      setOpenProjectModal(true)
+    }
+  >
+    <Plus className="mr-2 h-4 w-4" />
+    Nuevo Proyecto/Servicio
+  </Button>
+
+</div>
       </div>
 
       {/* Stats Cards */}
@@ -278,7 +314,7 @@ if (!client) {
                 <p className="text-2xl font-bold">
   {projects.length}
 </p>
-                <p className="text-sm text-muted-foreground">Proyectos Totales</p>
+                <p className="text-sm text-muted-foreground">Proyectos/Servicios Totales</p>
               </div>
             </div>
           </CardContent>
@@ -289,16 +325,18 @@ if (!client) {
               <div className="rounded-md bg-success/10 p-3">
                 <TrendingUp className="h-5 w-5 text-success" />
               </div>
+              
               <div>
                 <p className="text-2xl font-bold">
   {(Array.isArray(projects) ? projects : []).filter((p) => p.estado === "EN_CURSO").length}
 
 </p>
-                <p className="text-sm text-muted-foreground">Proyectos Activos</p>
+                <p className="text-sm text-muted-foreground">Proyectos/Servicios Activos</p>
               </div>
             </div>
           </CardContent>
         </Card>
+        
         <Card className="bg-card border-border">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -613,10 +651,7 @@ if (!client) {
         `/api/clientes/${client.id}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
+          
           body: JSON.stringify(
             editedClient
           ),
@@ -750,8 +785,8 @@ if (!client) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Proyectos Registrados</CardTitle>
-<CardDescription>Proyectos activos y recientemente completados</CardDescription>
+              <CardTitle>Proyectos/Servicios Registrados</CardTitle>
+<CardDescription>Proyectos/Servicios activos y recientemente completados</CardDescription>
             </div>
            
 
@@ -767,7 +802,7 @@ if (!client) {
 
     <div className="rounded-lg border border-border p-8 text-center">
       <p className="text-muted-foreground">
-        No hay proyectos registrados
+        No hay proyectos/servicios registrados
       </p>
     </div>
 
@@ -835,13 +870,44 @@ if (!client) {
   <DialogContent>
     <DialogHeader>
       <DialogTitle>
-        Nuevo Proyecto
+        Nuevo Proyecto/Servicio
       </DialogTitle>
 
     </DialogHeader>
 
     <div className="space-y-4">
+<div className="space-y-2">
+  <label className="text-sm font-medium">
+    Contrato 
+  </label>
 
+  <label
+    htmlFor="contrato"
+    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-5 text-center hover:bg-muted/50"
+  >
+    <UploadCloud className="mb-2 h-6 w-6 text-muted-foreground" />
+
+    <span className="text-sm font-medium">
+      {contrato
+        ? contrato.name
+        : "Adjuntar contrato"}
+    </span>
+
+    <span className="mt-1 text-xs text-muted-foreground">
+      PDF, Word o Excel
+    </span>
+
+    <input
+      id="contrato"
+      type="file"
+      className="hidden"
+      accept=".pdf,.doc,.docx,.xls,.xlsx"
+      onChange={(e) =>
+        setContrato(e.target.files?.[0] || null)
+      }
+    />
+  </label>
+</div>
       <div>
         <label className="text-sm">
           Nombre
@@ -915,26 +981,48 @@ if (!client) {
             return
 
           try {
-            const response =
-              await fetch(
-                "/api/proyectos",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type":
-                      "application/json",
-                  },
-                  body:
-                    JSON.stringify({
-                      cliente_id:
-                        client.id,
-                      nombre:
-                        projectForm.nombre,
-                      descripcion:
-                        projectForm.descripcion,
-                    }),
-                }
-              )
+            const formData = new FormData()
+
+formData.append(
+  "cliente_id",
+  String(client.id)
+)
+
+formData.append(
+  "nombre",
+  projectForm.nombre
+)
+
+formData.append(
+  "descripcion",
+  projectForm.descripcion
+)
+
+if (contrato) {
+  formData.append(
+    "contrato",
+    contrato
+  )
+}
+
+const projectData = new FormData()
+
+projectData.append("cliente_id", String(client.id))
+projectData.append("nombre", projectForm.nombre)
+projectData.append("descripcion", projectForm.descripcion)
+
+if (contrato) {
+  projectData.append("contrato", contrato)
+}
+
+const response =
+  await fetch(
+    "/api/proyectos",
+    {
+      method: "POST",
+      body: projectData,
+    }
+  )
 
             const data =
               await response.json()
@@ -951,7 +1039,10 @@ if (!client) {
             setProjectForm({
   nombre: "",
   descripcion: "",
+  
 })
+
+
 
 await cargarProyectos()
 
