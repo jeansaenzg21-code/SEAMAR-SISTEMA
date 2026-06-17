@@ -76,6 +76,23 @@ export function AccountsReceivableContent() {
   const [searchQuery, setSearchQuery] = useState("")
 
   const [clientes, setClientes] = useState<any[]>([])
+  const [mostrarResumen, setMostrarResumen] =
+  useState(false);
+
+const [resultadoSync, setResultadoSync] =
+  useState<any>(null);
+
+const [sincronizando, setSincronizando] =
+  useState(false);
+
+const [progreso, setProgreso] =
+  useState(0);
+
+const [mensajeProgreso, setMensajeProgreso] =
+  useState("");
+
+const [documentosDetectados, setDocumentosDetectados] =
+  useState(0);
  
   useEffect(() => {
   cargarCuentasPorCobrar()
@@ -123,12 +140,21 @@ const cargarClientes = async () => {
 }
 const sincronizarOneDrive = async () => {
 
+  setSincronizando(true);
+
+  setDocumentosDetectados(0);
+
+  setProgreso(0);
+
+  setMensajeProgreso(
+    "Buscando documentos nuevos en OneDrive..."
+  );
+
   try {
-    
 
     const response =
       await fetch(
-        "/api/sincronizar-cuentas-por-cobrar",
+        "/api/sincronizar-documentos",
         {
           method: "POST"
         }
@@ -137,19 +163,71 @@ const sincronizarOneDrive = async () => {
     const data =
       await response.json();
 
-    console.log(data);
-
-    await cargarCuentasPorCobrar();
-
-    alert(
-`Sincronización completada.
-
-Nuevas CxC: ${data.nuevos}
-
-Clientes no encontrados: ${data.clientesNoEncontrados}
-
-Proyectos no encontrados: ${data.proyectosNoEncontrados}`
+setDocumentosDetectados(
+  data.documentosProcesados
 );
+
+    const sincronizacionId =
+  data.sincronizacionId;
+
+const intervalo =
+  setInterval(
+    async () => {
+
+      const r =
+        await fetch(
+          `/api/sincronizaciones/${sincronizacionId}`
+        );
+
+      const sync =
+        await r.json();
+
+      const porcentaje =
+        sync.total_documentos > 0
+          ? Math.round(
+              (
+                sync.procesados /
+                sync.total_documentos
+              ) * 100
+            )
+          : 100;
+
+      setProgreso(
+        porcentaje
+      );
+
+      setMensajeProgreso(
+        sync.mensaje
+      );
+
+      if (
+        sync.estado ===
+        "COMPLETADO"
+      ) {
+
+        clearInterval(
+          intervalo
+        );
+
+        setSincronizando(
+          false
+        );
+
+        await cargarCuentasPorCobrar();
+
+        setResultadoSync(
+          sync
+        );
+
+        setMostrarResumen(
+          true
+        );
+
+      }
+
+    },
+    1000
+  );
 
   } catch (error) {
 
@@ -227,7 +305,114 @@ Proyectos no encontrados: ${data.proyectosNoEncontrados}`
   window.URL.revokeObjectURL(url)
 }
 
+const modalProgreso = (
+  sincronizando && (
+
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+      <div className="bg-card border rounded-xl p-6 w-[550px]">
+
+        <h2 className="text-xl font-bold mb-4">
+          Sincronizando documentos
+        </h2>
+
+        <p className="mb-2">
+          Se detectaron {documentosDetectados} documentos nuevos
+        </p>
+
+        <p className="mb-4 text-sm text-muted-foreground">
+          {mensajeProgreso}
+        </p>
+
+        <div className="w-full bg-secondary rounded-full h-4 overflow-hidden">
+
+          <div
+            className="bg-blue-500 h-4 transition-all"
+            style={{
+              width: `${progreso}%`
+            }}
+          />
+
+        </div>
+
+        <p className="text-center mt-3 font-medium">
+          {progreso}%
+        </p>
+
+      </div>
+
+    </div>
+
+  )
+);
+
+const modalResumen = (
+  mostrarResumen &&
+  resultadoSync && (
+
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+      <div className="bg-card border rounded-xl p-6 w-[500px]">
+
+        <h2 className="text-xl font-bold mb-4">
+          Sincronización completada
+        </h2>
+
+        <p>
+          Documentos procesados:
+          {resultadoSync.total_documentos}
+        </p>
+
+        <p>
+          CxC generadas:
+          {resultadoSync.cuentas_cobrar}
+        </p>
+
+        {resultadoSync.cuentas_pagar > 0 && (
+          <p>
+            CxP generadas:
+            {resultadoSync.cuentas_pagar}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2 mt-6">
+
+          {resultadoSync.cuentas_pagar > 0 && (
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                window.location.href =
+                "/cuentas-por-pagar"
+              }
+            >
+              Ver cuentas por pagar
+            </Button>
+
+          )}
+
+          <Button
+            onClick={() =>
+              setMostrarResumen(false)
+            }
+          >
+            Aceptar
+          </Button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  )
+);
   return (
+  <>
+    
+  {modalProgreso}
+  {modalResumen}
+
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
         <div>
@@ -425,5 +610,7 @@ Proyectos no encontrados: ${data.proyectosNoEncontrados}`
         </Card>
       </div>
     </div>
-  )
+
+  </>
+)
 }
