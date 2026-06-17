@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
+import { procesarDocumento } from "@/lib/openai-documentos";
 type ClientFormProps = {
   onClose: () => void
 }
@@ -97,7 +98,18 @@ const consultarRuc = async () => {
   setDireccion("")
   setRucConsultado("")
 
-  alert("RUC no encontrado")
+  let mensaje =
+    "No se pudo consultar el RUC."
+
+  if (
+    data.code === "401"
+  ) {
+    mensaje =
+      "El servicio de consulta RUC no está disponible en este momento."
+  }
+
+  alert(mensaje)
+
   return
 }
 

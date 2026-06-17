@@ -6,7 +6,7 @@ import {
 } from "@/lib/onedrive";
 import { guardarValorizacion } from "@/lib/valorizaciones";
 
-import { procesarPdf } from "@/lib/openai-documentos";
+import { procesarDocumento } from "@/lib/openai-documentos";
 
 
 
@@ -49,8 +49,9 @@ console.log(
 );
 
 const json =
-  await procesarPdf(
-    archivoCompleto.buffer
+  await procesarDocumento(
+    archivoCompleto.buffer,
+    archivoCompleto.nombre
   );
 
 console.log(json);

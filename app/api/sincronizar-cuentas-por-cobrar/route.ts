@@ -6,10 +6,10 @@ import {
 
 import pool from "@/lib/mysql";
 
+import { procesarDocumento } from "@/lib/openai-documentos";
 import {
-  procesarPdf
-} from "@/lib/openai-documentos";
-
+  guardarContrato
+} from "@/lib/valorizaciones";
 
 export async function POST() {
 
@@ -44,9 +44,11 @@ for (const archivo of archivos) {
     await descargarArchivo(
       archivo.id
     );
-    const json =
-  await procesarPdf(
-    archivoCompleto.buffer
+
+  const json =
+  await procesarDocumento(
+    archivoCompleto.buffer,
+    archivoCompleto.nombre
   );
 
 console.log(
@@ -241,6 +243,7 @@ await pool.query(
   nuevos++;
 
 }
+
 }
 
 return NextResponse.json({

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { leerPdf } from "./pdf-reader";
+import * as XLSX from "xlsx";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -18,12 +19,62 @@ function parsearJson(
   return JSON.parse(limpio);
 
 }
-export async function procesarPdf(
+function leerExcel(
   buffer: Buffer
 ) {
 
-  const textoPdf =
-  await leerPdf(buffer);
+  const workbook =
+    XLSX.read(buffer, {
+      type: "buffer"
+    });
+
+  let texto = "";
+
+  for (
+    const sheetName of workbook.SheetNames
+  ) {
+
+    const sheet =
+      workbook.Sheets[sheetName];
+
+    const filas =
+      XLSX.utils.sheet_to_json(
+        sheet,
+        {
+          header: 1,
+          defval: ""
+        }
+      );
+
+    texto +=
+      `\nHOJA: ${sheetName}\n`;
+
+    texto += filas
+      .map(
+        (fila: any) =>
+          fila.join(" | ")
+      )
+      .join("\n");
+
+  }
+
+  return texto;
+
+}
+export async function procesarDocumento(
+  buffer: Buffer,
+  nombreArchivo: string
+) {
+
+  const esExcel =
+    nombreArchivo.endsWith(".xlsx") ||
+    nombreArchivo.endsWith(".xls") ||
+    nombreArchivo.endsWith(".csv");
+
+  const textoDocumento =
+    esExcel
+      ? leerExcel(buffer)
+      : await leerPdf(buffer);
 
   let ultimoError: any;
 
@@ -52,6 +103,7 @@ Los tipos posibles son:
 - afp
 - valorizacion
 - orden_servicio
+- contrato
 
 Devuelve SOLO JSON válido.
 No uses markdown.
@@ -81,31 +133,74 @@ Si es VALORIZACION extrae:
 - monto
 - moneda
 - periodo
-- fechaEjecucion (formato YYYY-MM-DD)
+- fechaEjecucion
+
+También considera como VALORIZACION:
+- Archivos Excel o tablas con valorizaciones.
+- Documentos que tengan columnas como:
+  "Orden de Servicio", "OS", "O/S", "N° OS",
+  "Descripción", "Servicio", "Monto", "Importe",
+  "Periodo", "Fecha", "Fecha de ejecución".
+- Reportes donde cada fila representa una valorización o servicio valorizado.
+
+Reglas para Excel de valorizaciones:
+- Si el documento viene de Excel, analiza filas y columnas aunque estén desordenadas.
+- Usa los encabezados para identificar los campos.
+- Si una fila contiene una valorización, extrae los datos de esa fila.
+- Si hay varias filas, toma la valorización principal o la primera fila válida con monto y descripción.
+- No inventes datos.
+- Si un campo no existe, devuelve null.
+
+Mapeo de columnas posibles:
+- proveedor: "Proveedor", "Razón Social", "Empresa", "Contratista"
+- ruc: "RUC", "RUC Proveedor", "RUC Empresa"
+- negocioOperacion: "Negocio", "Operación", "Unidad", "Área", "Sede"
+- numeroOrdenServicio: "Orden de Servicio", "N° Orden de Servicio", "OS", "O/S", "N° OS", "Nro OS"
+- descripcion: "Descripción", "Servicio", "Concepto", "Detalle", "Trabajo ejecutado", "Actividad"
+- monto: "Monto", "Importe", "Total", "Valor", "Subtotal", "Monto valorizado"
+- moneda: "Moneda", "Currency", "Soles", "USD"
+- periodo: "Periodo", "Mes", "Semana", "Valorización del mes"
+- fechaEjecucion: "Fecha ejecución", "Fecha de ejecución", "Fecha", "Fecha fin", "Fecha valorización"
 
 Reglas para numeroOrdenServicio:
-- En documentos de VALORIZACIÓN, busca la columna o etiqueta:
-  "N° de Orden de Servicio (OS)", "Orden de Servicio", "OS", "O/S".
-- Si cerca de esa etiqueta aparece un número, ese número es numeroOrdenServicio.
-- En tablas, si aparece una fila con valores como:
-  "34643 23,000.00 27-Feb-26",
-  el primer número antes del monto es la Orden de Servicio.
-- No confundas numeroOrdenServicio con monto, fecha o factura.
-- Si aparece "34643" asociado a "N° de Orden de Servicio (OS)", devuelve "34643".
-- Devuelve solo el número/código, sin texto adicional.
+- Busca etiquetas como:
+  "N° de Orden de Servicio (OS)", "Orden de Servicio", "OS", "O/S", "N° OS".
+- Devuelve solo el número o código, sin texto adicional.
+- No confundas numeroOrdenServicio con monto, factura, RUC, fecha o número de fila.
+- Si aparece una fila como:
+  "34643 23,000.00 27-Feb-26"
+  entonces:
+  numeroOrdenServicio = "34643"
+  monto = 23000
+  fechaEjecucion = "2026-02-27"
+- Si existe un código asociado a OS, nunca devuelvas null.
+
+Reglas para monto:
+- Devuelve número, no texto.
+- Quita comas, símbolos y moneda.
+- Ejemplo: "S/ 23,000.00" => 23000
+- Ejemplo: "$ 1,500.50" => 1500.5
+
+Reglas para moneda:
+- Si aparece "S/", "SOLES", "PEN" devuelve "SOLES".
+- Si aparece "$", "USD", "DOLARES" devuelve "DOLARES".
+- Si no aparece, devuelve null.
+
+Reglas para fechaEjecucion:
+- Devuelve formato YYYY-MM-DD.
+- Convierte fechas como "27-Feb-26" a "2026-02-27".
+- Si solo hay periodo o mes, deja fechaEjecucion en null.
+
+Reglas para periodo:
+- Si aparece mes y año, devuelve algo como "FEBRERO 2026".
+- Si aparece "2026-02", devuelve "FEBRERO 2026".
 - Si no existe, devuelve null.
 
-IMPORTANTE:
-En el documento de valorización, el número de Orden de Servicio puede aparecer como primer valor de la fila de datos.
-
-Ejemplo real:
-"34643 23,000.00 27-Feb-26"
-
-En ese caso:
-- numeroOrdenServicio = "34643"
-- monto = 23000
-- NO tomes 34643 como número de factura.
-- NO devuelvas numeroOrdenServicio como null si existe ese número en la fila.
+Reglas importantes:
+- Si el archivo parece una tabla de valorizaciones, clasifícalo como "valorizacion".
+- No clasifiques como factura solo porque hay monto.
+- No clasifiques como contrato solo porque hay servicios.
+- Una valorización normalmente confirma trabajos ejecutados, montos valorizados, periodo, OS o servicio.
 
 Si es FACTURA extrae:
 - tipoDocumento
@@ -131,6 +226,7 @@ Extrae solamente el nombre corto del proyecto o trabajo ejecutado.
 
 Ejemplo:
 "MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS"
+
 
 descripcionServicio:
 Extrae la descripción completa del servicio facturado.
@@ -177,15 +273,88 @@ Si es AFP extrae:
 - montoPensiones
 - montoRetribuciones
 - numeroPlanilla
+Para CONTRATO u ORDEN DE COMPRA responde exactamente con esta estructura:
+{
+  "tipoDocumento": "contrato",
+  "cliente": null,
+  "rucCliente": null,
+  "proveedor": null,
+  "rucProveedor": null,
+  "numeroContrato": null,
+  "numeroOrdenCompra": null,
+  "proyecto": null,
+  "descripcionProyecto": null,
+  "moneda": null,
+  "terminoPago": null,
+  "fechaEmision": null,
+  "subtotal": null,
+  "igv": null,
+  "total": null,
+  "servicios": [
+    {
+      "nombreServicio": null,
+      "descripcion": null,
+      "numeroRequerimiento": null,
+      "fechaProgramada": null,
+      "unidadMedida": null,
+      "cantidad": null,
+      "precioUnitario": null,
+      "montoPactado": null
+    }
+  ]
+}
+
+Si es CONTRATO u ORDEN DE COMPRA extrae:
+- cliente
+- rucCliente
+- proveedor
+- rucProveedor
+- numeroContrato
+- numeroOrdenCompra
+- proyecto
+- descripcionProyecto
+- moneda
+- terminoPago
+- fechaEmision
+- subtotal
+- igv
+- total
+- servicios
+
+Reglas para detectar CONTRATO:
+- Si el documento dice "Contrato", "Contrato Marco", "Número Contrato", "Orden Compra", "Orden de Compra", "N° OC", o tiene líneas de servicios con precio unitario y valor total, clasifícalo como "contrato".
+- Una Orden de Compra también debe devolverse como tipoDocumento: "contrato" si contiene precios pactados, fechas de entrega o líneas valorizables.
+
+Reglas para servicios:
+- Cada línea de la tabla de la orden de compra debe ser un objeto dentro de "servicios".
+- nombreServicio debe ser el nombre corto del servicio.
+- descripcion debe conservar la descripción completa de la línea.
+- fechaProgramada debe estar en formato YYYY-MM-DD.
+- cantidad debe ser número.
+- precioUnitario debe ser número.
+- montoPactado debe ser el valor total de esa línea.
+- numeroRequerimiento debe salir de la columna "Número Requer." si existe.
+- unidadMedida debe salir de "UM" si existe.
+
+Reglas para proyecto:
+- Si aparece "Proyecto", usa ese valor.
+- Si el valor de Proyecto es muy general, usa también la descripción principal del servicio para formar un nombre de proyecto entendible.
+- Ejemplo: si aparece "TDP - Terminales del Peru" y el servicio dice "SERVICIO DE MANTENIMIENTO GENERAL DE AMARRADERO", el proyecto puede ser "MANTENIMIENTO GENERAL DE AMARRADERO".
+
+Reglas para número de OC:
+- Si aparece "N° OC 34647", devuelve numeroOrdenCompra = "34647".
+- No confundas numeroOrdenCompra con número de requerimiento.
 
 DOCUMENTO:
 
-${textoPdf}
+${textoDocumento}
   `
             });
 
       return parsearJson(
   response.output_text ?? "{}"
+
+  
 );
 
     } catch (error: any) {

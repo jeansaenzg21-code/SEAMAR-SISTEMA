@@ -12,10 +12,69 @@ export async function PATCH(
 
     const { estado, observacion } = body;
 
+    let estadoFinal = estado;
+
+    const observacionesSistema: string[] = [];
+
+    if (estado === "EN_REVISION") {
+      const [rows]: any = await pool.query(
+        `
+        SELECT
+          numero_orden_servicio,
+          pdf_a,
+          pdf_b,
+          excel_a,
+          excel_b
+        FROM valorizaciones
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [id]
+      );
+
+      const valorizacion = rows[0];
+
+      if (!valorizacion?.numero_orden_servicio) {
+        observacionesSistema.push(
+          "Orden de servicio no fue encontrada"
+        );
+      }
+
+      if (!valorizacion?.pdf_a) {
+        observacionesSistema.push(
+          "Falta documento PDF A"
+        );
+      }
+
+      if (!valorizacion?.pdf_b) {
+        observacionesSistema.push(
+          "Falta documento PDF B"
+        );
+      }
+
+      if (!valorizacion?.excel_a) {
+        observacionesSistema.push(
+          "Falta documento Excel A"
+        );
+      }
+
+      if (!valorizacion?.excel_b) {
+        observacionesSistema.push(
+          "Falta documento Excel B"
+        );
+      }
+
+      if (observacionesSistema.length > 0) {
+        estadoFinal = "OBSERVADO";
+      }
+    }
+
     const observacionFinal =
-      observacion && observacion.trim() !== ""
-        ? observacion
-        : "Orden de servicio no fue encontrada";
+      observacionesSistema.length > 0
+        ? observacionesSistema.join("\n")
+        : observacion && observacion.trim() !== ""
+          ? observacion
+          : "Orden de servicio no fue encontrada";
 
     await pool.query(
       `
@@ -54,55 +113,53 @@ export async function PATCH(
       WHERE id = ?
       `,
       [
-        estado,
-        estado,
-        estado,
-        estado,
+        estadoFinal,
+        estadoFinal,
+        estadoFinal,
+        estadoFinal,
         observacionFinal,
-        estado,
+        estadoFinal,
         id,
       ]
     );
 
-    if (estado === "OBSERVADO") {
-  const [observacionesExistentes]: any = await pool.query(
-    `
-    SELECT id
-    FROM valorizacion_observaciones
-    WHERE valorizacion_id = ?
-      AND tipo = 'SISTEMA'
-      AND observacion = ?
-      AND estado = 'PENDIENTE'
-    LIMIT 1
-    `,
-    [
-      id,
-      observacionFinal,
-    ]
-  );
+    if (estadoFinal === "OBSERVADO") {
+      for (const obs of observacionFinal.split("\n")) {
+        const [observacionesExistentes]: any = await pool.query(
+          `
+          SELECT id
+          FROM valorizacion_observaciones
+          WHERE valorizacion_id = ?
+            AND tipo = 'SISTEMA'
+            AND observacion = ?
+            AND estado = 'PENDIENTE'
+          LIMIT 1
+          `,
+          [id, obs]
+        );
 
-  if (observacionesExistentes.length === 0) {
-    await pool.query(
-      `
-      INSERT INTO valorizacion_observaciones (
-        valorizacion_id,
-        observacion,
-        tipo,
-        usuario,
-        estado
-      )
-      VALUES (?, ?, 'SISTEMA', 'Sistema', 'PENDIENTE')
-      `,
-      [
-        id,
-        observacionFinal,
-      ]
-    );
-  }
-}
+        if (observacionesExistentes.length === 0) {
+          await pool.query(
+            `
+            INSERT INTO valorizacion_observaciones (
+              valorizacion_id,
+              observacion,
+              tipo,
+              usuario,
+              estado
+            )
+            VALUES (?, ?, 'SISTEMA', 'Sistema', 'PENDIENTE')
+            `,
+            [id, obs]
+          );
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
+      estado: estadoFinal,
+      observaciones: observacionFinal,
     });
   } catch (error) {
     console.error(error);

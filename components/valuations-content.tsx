@@ -58,6 +58,14 @@ type Valuation = {
   archivo_nombre?: string
   observacion_sistema?: string
 archivo_url?: string
+
+pdf_a?: string
+pdf_b?: string
+excel_a?: string
+excel_b?: string
+
+documentos_completos: number
+
 }
 
 
@@ -143,7 +151,11 @@ const [valuations, setValuations] = useState<Valuation[]>([])
   const [amount, setAmount] = useState("")
   const [fecha, setFecha] = useState("")
   const [encargado, setEncargado] = useState("")
-  const [archivo, setArchivo] = useState<File | null>(null)
+  const [archivo, setArchivo] = useState<File | null>(null) 
+  const [pdfA, setPdfA] = useState<File | null>(null)
+const [pdfB, setPdfB] = useState<File | null>(null)
+const [excelA, setExcelA] = useState<File | null>(null)
+const [excelB, setExcelB] = useState<File | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState("")
   useEffect(() => {
   cargarValorizaciones()
@@ -213,8 +225,21 @@ const cargarValorizaciones = async () => {
   archivo_nombre:
     item.archivo_nombre || "",
 
+pdf_a: item.pdf_a || "",
+pdf_b: item.pdf_b || "",
+excel_a: item.excel_a || "",
+excel_b: item.excel_b || "",
+
   observacion_sistema:
     item.observacion_sistema || "",
+
+    documentos_completos: [
+  item.pdf_a,
+  item.pdf_b,
+  item.excel_a,
+  item.excel_b,
+].filter(Boolean).length,
+    
 }))
 
     setValuations(valorizaciones)
@@ -295,6 +320,11 @@ Nuevos archivos: ${data.nuevos}`
   setFecha("")
   setEncargado("")
   setArchivo(null)
+
+  setPdfA(null)
+setPdfB(null)
+setExcelA(null)
+setExcelB(null)
 }
 
   const guardarValorizacion = async () => {
@@ -329,6 +359,11 @@ Nuevos archivos: ${data.nuevos}`
   respaldo_nombre: archivo?.name || null,
   respaldo_onedrive_id: null,
   respaldo_url: null,
+
+  pdf_a: pdfA?.name || null,
+pdf_b: pdfB?.name || null,
+excel_a: excelA?.name || null,
+excel_b: excelB?.name || null,
   
 }),
     })
@@ -682,25 +717,59 @@ if (observacionAutomatica) {
                     />
 
                     {(archivo || editingValuation?.archivo_nombre) && (
-  <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
-    <p className="mb-2 text-sm font-medium">
-      Documentos adjuntos
-    </p>
+  <div className="space-y-3">
+  <p className="text-sm font-medium">
+    Documentos obligatorios
+  </p>
 
-    <div className="flex items-center gap-3">
-  <FileText className="h-5 w-5 text-blue-400" />
+  <Input
+    type="file"
+    accept=".doc,.docx,.pdf"
+    onChange={(e) => setPdfA(e.target.files?.[0] || null)}
+  />
 
-  <div>
-    <p className="text-sm font-medium">
-      {archivo?.name || editingValuation?.archivo_nombre}
-    </p>
-
+  {pdfA && (
     <p className="text-xs text-muted-foreground">
-      Documento de respaldo
+      Word/PDF A: {pdfA.name}
     </p>
-  </div>
+  )}
+
+  <Input
+    type="file"
+    accept=".doc,.docx,.pdf"
+    onChange={(e) => setPdfB(e.target.files?.[0] || null)}
+  />
+
+  {pdfB && (
+    <p className="text-xs text-muted-foreground">
+      Word/PDF B: {pdfB.name}
+    </p>
+  )}
+
+  <Input
+    type="file"
+    accept=".doc,.docx,.pdf"
+    onChange={(e) => setExcelA(e.target.files?.[0] || null)}
+  />
+
+  {excelA && (
+    <p className="text-xs text-muted-foreground">
+      Excel Valorización: {excelA.name}
+    </p>
+  )}
+
+  <Input
+    type="file"
+    accept=".doc,.docx,.pdf"
+    onChange={(e) => setExcelB(e.target.files?.[0] || null)}
+  />
+
+  {excelB && (
+    <p className="text-xs text-muted-foreground">
+      Excel Check List: {excelB.name}
+    </p>
+  )}
 </div>
-  </div>
 )}
                   </div>
                 </div>
@@ -774,7 +843,19 @@ if (observacionAutomatica) {
     </a>
   ) : (
     <span className="text-muted-foreground text-xs">
-      Sin adjunto
+      {item.documentos_completos === 4 ? (
+  <span className="text-green-500 font-medium">
+    Completo
+  </span>
+) : item.documentos_completos === 0 ? (
+  <span className="text-red-500 font-medium">
+    Sin documentos
+  </span>
+) : (
+  <span className="text-yellow-500 font-medium">
+    {item.documentos_completos}/4
+  </span>
+)}
     </span>
   )}
 </td>
@@ -890,9 +971,36 @@ if (observacionAutomatica) {
                   </span>
                 </a>
               ) : (
-                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Sin documentos adjuntos
-                </div>
+                <div className="space-y-2">
+  {[
+    { label: "Word/PDF A", value: selectedValuation?.pdf_a },
+    { label: "Word/PDF B", value: selectedValuation?.pdf_b },
+    { label: "Excel Valorización", value: selectedValuation?.excel_a },
+    { label: "Excel Check List", value: selectedValuation?.excel_b },
+  ].map((doc) => (
+    <div
+      key={doc.label}
+      className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2"
+    >
+      <div>
+        <p className="text-xs font-medium text-muted-foreground">
+          {doc.label}
+        </p>
+        <p className="text-sm">
+          {doc.value || "No adjuntado"}
+        </p>
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!doc.value}
+      >
+        Vista previa
+      </Button>
+    </div>
+  ))}
+</div>
               )}
             </div>
 

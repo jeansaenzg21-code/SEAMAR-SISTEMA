@@ -1,5 +1,5 @@
 "use client"
-
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -150,6 +150,38 @@ const typeIcons: Record<string, string> = {
 export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
   const project = projectsData[projectId] || defaultProject
   const remainingBudget = project.budget - project.spent
+
+  const [valorizaciones, setValorizaciones] = useState<any[]>([])
+
+  useEffect(() => {
+    cargarValorizaciones()
+  }, [])
+
+  const cargarValorizaciones = async () => {
+    try {
+      const res = await fetch("/api/valorizaciones")
+      const data = await res.json()
+      setValorizaciones(data)
+    } catch (error) {
+      console.error("Error al cargar valorizaciones:", error)
+    }
+  }
+
+  const valorizacionesMilestones = valorizaciones.map((v) => ({
+    name: v.descripcion || `Valorización ${v.id}`,
+  status:
+      v.estado === "APROBADO"
+        ? "completed"
+        : v.estado === "EN_REVISION"
+        ? "in-progress"
+        : "pending",
+    date:
+      v.fecha_aprobacion ||
+      v.fecha_revision ||
+      v.fecha_ejecucion ||
+      v.periodo ||
+      new Date().toISOString(),
+  }))
 
   return (
     <div className="space-y-6">
@@ -404,39 +436,55 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
         </TabsContent>
 
         <TabsContent value="milestones">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle>Project Milestones</CardTitle>
-              <CardDescription>Track project progress through key milestones</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {project.milestones.map((milestone, index) => (
-                  <div
-                    key={milestone.name}
-                    className="flex items-center gap-4 rounded-lg border border-border bg-muted/30 p-4"
-                  >
-                    <div className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold",
-                      milestone.status === "completed" ? "bg-success/20 text-success" :
-                      milestone.status === "in-progress" ? "bg-primary/20 text-primary" :
-                      "bg-muted text-muted-foreground"
-                    )}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{milestone.name}</p>
-                      <p className="text-sm text-muted-foreground">{new Date(milestone.date).toLocaleDateString()}</p>
-                    </div>
-                    <Badge variant={statusConfig[milestone.status as keyof typeof statusConfig]?.variant || "secondary"}>
-                      {statusConfig[milestone.status as keyof typeof statusConfig]?.label || milestone.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+  <Card className="bg-card border-border">
+    <CardHeader>
+      <CardTitle>Project Milestones</CardTitle>
+      <CardDescription>Track project progress through key milestones</CardDescription>
+    </CardHeader>
+
+    <CardContent>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40">
+            <tr className="border-b border-border">
+              <th className="px-4 py-3 text-left font-semibold">ID</th>
+              <th className="px-4 py-3 text-left font-semibold">Cliente</th>
+              <th className="px-4 py-3 text-left font-semibold">Nombre P.</th>
+              <th className="px-4 py-3 text-left font-semibold">N° O/S</th>
+              <th className="px-4 py-3 text-left font-semibold">Tipo</th>
+              <th className="px-4 py-3 text-left font-semibold">Monto</th>
+              <th className="px-4 py-3 text-left font-semibold">Estado</th>
+              <th className="px-4 py-3 text-left font-semibold">Encargado</th>
+              <th className="px-4 py-3 text-left font-semibold">Fecha Inicio</th>
+              <th className="px-4 py-3 text-left font-semibold">Documentos</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {valorizaciones.map((v) => (
+              <tr key={v.id} className="border-b border-border">
+                <td className="px-4 py-4 font-medium">{v.codigo || `VAL-${v.id}`}</td>
+                <td className="px-4 py-4">{v.proveedor}</td>
+                <td className="px-4 py-4">{v.negocio_operacion}</td>
+                <td className="px-4 py-4">{v.numero_orden_servicio}</td>
+                <td className="px-4 py-4">{v.tipo}</td>
+                <td className="px-4 py-4">S/ {Number(v.monto).toLocaleString("es-PE")}</td>
+                <td className="px-4 py-4">
+                  <span className="rounded-full border px-2 py-1 text-xs">
+                    {v.estado}
+                  </span>
+                </td>
+                <td className="px-4 py-4">{v.encargado}</td>
+                <td className="px-4 py-4">{v.fecha_ejecucion?.slice(0, 10)}</td>
+                <td className="px-4 py-4">{v.archivo_nombre || "Sin adjunto"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
 
         <TabsContent value="financials">
           <div className="grid gap-6 lg:grid-cols-3">

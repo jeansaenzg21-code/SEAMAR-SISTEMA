@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { procesarDocumento } from "@/lib/openai-documentos";
 
 export async function GET() {
   try {
@@ -45,128 +46,127 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const {
-  proveedor,
-  ruc,
-  negocio_operacion,
-  numero_orden_servicio,
-  descripcion,
-  monto,
-  moneda,
-  periodo,
-  fecha_ejecucion,
+      proveedor,
+      ruc,
+      negocio_operacion,
+      numero_orden_servicio,
+      descripcion,
+      monto,
+      moneda,
+      periodo,
+      fecha_ejecucion,
 
-  encargado,
+      encargado,
 
-  archivo_nombre,
-  archivo_onedrive_id,
-  archivo_url,
+      archivo_nombre,
+      archivo_onedrive_id,
+      archivo_url,
 
-  respaldo_nombre,
-  respaldo_onedrive_id,
-  respaldo_url,
+      respaldo_nombre,
+      respaldo_onedrive_id,
+      respaldo_url,
 
-} = body;
+      pdf_a,
+      pdf_b,
+      excel_a,
+      excel_b,
+    } = body;
 
     const codigo = `VAL-${Date.now()}`;
 
-   const [result] = await pool.query(
-  `
-  INSERT INTO valorizaciones (
+    const [result] = await pool.query(
+      `
+      INSERT INTO valorizaciones (
+        codigo,
+        proveedor,
+        ruc,
+        negocio_operacion,
+        numero_orden_servicio,
+        descripcion,
+        monto,
+        moneda,
+        periodo,
+        fecha_ejecucion,
+        estado,
+        encargado,
+        archivo_nombre,
+        archivo_onedrive_id,
+        archivo_url,
+        respaldo_nombre,
+        respaldo_onedrive_id,
+        respaldo_url,
+        pdf_a,
+        pdf_b,
+        excel_a,
+        excel_b
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        codigo,
+        proveedor,
+        ruc,
+        negocio_operacion,
+        numero_orden_servicio,
+        descripcion,
+        monto,
+        moneda,
+        periodo,
+        fecha_ejecucion,
+        "BORRADOR",
+        encargado,
+        archivo_nombre,
+        archivo_onedrive_id,
+        archivo_url,
+        respaldo_nombre,
+        respaldo_onedrive_id,
+        respaldo_url,
+        pdf_a || null,
+        pdf_b || null,
+        excel_a || null,
+        excel_b || null,
+      ]
+    );
 
-    codigo,
+    const insertResult = result as any;
+    const valorizacionId = insertResult.insertId;
 
-    proveedor,
-    ruc,
-    negocio_operacion,
+    const observacionesSistema: string[] = [];
 
-    numero_orden_servicio,
+    if (!pdf_a) {
+      observacionesSistema.push("Falta documento PDF A");
+    }
 
-    descripcion,
+    if (!pdf_b) {
+      observacionesSistema.push("Falta documento PDF B");
+    }
 
-    monto,
-    moneda,
-    periodo,
+    if (!excel_a) {
+      observacionesSistema.push("Falta documento Excel A");
+    }
 
-    fecha_ejecucion,
+    if (!excel_b) {
+      observacionesSistema.push("Falta documento Excel B");
+    }
 
-    estado,
+    if (observacionesSistema.length > 0) {
+      for (const obs of observacionesSistema) {
+        await pool.query(
+          `
+          INSERT INTO valorizacion_observaciones (
+            valorizacion_id,
+            observacion,
+            tipo,
+            usuario,
+            estado
+          )
+          VALUES (?, ?, 'SISTEMA', 'Sistema', 'PENDIENTE')
+          `,
+          [valorizacionId, obs]
+        );
+      }
+    }
 
-    encargado,
-
-    archivo_nombre,
-    archivo_onedrive_id,
-    archivo_url,
-
-    respaldo_nombre,
-    respaldo_onedrive_id,
-    respaldo_url
-
-  )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `,
-  [
-
-    codigo,
-
-    proveedor,
-    ruc,
-    negocio_operacion,
-
-    numero_orden_servicio,
-
-    descripcion,
-
-    monto,
-    moneda,
-    periodo,
-
-    fecha_ejecucion,
-
-    "BORRADOR",
-
-    encargado,
-
-    archivo_nombre,
-    archivo_onedrive_id,
-    archivo_url,
-
-    respaldo_nombre,
-    respaldo_onedrive_id,
-    respaldo_url
-
-  ]
-);
-
-const insertResult = result as any;
-const valorizacionId = insertResult.insertId;
-
-const observacionesSistema: string[] = [];
-
-if (!archivo_nombre) {
-  observacionesSistema.push("Falta adjuntar el documento principal de valorización");
-}
-
-if (!respaldo_nombre) {
-  observacionesSistema.push("Falta adjuntar el documento de respaldo");
-}
-
-if (observacionesSistema.length > 0) {
-  await pool.query(
-    `
-    INSERT INTO valorizacion_observaciones (
-      valorizacion_id,
-      observacion,
-      tipo,
-      estado
-    )
-    VALUES (?, ?, 'SISTEMA', 'PENDIENTE')
-    `,
-    [
-      valorizacionId,
-      observacionesSistema.join(" "),
-    ]
-  );
-}
     return NextResponse.json({
       success: true,
       message: "Valorización registrada correctamente",
