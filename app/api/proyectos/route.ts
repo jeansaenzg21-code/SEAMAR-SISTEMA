@@ -31,56 +31,88 @@ export async function GET() {
   }
 }
 
-
 export async function POST(
   request: Request
 ) {
-
   try {
     const formData =
-  await request.formData()
+      await request.formData()
 
-const cliente_id =
-  formData.get("cliente_id")
+    const cliente_id =
+      formData.get("cliente_id")
 
-const nombre =
-  formData.get("nombre") as string
+    const nombre =
+      formData.get("nombre") as string
 
-const descripcion =
-  formData.get("descripcion") as string
+    const descripcion =
+      formData.get("descripcion") as string
 
-const contrato =
-  formData.get("contrato") as File | null
+    const tipo =
+      formData.get("tipo") as string
 
-  let contrato_nombre = null
-let contrato_onedrive_id = null
-let contrato_url = null
+    const monto =
+      formData.get("monto") as string
 
-if (
+    const moneda =
+      formData.get("moneda") as string
+
+    const fecha_inicio =
+      formData.get("fecha_inicio") as string
+
+    const fecha_fin =
+      formData.get("fecha_fin") as string
+
+    const contrato =
+      formData.get("contrato") as File | null
+
+    let contrato_nombre = null
+    let contrato_onedrive_id = null
+    let contrato_url = null
+
+    if (
+      contrato &&
+      contrato.size > 0
+    ) {
+      const buffer =
+        Buffer.from(
+          await contrato.arrayBuffer()
+        )
+
+      if (
   contrato &&
   contrato.size > 0
 ) {
-
   const buffer =
     Buffer.from(
       await contrato.arrayBuffer()
     )
 
-  const archivo =
-    await subirContratoAOneDrive(
-      contrato.name,
-      buffer
+  try {
+    const archivo =
+      await subirContratoAOneDrive(
+        contrato.name,
+        buffer
+      )
+
+    contrato_nombre =
+      archivo.nombre
+
+    contrato_onedrive_id =
+      archivo.itemId
+
+    contrato_url =
+      archivo.webUrl
+  } catch (error) {
+    console.error(
+      "No se pudo subir contrato a OneDrive:",
+      error
     )
 
-  contrato_nombre =
-    archivo.nombre
-
-  contrato_onedrive_id =
-    archivo.itemId
-
-  contrato_url =
-    archivo.webUrl
+    contrato_nombre =
+      contrato.name
+  }
 }
+
     if (!nombre?.trim()) {
       return NextResponse.json(
         {
@@ -95,65 +127,43 @@ if (
 
     const [result]: any =
       await pool.query(
-
-        
         `
-        let contrato_nombre = null
-let contrato_onedrive_id = null
-let contrato_url = null
-
-if (
-  contrato &&
-  contrato.size > 0
-) {
-
-  const buffer =
-    Buffer.from(
-      await contrato.arrayBuffer()
-    )
-
-  const archivo =
-    await subirContratoAOneDrive(
-      contrato.name,
-      buffer
-    )
-
-  contrato_nombre =
-    archivo.nombre
-
-  contrato_onedrive_id =
-    archivo.itemId
-
-  contrato_url =
-    archivo.webUrl
-}
         INSERT INTO proyectos (
-  cliente_id,
-  nombre,
-  descripcion,
-  estado,
-  fecha_inicio,
-  contrato_nombre,
-  contrato_onedrive_id,
-  contrato_url
-)
-VALUES (?, ?, ?, 'EN_CURSO', CURDATE(), ?, ?, ?)
+          cliente_id,
+          nombre,
+          descripcion,
+          tipo,
+          monto,
+          moneda,
+          estado,
+          fecha_inicio,
+          fecha_fin,
+          contrato_nombre,
+          contrato_onedrive_id,
+          contrato_url
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'EN_CURSO', ?, ?, ?, ?, ?)
         `,
         [
-  cliente_id,
-  nombre,
-  descripcion || null,
-  contrato_nombre,
-  contrato_onedrive_id,
-  contrato_url,
-]
+          cliente_id,
+          nombre,
+          descripcion || null,
+          tipo || "PROYECTO",
+          monto || null,
+          moneda || "PEN",
+          fecha_inicio || null,
+          fecha_fin || null,
+          contrato_nombre,
+          contrato_onedrive_id,
+          contrato_url,
+        ]
       )
 
     return NextResponse.json({
       success: true,
       id: result.insertId,
     })
-
+    }
   } catch (error) {
     console.error(error)
 

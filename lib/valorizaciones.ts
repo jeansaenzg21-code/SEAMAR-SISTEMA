@@ -54,17 +54,17 @@ respaldo_nombre,
 
       codigo,
 
-      data.proveedor ?? null,
-      data.ruc ?? null,
-      data.negocioOperacion ?? null,
+      data.proveedor || "SIN PROVEEDOR",
+data.ruc || "",
+data.negocioOperacion || "",
 
-      data.numeroOrdenServicio ?? null,
+data.numeroOrdenServicio || "",
 
-      data.descripcion ?? null,
+data.descripcion || data.archivoNombre || "Valorización sin descripción",
 
-      data.monto ?? null,
-      data.moneda ?? null,
-      data.periodo ?? null,
+data.monto || 0,
+data.moneda || "PEN",
+data.periodo || "",
 
       data.fechaEjecucion
   ? data.fechaEjecucion

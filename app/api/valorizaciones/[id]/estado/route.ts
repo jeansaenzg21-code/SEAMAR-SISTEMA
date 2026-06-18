@@ -12,6 +12,41 @@ export async function PATCH(
 
     const { estado, observacion } = body;
 
+    if (!estado) {
+  await pool.query(
+    `
+    UPDATE valorizaciones
+    SET
+      proveedor = ?,
+      negocio_operacion = ?,
+      numero_orden_servicio = ?,
+      descripcion = ?,
+      monto = ?,
+      moneda = ?,
+      periodo = ?,
+      fecha_ejecucion = ?,
+      encargado = ?
+    WHERE id = ?
+    `,
+    [
+      body.proveedor,
+      body.negocio_operacion,
+      body.numero_orden_servicio,
+      body.descripcion,
+      body.monto,
+      body.moneda,
+      body.periodo,
+      body.fecha_ejecucion,
+      body.encargado,
+      id,
+    ]
+  );
+
+  return NextResponse.json({
+    success: true,
+  });
+}
+
     let estadoFinal = estado;
 
     const observacionesSistema: string[] = [];

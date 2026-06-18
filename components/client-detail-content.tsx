@@ -65,6 +65,8 @@ const cobranza = {
 export function ClientDetailContent({ clientId }: ClientDetailProps) {
 
   const [contrato, setContrato] = useState<File | null>(null)
+  const [analizandoContrato, setAnalizandoContrato] = useState(false)
+
   const [client, setClient] = useState<Client | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [editedClient, setEditedClient] = useState({
@@ -86,14 +88,91 @@ const [projectForm, setProjectForm] =
   useState({
     nombre: "",
     descripcion: "",
+    tipo: "PROYECTO",
+    monto: "",
+    moneda: "PEN",
+    fecha_inicio: "",
+    fecha_fin: "",
   })
   const [projectErrors, setProjectErrors] =
   useState({
     nombre: "",
   })
   const [projects, setProjects] = useState<any[]>([])
+  const extraerNombreContrato = (nombreArchivo: string) => {
+  const sinExtension = nombreArchivo.replace(/\.[^/.]+$/, "")
+
+  const partes = sinExtension.split(" - ")
+
+  return partes[partes.length - 1]
+    .replace(/^Firmado\s*/i, "")
+    .trim()
+}
+
+
+
+const abrirContrato = () => {
+  if (!contrato) return
+
+  const url = URL.createObjectURL(contrato)
+  window.open(url, "_blank")
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 1000)
+}
 
   const recentProjects = projects
+  const seleccionarContrato = async (file: File | null) => {
+  setContrato(file)
+
+  if (!file) return
+
+  try {
+    setAnalizandoContrato(true)
+
+    const formData = new FormData()
+    formData.append("contrato", file)
+
+    const response = await fetch(
+      "/api/extraer-datos-contrato",
+      {
+        method: "POST",
+        body: formData,
+      }
+    )
+
+    const data = await response.json()
+
+    if (data.success) {
+  console.log("DATOS IA CONTRATO:", data.data)
+
+  setProjectForm((prev) => ({
+    ...prev,
+    tipo: data.data.tipo || prev.tipo,
+    nombre: data.data.nombre || prev.nombre,
+    descripcion:
+      data.data.descripcion || prev.descripcion,
+    monto:
+      data.data.monto !== null &&
+      data.data.monto !== undefined
+        ? String(data.data.monto)
+        : prev.monto,
+    moneda:
+      data.data.moneda || prev.moneda,
+    fecha_inicio:
+      data.data.fecha_inicio || prev.fecha_inicio,
+    fecha_fin:
+      data.data.fecha_fin || prev.fecha_fin,
+  }))
+}
+  } catch (error) {
+    console.error(error)
+    alert("No se pudo analizar el contrato con IA")
+  } finally {
+    setAnalizandoContrato(false)
+  }
+}
 const validarFormulario = () => {
   const nuevosErrores = {
     razon_social: "",
@@ -903,12 +982,58 @@ if (!client) {
       className="hidden"
       accept=".pdf,.doc,.docx,.xls,.xlsx"
       onChange={(e) =>
-        setContrato(e.target.files?.[0] || null)
-      }
+  seleccionarContrato(e.target.files?.[0] || null)
+}
     />
   </label>
+  {analizandoContrato && (
+  <p className="text-xs text-blue-500">
+    Analizando contrato con IA...
+  </p>
+)}
+  {contrato && (
+  <Button
+    type="button"
+    variant="outline"
+    className="w-full"
+    onClick={abrirContrato}
+  >
+    Ver 
+    <ArrowUpRight className="ml-2 h-4 w-4" />
+  </Button>
+)}
 </div>
       <div>
+        <div>
+  <label className="text-sm">
+    Tipo
+  </label>
+
+  <select
+    value={projectForm.tipo}
+    onChange={(e) =>
+      setProjectForm({
+        ...projectForm,
+        tipo: e.target.value,
+      })
+    }
+    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+  >
+    <option value="PROYECTO">
+      Proyecto
+    </option>
+    <option value="SERVICIO">
+      Servicio
+    </option>
+  </select>
+</div>
+<div>
+  
+
+  
+    
+  
+</div>
         <label className="text-sm">
           Nombre
         </label>
@@ -944,6 +1069,7 @@ if (!client) {
         <label className="text-sm">
           Descripción
         </label>
+        
 
         <Input
           value={
@@ -958,7 +1084,75 @@ if (!client) {
           }
         />
       </div>
+<div className="grid grid-cols-2 gap-3">
+  <div>
+    <label className="text-sm">
+      Monto
+    </label>
+    <Input
+      value={projectForm.monto}
+      onChange={(e) =>
+        setProjectForm({
+          ...projectForm,
+          monto: e.target.value,
+        })
+      }
+    />
+  </div>
 
+  <div>
+    <label className="text-sm">
+      Moneda
+    </label>
+    <select
+      value={projectForm.moneda}
+      onChange={(e) =>
+        setProjectForm({
+          ...projectForm,
+          moneda: e.target.value,
+        })
+      }
+      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+    >
+      <option value="PEN">PEN</option>
+      <option value="USD">USD</option>
+    </select>
+  </div>
+</div>
+
+<div className="grid grid-cols-2 gap-3">
+  <div>
+    <label className="text-sm">
+      Fecha inicio
+    </label>
+    <Input
+      type="date"
+      value={projectForm.fecha_inicio}
+      onChange={(e) =>
+        setProjectForm({
+          ...projectForm,
+          fecha_inicio: e.target.value,
+        })
+      }
+    />
+  </div>
+
+  <div>
+    <label className="text-sm">
+      Fecha fin
+    </label>
+    <Input
+      type="date"
+      value={projectForm.fecha_fin}
+      onChange={(e) =>
+        setProjectForm({
+          ...projectForm,
+          fecha_fin: e.target.value,
+        })
+      }
+    />
+  </div>
+</div>
     </div>
 
     <DialogFooter>
@@ -1010,6 +1204,11 @@ const projectData = new FormData()
 projectData.append("cliente_id", String(client.id))
 projectData.append("nombre", projectForm.nombre)
 projectData.append("descripcion", projectForm.descripcion)
+projectData.append("tipo", projectForm.tipo)
+projectData.append("monto", projectForm.monto)
+projectData.append("moneda", projectForm.moneda)
+projectData.append("fecha_inicio", projectForm.fecha_inicio)
+projectData.append("fecha_fin", projectForm.fecha_fin)
 
 if (contrato) {
   projectData.append("contrato", contrato)
@@ -1039,8 +1238,14 @@ const response =
             setProjectForm({
   nombre: "",
   descripcion: "",
-  
+  tipo: "PROYECTO",
+  monto: "",
+  moneda: "PEN",
+  fecha_inicio: "",
+  fecha_fin: "",
 })
+
+setContrato(null)
 
 
 
