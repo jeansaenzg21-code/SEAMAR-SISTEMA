@@ -56,10 +56,17 @@ const json =
 
 console.log(json);
 
-if (
+const esValorizacion =
   json.tipoDocumento?.toLowerCase() ===
-  "valorizacion"
-) {
+  "valorizacion" ||
+  archivoCompleto.nombre
+    .toLowerCase()
+    .includes("valorización") ||
+  archivoCompleto.nombre
+    .toLowerCase()
+    .includes("valorizacion");
+
+if (esValorizacion) {
 
   json.archivoNombre =
     archivoCompleto.nombre;

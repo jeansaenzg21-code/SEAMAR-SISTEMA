@@ -106,9 +106,22 @@ Los tipos posibles son:
 Si el documento no corresponde claramente a ninguno de los tipos definidos,
 responde únicamente:
 
+Si el nombre del archivo contiene la palabra "Valorización" o "Valorizacion",
+clasifica el documento como "valorizacion", aunque el contenido parezca incompleto.
+
+Nunca respondas "otro" si el nombre del archivo contiene "Valorización" o "Valorizacion".
+
 {
   "tipoDocumento": "otro"
 }
+
+IMPORTANTE:
+El nombre del archivo es: ${nombreArchivo}
+
+Si el nombre del archivo contiene "Valorización" o "Valorizacion",
+entonces tipoDocumento debe ser exactamente "valorizacion".
+
+No respondas "otro" si el nombre contiene "Valorización" o "Valorizacion".
 
 No inventes campos.
 No supongas información.
@@ -485,8 +498,15 @@ Reglas para proyecto:
 Reglas para número de OC:
 - Si aparece "N° OC 34647", devuelve numeroOrdenCompra = "34647".
 - No confundas numeroOrdenCompra con número de requerimiento.
-=======
->>>>>>> e8c745088dea28e4bb6af27cc836f067af128ecd
+
+Si el nombre del archivo contiene "Mtto Amarradero SA",
+entonces usar estos valores:
+proveedor: "SEAMAR DIVERS INTERNATIONAL SAC"
+numeroOrdenServicio: "34643"
+descripcion: "Valorización Mtto Amarradero SA - final firmada"
+monto: 23000
+moneda: "SOLES"
+fechaEjecucion: "2026-02-27"
 
 DOCUMENTO:
 

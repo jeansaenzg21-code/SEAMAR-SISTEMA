@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { procesarDocumento } from "@/lib/openai-documentos";
 import {
   Select,
   SelectContent,
@@ -160,9 +161,17 @@ const [excelB, setExcelB] = useState<File | null>(null)
   useEffect(() => {
   cargarValorizaciones()
 }, [])
+
 const [selectedValuation, setSelectedValuation] =
   useState<Valuation | null>(null)
 const [clientes, setClientes] = useState<any[]>([])
+const [proyectosCliente, setProyectosCliente] =
+  useState<any[]>([])
+  const [valorizacionesPactadas, setValorizacionesPactadas] =
+  useState<any[]>([])
+
+const [valorizacionPactadaId, setValorizacionPactadaId] =
+  useState("")
 
 useEffect(() => {
   const cargarClientes = async () => {
@@ -178,7 +187,66 @@ useEffect(() => {
 }
 
   cargarClientes()
-}, [])
+},[])
+useEffect(() => {
+  const cargarValorizacionesPactadas = async () => {
+    if (!type) {
+      setValorizacionesPactadas([])
+      return
+    }
+
+    try {
+      const res = await fetch(
+        `/api/valorizaciones-pactadas/proyecto/${type}`
+      )
+
+      const data = await res.json()
+
+      setValorizacionesPactadas(
+        Array.isArray(data) ? data : []
+      )
+    } catch (error) {
+      console.error(error)
+      setValorizacionesPactadas([])
+    }
+  }
+
+  cargarValorizacionesPactadas()
+}, [type])
+
+useEffect(() => {
+  const cargarProyectosCliente = async () => {
+    if (!client) {
+      setProyectosCliente([])
+      return
+    }
+
+    const clienteEncontrado =
+      clientes.find(
+        (c) => c.razon_social === client
+      )
+
+    if (!clienteEncontrado) return
+
+    try {
+      const res = await fetch(
+        `/api/proyectos/cliente/${clienteEncontrado.id}`
+      )
+
+      const data = await res.json()
+
+      setProyectosCliente(
+        Array.isArray(data) ? data : []
+      )
+    } catch (error) {
+      console.error(error)
+      setProyectosCliente([])
+    }
+  }
+
+  cargarProyectosCliente()
+}, [client, clientes])
+
 const [isViewOpen, setIsViewOpen] =
   useState(false)
 const cargarValorizaciones = async () => {
@@ -189,6 +257,9 @@ const cargarValorizaciones = async () => {
 
     const valorizaciones = data.map((item: any) => ({
   id: item.id,
+
+  projectName: item.proyecto_nombre,
+valuationName: item.valorizacion_pactada_nombre,
 
   client: item.proveedor || "",
 
@@ -334,42 +405,42 @@ setExcelB(null)
   }
 
   try {
-    const response = await fetch("/api/valorizaciones", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-  proveedor: client,
-  ruc: null,
-  negocio_operacion: type,
-  numero_orden_servicio: ordenServicio,
-  descripcion: description,
-  monto: Number(amount),
+  const url = editingValuation
+    ? `/api/valorizaciones/${editingValuation.id}`
+    : "/api/valorizaciones"
 
-  estado: "BORRADOR",
+  const method = editingValuation
+  ? "PATCH"
+  : "POST"
 
-  moneda: "PEN",
-  periodo: fecha,
-  fecha_ejecucion: fecha,
-  encargado,
-  archivo_nombre: archivo?.name || null,
-  archivo_onedrive_id: null,
-  archivo_url: null,
-  respaldo_nombre: archivo?.name || null,
-  respaldo_onedrive_id: null,
-  respaldo_url: null,
-
-  pdf_a: pdfA?.name || null,
-pdf_b: pdfB?.name || null,
-excel_a: excelA?.name || null,
-excel_b: excelB?.name || null,
-  
-}),
-    })
+  const response = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      proveedor: client,
+      ruc: null,
+      negocio_operacion: type,
+      numero_orden_servicio: ordenServicio,
+      descripcion: description,
+      monto: Number(amount),
+      estado: "BORRADOR",
+      moneda: "PEN",
+      periodo: fecha,
+      fecha_ejecucion: fecha,
+      encargado,
+      archivo_nombre: archivo?.name || null,
+      archivo_onedrive_id: null,
+      archivo_url: null,
+      respaldo_nombre: archivo?.name || null,
+      respaldo_onedrive_id: null,
+      respaldo_url: null,
+      valorizacion_pactada_id: valorizacionPactadaId || null,
+    }),
+  })
 
     const data = await response.json()
-
     if (!data.success) {
       alert(data.message)
       return
@@ -636,17 +707,103 @@ if (observacionAutomatica) {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Tipo de valorización</Label>
-                    <Select value={type} onValueChange={setType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="service">Servicio</SelectItem>
-                        <SelectItem value="maintenance">Mantenimiento</SelectItem>
-                        <SelectItem value="project">Proyecto</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Servicio / Proyecto</Label>
+                    <Select
+  value={type}
+  onValueChange={(value) => {
+    setType(value)
+
+    const proyecto =
+      proyectosCliente.find(
+        (p) => String(p.id) === value
+      )
+
+    if (proyecto) {
+      setDescription(
+        proyecto.descripcion ||
+        proyecto.nombre ||
+        ""
+      )
+
+      if (proyecto.monto) {
+        setAmount(String(proyecto.monto))
+      }
+    }
+  }}
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Seleccionar proyecto o servicio" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {proyectosCliente.length === 0 ? (
+      <SelectItem value="sin-proyectos" disabled>
+        No hay proyectos/servicios
+      </SelectItem>
+    ) : (
+      proyectosCliente.map((proyecto) => (
+        <SelectItem
+          key={proyecto.id}
+          value={String(proyecto.id)}
+        >
+          {proyecto.tipo} - {proyecto.nombre}
+        </SelectItem>
+      ))
+    )}
+  </SelectContent>
+</Select>
+
+<div>
+  <label className="text-sm font-medium">
+    Valorización pactada
+  </label>
+
+  <Select
+    value={valorizacionPactadaId}
+    onValueChange={(value) => {
+      setValorizacionPactadaId(value)
+
+      const valorizacion =
+        valorizacionesPactadas.find(
+          (v) => String(v.id) === value
+        )
+
+      if (valorizacion) {
+        setAmount(
+          valorizacion.monto
+            ? String(valorizacion.monto)
+            : ""
+        )
+
+        setDescription(
+          valorizacion.nombre ||
+          description
+        )
+      }
+    }}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Seleccionar valorización pactada" />
+    </SelectTrigger>
+
+    <SelectContent>
+      {valorizacionesPactadas.length === 0 ? (
+        <SelectItem value="sin-valorizaciones" disabled>
+          No hay valorizaciones pactadas
+        </SelectItem>
+      ) : (
+        valorizacionesPactadas.map((item) => (
+          <SelectItem
+            key={item.id}
+            value={String(item.id)}
+          >
+            {item.nombre} - S/ {item.monto || "0.00"}
+          </SelectItem>
+        ))
+      )}
+    </SelectContent>
+  </Select>
+</div>
                   </div>
 
                   <div className="grid gap-2">

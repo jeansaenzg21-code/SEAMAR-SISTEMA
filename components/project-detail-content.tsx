@@ -3,6 +3,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { procesarDocumento } from "@/lib/openai-documentos";
+type AnyItem = any
 import {
   Tabs,
   TabsContent,
@@ -51,67 +53,8 @@ interface ProjectDetailProps {
   projectId: string
 }
 
-const projectsData: Record<string, {
-  id: string
-  name: string
-  client: string
-  clientColor: string
-  status: string
-  description: string
-  progress: number
-  budget: number
-  spent: number
-  dueDate: string
-  startDate: string
-  team: number
-  documents: { id: string; name: string; type: string; date: string; size: string }[]
-  costBreakdown: { name: string; value: number; color: string }[]
-  spendingTrend: { month: string; budget: number; actual: number }[]
-  milestones: { name: string; status: string; date: string }[]
-}> = {
-  "proj-001": {
-    id: "proj-001",
-    name: "Offshore Platform Maintenance",
-    client: "Repsol",
-    clientColor: "bg-orange-500",
-    status: "active",
-    description: "Annual maintenance and inspection of offshore drilling platforms including safety systems, structural integrity checks, and equipment calibration.",
-    progress: 75,
-    budget: 450000,
-    spent: 337500,
-    dueDate: "2024-06-30",
-    startDate: "2024-01-15",
-    team: 8,
-    documents: [
-      { id: "doc-001", name: "Maintenance Schedule Q1.pdf", type: "report", date: "2024-05-10", size: "2.4 MB" },
-      { id: "doc-002", name: "Safety Inspection Report.pdf", type: "report", date: "2024-05-08", size: "1.8 MB" },
-      { id: "doc-003", name: "Equipment Inventory.xlsx", type: "spreadsheet", date: "2024-05-05", size: "890 KB" },
-      { id: "doc-004", name: "INV-2024-0847.pdf", type: "invoice", date: "2024-05-01", size: "156 KB" },
-      { id: "doc-005", name: "PO-2024-1234.pdf", type: "purchase-order", date: "2024-04-28", size: "234 KB" },
-    ],
-    costBreakdown: [
-      { name: "Labor", value: 135000, color: "#3b82f6" },
-      { name: "Equipment", value: 98700, color: "#f97316" },
-      { name: "Materials", value: 67000, color: "#10b981" },
-      { name: "Subcontractors", value: 36800, color: "#a855f7" },
-    ],
-    spendingTrend: [
-      { month: "Jan", budget: 75000, actual: 72000 },
-      { month: "Feb", budget: 75000, actual: 78000 },
-      { month: "Mar", budget: 75000, actual: 68000 },
-      { month: "Apr", budget: 75000, actual: 71000 },
-      { month: "May", budget: 75000, actual: 48500 },
-    ],
-    milestones: [
-      { name: "Project Kickoff", status: "completed", date: "2024-01-15" },
-      { name: "Initial Assessment", status: "completed", date: "2024-02-01" },
-      { name: "Phase 1 Complete", status: "completed", date: "2024-03-15" },
-      { name: "Phase 2 Complete", status: "in-progress", date: "2024-05-30" },
-      { name: "Final Inspection", status: "pending", date: "2024-06-15" },
-      { name: "Project Closure", status: "pending", date: "2024-06-30" },
-    ],
-  },
-}
+
+
 
 const defaultProject = {
   id: "proj-default",
@@ -148,8 +91,66 @@ const typeIcons: Record<string, string> = {
 }
 
 export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
-  const project = projectsData[projectId] || defaultProject
-  const remainingBudget = project.budget - project.spent
+  const [project, setProject] =
+  useState<any>(defaultProject)
+
+const remainingBudget =
+  Number(project.monto || 0)
+
+useEffect(() => {
+  cargarProyecto()
+}, [projectId])
+
+const cargarProyecto = async () => {
+  try {
+    const res = await fetch(
+      `/api/proyectos/${projectId}`
+    )
+
+    const data = await res.json()
+
+    setProject({
+      ...defaultProject,
+      ...data,
+      id: data.id,
+      name: data.nombre,
+      client: "Cliente",
+      description:
+        data.descripcion ||
+        "Sin descripción registrada.",
+      startDate:
+        data.fecha_inicio?.slice(0, 10) ||
+        defaultProject.startDate,
+      dueDate:
+        data.fecha_fin?.slice(0, 10) ||
+        defaultProject.dueDate,
+      budget:
+        Number(data.monto || 0),
+      spent: 0,
+      team:
+        data.valorizaciones_pactadas || 0,
+      documents:
+        data.contrato_nombre
+          ? [
+              {
+                id: "contrato",
+                name: data.contrato_nombre,
+                type: "contract",
+                date:
+                  data.fecha_creacion?.slice(0, 10) ||
+                  "",
+                size: "",
+              },
+            ]
+          : [],
+    })
+  } catch (error) {
+    console.error(
+      "Error al cargar proyecto:",
+      error
+    )
+  }
+}
 
   const [valorizaciones, setValorizaciones] = useState<any[]>([])
 
@@ -159,7 +160,10 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
 
   const cargarValorizaciones = async () => {
     try {
-      const res = await fetch("/api/valorizaciones")
+      <Button>
+  Agregar valorización pactada
+</Button>
+      const res = await fetch(`/api/proyectos/${project.id}/valorizaciones-pactadas`)
       const data = await res.json()
       setValorizaciones(data)
     } catch (error) {
@@ -273,7 +277,7 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
               </div>
               <div>
                 <p className="text-lg font-bold">{project.team}</p>
-                <p className="text-xs text-muted-foreground">Team Members</p>
+                <p className="text-xs text-muted-foreground">Valorizaciones pactadas</p>
               </div>
             </div>
           </CardContent>
@@ -349,7 +353,7 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {project.costBreakdown.map((entry, index) => (
+                        {project.costBreakdown.map((entry: AnyItem, index: number) =>(
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -365,7 +369,7 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  {project.costBreakdown.map((item) => (
+                  {project.costBreakdown.map((item: AnyItem) =>(
                     <div key={item.name} className="flex items-center gap-2">
                       <div
                         className="h-2 w-2 rounded-full"
@@ -409,7 +413,7 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {project.documents.map((doc) => (
+                  {project.documents.map((doc: AnyItem) => (
                     <TableRow key={doc.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
@@ -520,7 +524,7 @@ export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {project.costBreakdown.map((category) => (
+                  {project.costBreakdown.map((category: AnyItem) => (
                     <div key={category.name} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-foreground">{category.name}</span>
