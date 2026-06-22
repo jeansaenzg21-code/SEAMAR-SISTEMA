@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,7 +14,10 @@ import {
   ReceiptText,
   Search,
   XCircle,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react"
+
 import {
   bankMatches,
   bankMovements,
@@ -45,181 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-type Currency = "PEN" | "USD"
 
-interface SyncedDocument {
-  id: string
-  fileName: string
-  docType: "Factura" | "Recibo" | "Comprobante" | "Nota de crédito"
-  party: string
-  ruc: string
-  docNumber: string
-  currency: Currency
-  amount: number
-  date: string
-  readStatus: "leido" | "pendiente" | "error"
-  source: "OneDrive"
-}
-
-interface MatchSuggestion {
-  id: string
-  docId: string
-  type: "CxC" | "CxP"
-  party: string
-  invoiceNumber: string
-  currency: Currency
-  amount: number
-  balance: number
-  status: "Pendiente" | "Parcial" | "Pagado"
-  matchPercent: number
-  amountDiff: number
-  currencyDiff: boolean
-  alert:
-    | "exact"
-    | "amount_diff"
-    | "currency_diff"
-    | "duplicate"
-    | "none"
-}
-
-const syncedDocuments: SyncedDocument[] = [
-  {
-    id: "d1",
-    fileName: "F001-002345_Tottus.pdf",
-    docType: "Factura",
-    party: "Hipermercados Tottus S.A.",
-    ruc: "20508565934",
-    docNumber: "F001-002345",
-    currency: "PEN",
-    amount: 12450.5,
-    date: "2025-06-12",
-    readStatus: "leido",
-    source: "OneDrive",
-  },
-  {
-    id: "d2",
-    fileName: "FT-9821_Cencosud.pdf",
-    docType: "Factura",
-    party: "Cencosud Retail Perú",
-    ruc: "20536557858",
-    docNumber: "FT-9821",
-    currency: "USD",
-    amount: 3420,
-    date: "2025-06-10",
-    readStatus: "leido",
-    source: "OneDrive",
-  },
-  {
-    id: "d3",
-    fileName: "recibo_luz_mayo.pdf",
-    docType: "Recibo",
-    party: "Enel Distribución Perú",
-    ruc: "20269985900",
-    docNumber: "R-554120",
-    currency: "PEN",
-    amount: 845.2,
-    date: "2025-06-05",
-    readStatus: "leido",
-    source: "OneDrive",
-  },
-  {
-    id: "d4",
-    fileName: "NC-0034_DevolucionTai.pdf",
-    docType: "Nota de crédito",
-    party: "TAI Loyalty Perú",
-    ruc: "20601334451",
-    docNumber: "NC-0034",
-    currency: "PEN",
-    amount: 1200,
-    date: "2025-06-08",
-    readStatus: "pendiente",
-    source: "OneDrive",
-  },
-  {
-    id: "d5",
-    fileName: "scan_factura_borrosa.jpg",
-    docType: "Factura",
-    party: "—",
-    ruc: "—",
-    docNumber: "—",
-    currency: "PEN",
-    amount: 0,
-    date: "2025-06-14",
-    readStatus: "error",
-    source: "OneDrive",
-  },
-]
-
-const matchSuggestions: Record<string, MatchSuggestion[]> = {
-  d1: [
-    {
-      id: "m1",
-      docId: "d1",
-      type: "CxC",
-      party: "Hipermercados Tottus S.A.",
-      invoiceNumber: "F001-002345",
-      currency: "PEN",
-      amount: 12450.5,
-      balance: 12450.5,
-      status: "Pendiente",
-      matchPercent: 100,
-      amountDiff: 0,
-      currencyDiff: false,
-      alert: "exact",
-    },
-  ],
-  d2: [
-    {
-      id: "m2",
-      docId: "d2",
-      type: "CxC",
-      party: "Cencosud Retail Perú",
-      invoiceNumber: "FT-9821",
-      currency: "USD",
-      amount: 3450,
-      balance: 3450,
-      status: "Pendiente",
-      matchPercent: 92,
-      amountDiff: -30,
-      currencyDiff: false,
-      alert: "amount_diff",
-    },
-    {
-      id: "m2b",
-      docId: "d2",
-      type: "CxC",
-      party: "Cencosud Retail Perú",
-      invoiceNumber: "FT-9821",
-      currency: "PEN",
-      amount: 12800,
-      balance: 12800,
-      status: "Pendiente",
-      matchPercent: 64,
-      amountDiff: 0,
-      currencyDiff: true,
-      alert: "currency_diff",
-    },
-  ],
-  d3: [
-    {
-      id: "m3",
-      docId: "d3",
-      type: "CxP",
-      party: "Enel Distribución Perú",
-      invoiceNumber: "R-554120",
-      currency: "PEN",
-      amount: 845.2,
-      balance: 845.2,
-      status: "Pendiente",
-      matchPercent: 100,
-      amountDiff: 0,
-      currencyDiff: false,
-      alert: "exact",
-    },
-  ],
-  d4: [],
-  d5: [],
-}
 
 const readTone: Record<
   SyncedDocument["readStatus"],
