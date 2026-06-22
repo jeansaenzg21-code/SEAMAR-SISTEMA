@@ -846,9 +846,9 @@ if (observacionAutomatica) {
                   </div>
 
                   <div className="grid gap-2 col-span-2">
-                    <Label>Descripción / Nombre del Proyecto</Label>
+                    <Label>Descripción</Label>
                     <Textarea
-                      placeholder="Introduzca la descripción o Nombre del Proyecto..."
+                      placeholder="Introduzca la descripción..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                     />
