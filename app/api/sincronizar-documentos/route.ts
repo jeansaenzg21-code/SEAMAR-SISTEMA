@@ -9,7 +9,7 @@ import { NextRequest } from "next/server";
 import {
   procesarDocumento
 } from "@/lib/openai-documentos";
-
+import { enviarCorreo } from "@/lib/outlook";
 
 export async function POST(
   request: NextRequest
@@ -647,6 +647,26 @@ WHERE id = ?
   proyectosNoEncontrados,
   sincronizacionId
 ]
+);
+
+const asunto =
+  "SEAMAR - Sincronización completada";
+
+const html = `
+<h2>Resumen de sincronización</h2>
+
+<p><strong>Documentos procesados:</strong> ${archivosNuevos.length}</p>
+
+<p><strong>Cuentas por cobrar:</strong> ${nuevasCxc}</p>
+
+<p><strong>Cuentas por pagar:</strong> ${nuevasCxp}</p>
+
+<p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
+`;
+
+await enviarCorreo(
+  asunto,
+  html
 );
 
 return NextResponse.json({
