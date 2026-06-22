@@ -38,7 +38,7 @@ export async function enviarCorreo(
             {
               emailAddress: {
                 address:
-                  "tu_correo@empresa.com"
+                  "traine.nomina@paredescano.com"
               }
             }
           ]

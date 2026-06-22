@@ -853,7 +853,7 @@ if (observacionAutomatica) {
                       onChange={(e) => setDescription(e.target.value)}
                     />
                   </div>
-
+ 
                   <div className="grid gap-2 col-span-2">
                     <Label>Documento de respaldo</Label>
                     <label
