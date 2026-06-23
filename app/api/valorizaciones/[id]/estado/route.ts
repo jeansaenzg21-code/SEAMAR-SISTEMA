@@ -12,6 +12,52 @@ export async function PATCH(
 
     const { estado, observacion } = body;
 
+    if (body.observation_status === "resolved") {
+  await pool.query(
+    `
+    UPDATE valorizacion_observaciones
+    SET
+      estado = 'RESUELTA',
+      fecha_resolucion = NOW()
+    WHERE valorizacion_id = ?
+      AND estado = 'EN_PROGRESO'
+    `,
+    [id]
+  );
+
+  await pool.query(
+    `
+    UPDATE valorizaciones
+    SET
+      estado = 'EN_REVISION',
+      fecha_revision = NOW()
+    WHERE id = ?
+    `,
+    [id]
+  );
+
+  return NextResponse.json({
+    success: true,
+  });
+}
+
+if (body.observation_status === "in_progress") {
+  await pool.query(
+    `
+    UPDATE valorizacion_observaciones
+    SET
+      estado = 'EN_PROGRESO',
+      fecha_en_progreso = NOW()
+    WHERE valorizacion_id = ?
+      AND estado = 'PENDIENTE'
+    `,
+    [id]
+  );
+
+  return NextResponse.json({
+    success: true,
+  });
+}
     if (!estado) {
   await pool.query(
     `

@@ -1224,16 +1224,18 @@ const response =
   )
 
             const data =
-              await response.json()
+  await response.json()
 
-            if (
-              !data.success
-            ) {
-              alert(
-                "Error al registrar proyecto"
-              )
-              return
-            }
+if (
+  !response.ok ||
+  !data.success
+) {
+  alert(
+    data.message ||
+    "Error al registrar proyecto"
+  )
+  return
+}
 
             setProjectForm({
   nombre: "",

@@ -94,7 +94,11 @@ const cargarObservaciones =
                 || "",
 
               status:
-  (v.observation_status || "pending") as ObservationStatus,
+  v.estado_observacion === "EN_PROGRESO"
+    ? "in_progress"
+    : v.estado_observacion === "RESUELTA"
+      ? "resolved"
+      : "pending",
 
               assignedTo:
                 v.encargado || "-",
@@ -279,7 +283,7 @@ const cargarObservaciones =
                            onClick={async () => {
   if (observation.status === "pending") {
     await fetch(
-  `/api/valorizaciones/${observation.valuation}/estado`,
+  `/api/valorizaciones/${observation.valuationId}/estado`,
   {
     method: "PATCH",
     headers: {
@@ -299,7 +303,10 @@ const cargarObservaciones =
     )
   }
 
-  setSelectedObservation(observation)
+  setSelectedObservation({
+  ...observation,
+  status: "in_progress",
+})
   setIsDetailModalOpen(true)
 }}
                           >
@@ -383,7 +390,7 @@ const cargarObservaciones =
                   <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
                     Guardar borrador.
                   </Button>
-                  <Button onClick={() => {
+                  <Button onClick={async () => {
   if (!selectedObservation) return
 
   const data = localStorage.getItem("fincontrol_valuations")
@@ -407,13 +414,32 @@ const cargarObservaciones =
     JSON.stringify(updatedValuations)
   )
 
-  setObservations((prev) =>
-    prev.filter((item) => String(item.valuation) !== String(selectedObservation.valuation))
-  )
+  await fetch(
+  `/api/valorizaciones/${selectedObservation.valuation}/estado`,
+  {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      observation_status: "resolved",
+    }),
+  }
+)
 
-  setIsDetailModalOpen(false)
-  setResponse("")
+setObservations((prev) =>
+  prev.map((item) =>
+    item.id === selectedObservation.id
+      ? { ...item, status: "resolved" }
+      : item
+  )
+)
+
+setIsDetailModalOpen(false)
+setResponse("")
 setAttachedFile(null)
+
+await cargarObservaciones()
 }}>
  
   Marcar como resuelto.

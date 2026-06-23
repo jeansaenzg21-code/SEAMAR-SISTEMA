@@ -65,6 +65,18 @@ export async function POST(
     const contrato =
       formData.get("contrato") as File | null
 
+    if (!nombre?.trim()) {
+      return NextResponse.json(
+        {
+          message:
+            "El nombre del proyecto es obligatorio",
+        },
+        {
+          status: 400,
+        }
+      )
+    }
+
     let contrato_nombre = null
     let contrato_onedrive_id = null
     let contrato_url = null
@@ -78,51 +90,30 @@ export async function POST(
           await contrato.arrayBuffer()
         )
 
-      if (
-  contrato &&
-  contrato.size > 0
-) {
-  const buffer =
-    Buffer.from(
-      await contrato.arrayBuffer()
-    )
+      try {
+        const archivo =
+          await subirContratoAOneDrive(
+            contrato.name,
+            buffer
+          )
 
-  try {
-    const archivo =
-      await subirContratoAOneDrive(
-        contrato.name,
-        buffer
-      )
+        contrato_nombre =
+          archivo.nombre
 
-    contrato_nombre =
-      archivo.nombre
+        contrato_onedrive_id =
+          archivo.itemId
 
-    contrato_onedrive_id =
-      archivo.itemId
+        contrato_url =
+          archivo.webUrl
+      } catch (error) {
+        console.error(
+          "No se pudo subir contrato a OneDrive:",
+          error
+        )
 
-    contrato_url =
-      archivo.webUrl
-  } catch (error) {
-    console.error(
-      "No se pudo subir contrato a OneDrive:",
-      error
-    )
-
-    contrato_nombre =
-      contrato.name
-  }
-}
-
-    if (!nombre?.trim()) {
-      return NextResponse.json(
-        {
-          message:
-            "El nombre del proyecto es obligatorio",
-        },
-        {
-          status: 400,
-        }
-      )
+        contrato_nombre =
+          contrato.name
+      }
     }
 
     const [result]: any =
@@ -149,10 +140,10 @@ export async function POST(
           nombre,
           descripcion || null,
           tipo || "PROYECTO",
-          monto || null,
+          monto ? Number(monto) : 0,
           moneda || "PEN",
-          fecha_inicio || null,
-          fecha_fin || null,
+          fecha_inicio || new Date().toISOString().slice(0, 10),
+fecha_fin || null,
           contrato_nombre,
           contrato_onedrive_id,
           contrato_url,
@@ -163,18 +154,21 @@ export async function POST(
       success: true,
       id: result.insertId,
     })
-    }
+
   } catch (error) {
     console.error(error)
 
     return NextResponse.json(
-      {
-        message:
-          "Error al registrar proyecto",
-      },
-      {
-        status: 500,
-      }
-    )
+  {
+    success: false,
+    message:
+      error instanceof Error
+        ? error.message
+        : "Error al registrar proyecto",
+  },
+  {
+    status: 500,
+  }
+)
   }
 }

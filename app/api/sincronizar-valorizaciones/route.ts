@@ -7,6 +7,7 @@ import {
 import { guardarValorizacion } from "@/lib/valorizaciones";
 
 import { procesarDocumento } from "@/lib/openai-documentos";
+import { leerValorizacionesExcel } from "@/lib/excel-reader";
 
 
 
@@ -47,6 +48,25 @@ console.log(
   "Archivo descargado:",
   archivoCompleto.nombre
 );
+
+const esExcel =
+  archivoCompleto.nombre.toLowerCase().endsWith(".xlsx") ||
+  archivoCompleto.nombre.toLowerCase().endsWith(".xls");
+
+if (esExcel) {
+  const valorizacionesExcel =
+    await leerValorizacionesExcel(
+      archivoCompleto.buffer,
+      archivoCompleto
+    );
+
+  for (const val of valorizacionesExcel) {
+    await guardarValorizacion(val);
+    nuevos++;
+  }
+
+  continue;
+}
 
 const json =
   await procesarDocumento(

@@ -66,7 +66,7 @@ excel_a?: string
 excel_b?: string
 
 documentos_completos: number
-
+documentos_adjuntos?: number
 }
 
 
@@ -90,7 +90,7 @@ function StatusBadge({ status }: { status: Status }) {
 
   return (
     
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status]}`}>
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status]}`}>
       {label[status]}
     </span>
   )
@@ -116,18 +116,11 @@ export function ValuationsContent() {
 
     const data = await response.json()
 
-    if (!data.success) {
-      alert("No se pudo enviar a observaciones")
-      return
+    if (data.success) {
+      await cargarValorizaciones()
     }
-
-    await cargarValorizaciones()
-    setIsViewOpen(false)
-
-    alert("Valorización enviada a Observaciones")
   } catch (error) {
     console.error(error)
-    alert("Error al enviar a observaciones")
   }
 }
  const getAvanceValorizacion = (status: string) => {
@@ -152,11 +145,7 @@ const [valuations, setValuations] = useState<Valuation[]>([])
   const [amount, setAmount] = useState("")
   const [fecha, setFecha] = useState("")
   const [encargado, setEncargado] = useState("")
-  const [archivo, setArchivo] = useState<File | null>(null) 
-  const [pdfA, setPdfA] = useState<File | null>(null)
-const [pdfB, setPdfB] = useState<File | null>(null)
-const [excelA, setExcelA] = useState<File | null>(null)
-const [excelB, setExcelB] = useState<File | null>(null)
+  const [documentos, setDocumentos] = useState<File[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState("")
   useEffect(() => {
   cargarValorizaciones()
@@ -167,11 +156,7 @@ const [selectedValuation, setSelectedValuation] =
 const [clientes, setClientes] = useState<any[]>([])
 const [proyectosCliente, setProyectosCliente] =
   useState<any[]>([])
-  const [valorizacionesPactadas, setValorizacionesPactadas] =
-  useState<any[]>([])
-
-const [valorizacionPactadaId, setValorizacionPactadaId] =
-  useState("")
+ 
 
 useEffect(() => {
   const cargarClientes = async () => {
@@ -188,31 +173,7 @@ useEffect(() => {
 
   cargarClientes()
 },[])
-useEffect(() => {
-  const cargarValorizacionesPactadas = async () => {
-    if (!type) {
-      setValorizacionesPactadas([])
-      return
-    }
 
-    try {
-      const res = await fetch(
-        `/api/valorizaciones-pactadas/proyecto/${type}`
-      )
-
-      const data = await res.json()
-
-      setValorizacionesPactadas(
-        Array.isArray(data) ? data : []
-      )
-    } catch (error) {
-      console.error(error)
-      setValorizacionesPactadas([])
-    }
-  }
-
-  cargarValorizacionesPactadas()
-}, [type])
 
 useEffect(() => {
   const cargarProyectosCliente = async () => {
@@ -249,17 +210,58 @@ useEffect(() => {
 
 const [isViewOpen, setIsViewOpen] =
   useState(false)
+
+
+  const documentosPorEmpresa: Record<string, number> = {
+  REPSOL: 4,
+  TDP: 3,
+  TRALZA: 5,
+}
+
+const getCantidadDocumentosRequeridos = (empresa: string) => {
+  const nombre =
+    empresa.toUpperCase()
+
+  if (nombre.includes("REPSOL")) return 4
+
+  if (
+    nombre.includes("TDP") ||
+    nombre.includes("TERMINALES")
+  ) return 3
+
+  if (nombre.includes("TRALZA")) return 5
+
+  return 0
+}
+
+const cantidadDocumentosRequeridos =
+  getCantidadDocumentosRequeridos(client)
+
+const cantidadDocumentosAdjuntos =
+  documentos.length
+
+
+
+
 const cargarValorizaciones = async () => {
   try {
     const response = await fetch("/api/valorizaciones")
     const data = await response.json()
     console.log(data)
 
+  if (!Array.isArray(data)) {
+  alert(data.message || "Error al cargar valorizaciones")
+  console.error("ERROR API VALORIZACIONES:", data)
+  setValuations([])
+  return
+}
+
+
+
     const valorizaciones = data.map((item: any) => ({
   id: item.id,
 
   projectName: item.proyecto_nombre,
-valuationName: item.valorizacion_pactada_nombre,
 
   client: item.proveedor || "",
 
@@ -275,7 +277,11 @@ valuationName: item.valorizacion_pactada_nombre,
   amount:
     Number(item.monto || 0),
 
+  documentos_adjuntos:
+  item.documentos_adjuntos || 0,
+
   status:
+  (
     item.estado === "BORRADOR"
       ? "draft"
       : item.estado === "EN_REVISION"
@@ -284,7 +290,8 @@ valuationName: item.valorizacion_pactada_nombre,
       ? "observed"
       : item.estado === "APROBADO"
       ? "approved"
-      : "draft",
+      : "draft"
+  ) as Status,
 
   date:
     item.fecha_ejecucion
@@ -390,17 +397,22 @@ Nuevos archivos: ${data.nuevos}`
   setAmount("")
   setFecha("")
   setEncargado("")
-  setArchivo(null)
-
-  setPdfA(null)
-setPdfB(null)
-setExcelA(null)
-setExcelB(null)
-}
+  setDocumentos([])
+  }
 
   const guardarValorizacion = async () => {
   if (!client || !description || !amount) {
     alert("Completa los campos principales")
+    return
+  }
+
+  if (
+    cantidadDocumentosRequeridos > 0 &&
+    cantidadDocumentosAdjuntos < cantidadDocumentosRequeridos
+  ) {
+    alert(
+      `Para ${client} debes adjuntar ${cantidadDocumentosRequeridos} documentos.`
+    )
     return
   }
 
@@ -413,32 +425,55 @@ setExcelB(null)
   ? "PATCH"
   : "POST"
 
-  const response = await fetch(url, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      proveedor: client,
-      ruc: null,
-      negocio_operacion: type,
-      numero_orden_servicio: ordenServicio,
-      descripcion: description,
-      monto: Number(amount),
-      estado: "BORRADOR",
-      moneda: "PEN",
-      periodo: fecha,
-      fecha_ejecucion: fecha,
-      encargado,
-      archivo_nombre: archivo?.name || null,
-      archivo_onedrive_id: null,
-      archivo_url: null,
-      respaldo_nombre: archivo?.name || null,
-      respaldo_onedrive_id: null,
-      respaldo_url: null,
-      valorizacion_pactada_id: valorizacionPactadaId || null,
-    }),
-  })
+const formData = new FormData()
+
+formData.append("proveedor", client)
+formData.append("ruc", "")
+formData.append("negocio_operacion", type)
+formData.append("numero_orden_servicio", ordenServicio)
+formData.append("descripcion", description)
+formData.append("monto", String(amount))
+formData.append("estado", "BORRADOR")
+formData.append("moneda", "PEN")
+formData.append("periodo", fecha)
+formData.append("fecha_ejecucion", fecha)
+formData.append("encargado", encargado)
+
+documentos.forEach((doc) => {
+  formData.append("documentos", doc)
+})
+
+
+
+
+const response = await fetch(url, {
+  method,
+  headers:
+    editingValuation
+      ? {
+          "Content-Type":
+            "application/json",
+        }
+      : undefined,
+
+  body: editingValuation
+    ? JSON.stringify({
+        proveedor: client,
+        negocio_operacion: type,
+        numero_orden_servicio:
+          ordenServicio,
+        descripcion: description,
+        monto: Number(amount),
+        moneda: "PEN",
+        periodo: fecha,
+        fecha_ejecucion: fecha,
+        encargado,
+      })
+    : formData,
+})
+
+
+
 
     const data = await response.json()
     if (!data.success) {
@@ -467,7 +502,7 @@ setExcelB(null)
     setAmount(String(item.amount))
     setFecha(item.date)
     setEncargado(item.encargado)
-    setArchivo(null)
+    setDocumentos([])
     setIsNewModalOpen(true)
   }
 
@@ -753,57 +788,7 @@ if (observacionAutomatica) {
   </SelectContent>
 </Select>
 
-<div>
-  <label className="text-sm font-medium">
-    Valorización pactada
-  </label>
 
-  <Select
-    value={valorizacionPactadaId}
-    onValueChange={(value) => {
-      setValorizacionPactadaId(value)
-
-      const valorizacion =
-        valorizacionesPactadas.find(
-          (v) => String(v.id) === value
-        )
-
-      if (valorizacion) {
-        setAmount(
-          valorizacion.monto
-            ? String(valorizacion.monto)
-            : ""
-        )
-
-        setDescription(
-          valorizacion.nombre ||
-          description
-        )
-      }
-    }}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Seleccionar valorización pactada" />
-    </SelectTrigger>
-
-    <SelectContent>
-      {valorizacionesPactadas.length === 0 ? (
-        <SelectItem value="sin-valorizaciones" disabled>
-          No hay valorizaciones pactadas
-        </SelectItem>
-      ) : (
-        valorizacionesPactadas.map((item) => (
-          <SelectItem
-            key={item.id}
-            value={String(item.id)}
-          >
-            {item.nombre} - S/ {item.monto || "0.00"}
-          </SelectItem>
-        ))
-      )}
-    </SelectContent>
-  </Select>
-</div>
                   </div>
 
                   <div className="grid gap-2">
@@ -855,80 +840,77 @@ if (observacionAutomatica) {
                   </div>
  
                   <div className="grid gap-2 col-span-2">
-                    <Label>Documento de respaldo</Label>
-                    <label
-                      htmlFor="archivo"
-                      className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center hover:bg-muted/50"
-                    >
-                      <span className="text-sm font-medium">Subir archivos</span>
-                      <span className="text-xs text-muted-foreground">
-                        PDF, Excel, Word o imagen
-                      </span>
-                    </label>
+  <Label>Documentos de respaldo</Label>
 
-                    <Input
-                      id="archivo"
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => setArchivo(e.target.files?.[0] || null)}
-                    />
+{client && (
+  <div className="rounded-lg border p-3 mb-2">
+    <p className="font-medium">
+      Empresa: {client}
+    </p>
 
-                    {(archivo || editingValuation?.archivo_nombre) && (
-  <div className="space-y-3">
-  <p className="text-sm font-medium">
-    Documentos obligatorios
-  </p>
+    <p>
+      Requiere: {cantidadDocumentosRequeridos} documentos
+    </p>
+
+    <p>
+      Adjuntados: {cantidadDocumentosAdjuntos}
+    </p>
+  </div>
+)}
+
+  <label
+    htmlFor="documentos"
+    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center hover:bg-muted/50"
+  >
+    <span className="text-sm font-medium">
+      Subir documentos
+    </span>
+
+    <span className="text-xs text-muted-foreground">
+      Adjunta los archivos requeridos según la empresa
+    </span>
+  </label>
 
   <Input
-    type="file"
-    accept=".doc,.docx,.pdf"
-    onChange={(e) => setPdfA(e.target.files?.[0] || null)}
-  />
+  id="documentos"
+  type="file"
+  multiple
+  className="hidden"
+  onChange={(e) => {
+    const nuevos =
+      Array.from(e.target.files || [])
 
-  {pdfA && (
-    <p className="text-xs text-muted-foreground">
-      Word/PDF A: {pdfA.name}
-    </p>
-  )}
+    setDocumentos((prev) => [
+      ...prev,
+      ...nuevos,
+    ])
 
-  <Input
-    type="file"
-    accept=".doc,.docx,.pdf"
-    onChange={(e) => setPdfB(e.target.files?.[0] || null)}
-  />
+    e.target.value = ""
+  }}
+/>
 
-  {pdfB && (
-    <p className="text-xs text-muted-foreground">
-      Word/PDF B: {pdfB.name}
-    </p>
-  )}
+  {client && cantidadDocumentosRequeridos > 0 && (
+  <div className="rounded-md bg-muted/40 p-3 text-sm">
+    <span className="font-medium">
+      {cantidadDocumentosAdjuntos}/{cantidadDocumentosRequeridos}
+    </span>{" "}
+    documentos adjuntos requeridos para {client}
+  </div>
+)}
 
-  <Input
-    type="file"
-    accept=".doc,.docx,.pdf"
-    onChange={(e) => setExcelA(e.target.files?.[0] || null)}
-  />
-
-  {excelA && (
-    <p className="text-xs text-muted-foreground">
-      Excel Valorización: {excelA.name}
-    </p>
-  )}
-
-  <Input
-    type="file"
-    accept=".doc,.docx,.pdf"
-    onChange={(e) => setExcelB(e.target.files?.[0] || null)}
-  />
-
-  {excelB && (
-    <p className="text-xs text-muted-foreground">
-      Excel Check List: {excelB.name}
-    </p>
+  {documentos.length > 0 && (
+    <div className="space-y-1">
+      {documentos.map((doc, index) => (
+        <p
+          key={index}
+          className="text-xs text-muted-foreground"
+        >
+          {index + 1}. {doc.name}
+        </p>
+      ))}
+    </div>
   )}
 </div>
-)}
-                  </div>
                 </div>
 
                 <DialogFooter>
@@ -983,9 +965,9 @@ if (observacionAutomatica) {
                       <td className="px-4 py-4">
                         S/ {item.amount.toLocaleString("es-PE")}
                       </td>
-                      <td className="px-4 py-4">
-                        <StatusBadge status={item.status} />
-                      </td>
+                      <td className="px-4 py-4 min-w-[120px] whitespace-nowrap">
+  <StatusBadge status={item.status} />
+</td>
                       <td className="px-4 py-4">{item.encargado}</td>
                       <td className="px-4 py-4">{item.date}</td>
                       <td className="px-4 py-4">
@@ -1000,17 +982,13 @@ if (observacionAutomatica) {
     </a>
   ) : (
     <span className="text-muted-foreground text-xs">
-      {item.documentos_completos === 4 ? (
+      {(item.documentos_adjuntos || 0) > 0 ? (
   <span className="text-green-500 font-medium">
-    Completo
-  </span>
-) : item.documentos_completos === 0 ? (
-  <span className="text-red-500 font-medium">
-    Sin documentos
+    Archivos completos
   </span>
 ) : (
-  <span className="text-yellow-500 font-medium">
-    {item.documentos_completos}/4
+  <span className="text-red-500 font-medium">
+    Sin documentos
   </span>
 )}
     </span>

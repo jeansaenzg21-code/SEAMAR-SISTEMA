@@ -118,7 +118,11 @@ export async function descargarArchivo(
 } export async function subirContratoAOneDrive(
   nombreArchivo: string,
   buffer: Buffer
-) {
+) 
+
+
+
+{
   const token =
     await getAccessToken()
 
@@ -150,6 +154,46 @@ export async function descargarArchivo(
 
   const archivo =
     await response.json()
+
+  return {
+    nombre: archivo.name,
+    itemId: archivo.id,
+    webUrl: archivo.webUrl,
+  }
+}
+export async function subirDocumentoAOneDrive(
+  nombreArchivo: string,
+  buffer: Buffer
+) {
+  const token = await getAccessToken()
+
+  const nombreLimpio =
+  nombreArchivo.replace(/[<>:"/\\|?*]/g, "-")
+
+const ruta =
+  `SistemaSeamar/Documentos/${nombreLimpio}`
+
+  const response = await fetch(
+  `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.DOCUMENTOS}:/${nombreLimpio}:/content`,
+  {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/octet-stream",
+    },
+    body: buffer as unknown as BodyInit,
+  }
+)
+
+  if (!response.ok) {
+    const error = await response.text()
+
+    throw new Error(
+      `Error al subir documento a OneDrive: ${error}`
+    )
+  }
+
+  const archivo = await response.json()
 
   return {
     nombre: archivo.name,

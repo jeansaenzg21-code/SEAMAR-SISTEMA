@@ -127,8 +127,6 @@ const cargarProyecto = async () => {
       budget:
         Number(data.monto || 0),
       spent: 0,
-      team:
-        data.valorizaciones_pactadas || 0,
       documents:
         data.contrato_nombre
           ? [
@@ -160,12 +158,24 @@ const cargarProyecto = async () => {
 
   const cargarValorizaciones = async () => {
     try {
-      <Button>
-  Agregar valorización pactada
-</Button>
-      const res = await fetch(`/api/proyectos/${project.id}/valorizaciones-pactadas`)
-      const data = await res.json()
-      setValorizaciones(data)
+
+      const res = await fetch(
+  "/api/valorizaciones"
+)
+
+const data =
+  await res.json()
+
+  setValorizaciones(
+  Array.isArray(data)
+    ? data.filter(
+        (v: any) =>
+          String(v.negocio_operacion) === String(projectId)
+      )
+    : []
+)
+
+setValorizaciones(data)
     } catch (error) {
       console.error("Error al cargar valorizaciones:", error)
     }
