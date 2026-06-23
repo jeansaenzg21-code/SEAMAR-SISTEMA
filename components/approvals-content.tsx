@@ -30,6 +30,9 @@ type Approval = {
   priority: "high" | "medium" | "low"
   respuesta_observacion?: string
 archivo_respuesta_nombre?: string
+historial_observaciones?: any[]
+documentos?: any[]
+
 }
 
 const initialApprovals: Approval[] = []
@@ -110,6 +113,18 @@ export function ApprovalsContent() {
           archivo_respuesta_nombre:
             v.archivo_respuesta_nombre
 
+            ,
+
+historial_observaciones:
+  typeof v.historial_observaciones === "string"
+    ? JSON.parse(v.historial_observaciones)
+    : v.historial_observaciones || [],
+
+documentos:
+  typeof v.documentos === "string"
+    ? JSON.parse(v.documentos)
+    : v.documentos || []
+
         }));
 
     setApprovals(
@@ -144,8 +159,7 @@ const [isViewOpen, setIsViewOpen] =
   if (!selectedApproval) return
 
   try {
-const [selectedApproval, setSelectedApproval] = useState<any>(null)
-const [isViewOpen, setIsViewOpen] = useState(false)
+
     const response =
       await fetch(
         `/api/valorizaciones/${selectedApproval.id}/estado`,
@@ -217,7 +231,24 @@ const [isViewOpen, setIsViewOpen] = useState(false)
   setIsObserveOpen(false)
   setSelectedApproval(null)
 }
+const abrirDetalle = async (item: Approval) => {
+  setSelectedApproval(item)
+  setIsViewOpen(true)
 
+  const response = await fetch(
+    `/api/valorizaciones/${item.id}/detalle`
+  )
+
+  const data = await response.json()
+
+  if (!data.success) return
+
+  setSelectedApproval({
+    ...item,
+    historial_observaciones: data.observaciones || [],
+    documentos: data.documentos || [],
+  })
+}
   const renderCard = (item: Approval) => (
     <Card key={item.id} className="bg-card border-border">
       <CardContent className="p-5">
@@ -244,10 +275,7 @@ const [isViewOpen, setIsViewOpen] = useState(false)
             <Button
   size="icon"
   variant="outline"
-  onClick={() => {
-    setSelectedApproval(item)
-    setIsViewOpen(true)
-  }}
+  onClick={() => abrirDetalle(item)}
 >
   <Eye className="h-4 w-4" />
 </Button>
@@ -471,9 +499,28 @@ const [isViewOpen, setIsViewOpen] = useState(false)
         DOCUMENTOS ADJUNTOS
       </p>
 
-      <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-        Sin documentos adjuntos
-      </div>
+      {selectedApproval?.documentos &&
+selectedApproval.documentos.length > 0 ? (
+  <div className="space-y-2">
+    {selectedApproval.documentos.map((doc: any) => (
+      <a
+        key={doc.id}
+        href={doc.url || "#"}
+        target="_blank"
+        className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted/40"
+      >
+        <span>{doc.nombre}</span>
+        <span className="text-xs text-muted-foreground">
+          Abrir
+        </span>
+      </a>
+    ))}
+  </div>
+) : (
+  <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+    Sin documentos adjuntos
+  </div>
+)}
     </div>
 
     <div className="space-y-4 pt-4">
@@ -522,43 +569,126 @@ const [isViewOpen, setIsViewOpen] = useState(false)
       </p>
 
       <div className="rounded-lg border bg-muted/30 p-4">
-        {selectedApproval?.respuesta_observacion ? (
-          <div className="rounded-md border border-green-500/20 bg-green-500/10 p-3">
-            <p className="text-sm font-medium text-green-400">
-              Respuesta a observación
-            </p>
-
-            <p className="text-sm mt-1">
-              {selectedApproval.respuesta_observacion}
-            </p>
-
-            {selectedApproval.archivo_respuesta_nombre && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No hay observaciones registradas.
+  {selectedApproval?.historial_observaciones &&
+  selectedApproval.historial_observaciones.length > 0 ? (
+    <div className="space-y-3">
+      {selectedApproval.historial_observaciones.map((obs: any) => (
+        <div
+          key={obs.id}
+          className="rounded-md border border-border bg-background p-3"
+        >
+          <p className="text-sm font-medium">
+            {obs.tipo === "SISTEMA"
+              ? "Observación del sistema"
+              : "Observación de usuario"}
           </p>
-        )}
 
-        <div className="mt-4 flex gap-2">
-          <Input placeholder="Responder observación..." />
-          <Button variant="outline">Enviar</Button>
+          <p className="text-sm mt-1">
+            {obs.observacion}
+          </p>
+
+          <p className="text-xs text-muted-foreground mt-2">
+            Estado: {obs.estado} · {obs.fecha}
+          </p>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground">
+      No hay observaciones registradas.
+    </p>
+  )}
+
+  {selectedApproval?.respuesta_observacion && (
+    <div className="mt-3 rounded-md border border-green-500/20 bg-green-500/10 p-3">
+      <p className="text-sm font-medium text-green-400">
+        Respuesta a observación
+      </p>
+
+      <p className="text-sm mt-1">
+        {selectedApproval.respuesta_observacion}
+      </p>
+
+      {selectedApproval.archivo_respuesta_nombre && (
+        <p className="text-xs text-muted-foreground mt-2">
+          Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
+        </p>
+      )}
+    </div>
+  )}
+
+  <div className="mt-4 flex gap-2">
+    <Input
+      placeholder="Responder observación..."
+      value={observation}
+      onChange={(e) => setObservation(e.target.value)}
+    />
+
+    <Button
+      variant="outline"
+      onClick={async () => {
+        if (!selectedApproval) return
+
+        await fetch(
+          `/api/valorizaciones/${selectedApproval.id}/estado`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              estado: "OBSERVADO",
+              observacion: observation,
+            }),
+          }
+        )
+
+        location.reload()
+      }}
+    >
+      Enviar
+    </Button>
+  
         </div>
       </div>
     </div>
 
     <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
-      <Button className="flex-1 bg-green-600 hover:bg-green-700">
-        Aprobar
-      </Button>
+      <Button
+  className="flex-1 bg-green-600 hover:bg-green-700"
+  onClick={() => {
+    setIsApproveOpen(true)
+  }}
+>
+  Aprobar
+</Button>
 
-      <Button variant="outline" className="flex-1">
-        Solicitar corrección
-      </Button>
+      <Button
+  variant="outline"
+  className="flex-1"
+  onClick={async () => {
+    if (!selectedApproval) return
+
+    await fetch(
+      `/api/valorizaciones/${selectedApproval.id}/estado`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          estado: "OBSERVADO",
+          observacion:
+            observation.trim() || "Corrección solicitada desde Aprobaciones",
+        }),
+      }
+    )
+
+    location.reload()
+  }}
+>
+  Solicitar corrección
+</Button>
     </div>
   </DialogContent>
 </Dialog>

@@ -65,8 +65,9 @@ pdf_b?: string
 excel_a?: string
 excel_b?: string
 
-documentos_completos: number
+documentos_completos: number  
 documentos_adjuntos?: number
+documentos?: any[]
 }
 
 
@@ -98,8 +99,16 @@ function StatusBadge({ status }: { status: Status }) {
 
 export function ValuationsContent() {
   
-  const enviarAObservado = async (item: Valuation) => {
+  const enviarAObservado = async (
+  item: Valuation,
+  comentario?: string
+) => {
   try {
+    const observacion =
+      comentario && comentario.trim() !== ""
+        ? comentario.trim()
+        : "Corrección solicitada desde Valorizaciones"
+
     const response = await fetch(
       `/api/valorizaciones/${item.id}/estado`,
       {
@@ -109,18 +118,27 @@ export function ValuationsContent() {
         },
         body: JSON.stringify({
           estado: "OBSERVADO",
-          observacion: "Corrección solicitada desde Valorizaciones",
+          observacion,
         }),
       }
     )
 
     const data = await response.json()
 
-    if (data.success) {
-      await cargarValorizaciones()
+    if (!data.success) {
+      alert(data.message || "No se pudo enviar a Observaciones")
+      return
     }
+
+    await cargarValorizaciones()
+
+    setComentarioObservacion("")
+    setIsViewOpen(false)
+
+    alert("Enviado a Observaciones")
   } catch (error) {
     console.error(error)
+    alert("Error al enviar a Observaciones")
   }
 }
  const getAvanceValorizacion = (status: string) => {
@@ -153,6 +171,8 @@ const [valuations, setValuations] = useState<Valuation[]>([])
 
 const [selectedValuation, setSelectedValuation] =
   useState<Valuation | null>(null)
+  const [comentarioObservacion, setComentarioObservacion] =
+  useState("")
 const [clientes, setClientes] = useState<any[]>([])
 const [proyectosCliente, setProyectosCliente] =
   useState<any[]>([])
@@ -229,7 +249,7 @@ const getCantidadDocumentosRequeridos = (empresa: string) => {
     nombre.includes("TERMINALES")
   ) return 3
 
-  if (nombre.includes("TRALZA")) return 5
+  if (nombre.includes("TRALSA")) return 5
 
   return 0
 }
@@ -278,7 +298,7 @@ const cargarValorizaciones = async () => {
     Number(item.monto || 0),
 
   documentos_adjuntos:
-  item.documentos_adjuntos || 0,
+  Number(item.documentos_adjuntos || 0),
 
   status:
   (
@@ -311,12 +331,8 @@ excel_b: item.excel_b || "",
   observacion_sistema:
     item.observacion_sistema || "",
 
-    documentos_completos: [
-  item.pdf_a,
-  item.pdf_b,
-  item.excel_a,
-  item.excel_b,
-].filter(Boolean).length,
+    documentos_completos:
+  Number(item.documentos_adjuntos || 0),
     
 }))
 
@@ -567,6 +583,10 @@ if (observacionAutomatica) {
 
     const data =
       await response.json();
+
+
+      console.log(data)
+
 
     if (!data.success) {
       alert("No se pudo enviar a revisión");
@@ -922,119 +942,130 @@ if (observacionAutomatica) {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </div>
-        </div>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b bg-secondary">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">ID</th>
-<th className="px-4 py-3 text-left font-medium">Cliente</th>
-<th className="px-4 py-3 text-left font-medium">Nombre P.</th>
-<th className="px-4 py-3 text-left font-medium">N° O/S</th>
-<th className="px-4 py-3 text-left font-medium">Tipo</th>
-<th className="px-4 py-3 text-left font-medium">Monto</th>
-<th className="px-4 py-3 text-left font-medium">Estado</th>
-<th className="px-4 py-3 text-left font-medium">Encargado</th>
-<th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
-<th className="px-4 py-3 text-left font-medium">Documentos</th>
-<th className="px-4 py-3 text-left font-medium">Acciones</th>
-                  </tr>
-                </thead>
+          <Card className="bg-card border-border">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-secondary">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium">ID</th>
+  <th className="px-4 py-3 text-left font-medium">Cliente</th>
+  <th className="px-4 py-3 text-left font-medium">Nombre P.</th>
+  <th className="px-4 py-3 text-left font-medium">N° O/S</th>
+  <th className="px-4 py-3 text-left font-medium">Tipo</th>
+  <th className="px-4 py-3 text-left font-medium">Monto</th>
+  <th className="px-4 py-3 text-left font-medium">Estado</th>
+  <th className="px-4 py-3 text-left font-medium">Encargado</th>
+  <th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
+  <th className="px-4 py-3 text-left font-medium">Documentos</th>
+  <th className="px-4 py-3 text-left font-medium">Acciones</th>
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  {filteredValuations.map((item) => (
-                    <tr key={item.id} className="border-b border-border">
-                      <td className="px-4 py-4 font-medium">
-                        VAL-2026-{String(item.id).padStart(3, "0")}
-                      </td>
-                      <td className="px-4 py-4">{item.client}</td>
+                  <tbody>
+                    {filteredValuations.map((item) => (
+                      <tr key={item.id} className="border-b border-border">
+                        <td className="px-4 py-4 font-medium">
+                          VAL-2026-{String(item.id).padStart(3, "0")}
+                        </td>
+                        <td className="px-4 py-4">{item.client}</td>
 
-<td className="px-4 py-4 max-w-[220px]">
-  <p className="line-clamp-2 text-sm font-medium">
-    {item.description || "Sin proyecto"}
-  </p>
-</td>
+  <td className="px-4 py-4 max-w-[220px]">
+    <p className="line-clamp-2 text-sm font-medium">
+      {item.description || "Sin proyecto"}
+    </p>
+  </td>
 
-<td className="px-4 py-4">{item.orden_servicio}</td>
-<td className="px-4 py-4">{item.type}</td>
-                      <td className="px-4 py-4">
-                        S/ {item.amount.toLocaleString("es-PE")}
-                      </td>
-                      <td className="px-4 py-4 min-w-[120px] whitespace-nowrap">
-  <StatusBadge status={item.status} />
-</td>
-                      <td className="px-4 py-4">{item.encargado}</td>
-                      <td className="px-4 py-4">{item.date}</td>
-                      <td className="px-4 py-4">
-  {item.archivo_url ? (
-    <a
-      href={item.archivo_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-400 text-xs hover:underline"
-    >
-      Ver documento
-    </a>
+  <td className="px-4 py-4">{item.orden_servicio}</td>
+  <td className="px-4 py-4">{item.type}</td>
+                        <td className="px-4 py-4">
+                          S/ {item.amount.toLocaleString("es-PE")}
+                        </td>
+                        <td className="px-4 py-4 min-w-[120px] whitespace-nowrap">
+    <StatusBadge status={item.status} />
+  </td>
+                        <td className="px-4 py-4">{item.encargado}</td>
+                        <td className="px-4 py-4">{item.date}</td>
+                        <td className="px-4 py-4">
+    {item.archivo_url ? (
+      <a
+        href={item.archivo_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 text-xs hover:underline"
+      >
+        Ver documento
+      </a>
+    ) : (
+      <span className="text-muted-foreground text-xs">
+        {(item.documentos_adjuntos || 0) > 0 ? (
+    <span className="text-green-500 font-medium">
+      Archivos completos
+    </span>
   ) : (
-    <span className="text-muted-foreground text-xs">
-      {(item.documentos_adjuntos || 0) > 0 ? (
-  <span className="text-green-500 font-medium">
-    Archivos completos
-  </span>
-) : (
-  <span className="text-red-500 font-medium">
-    Sin documentos
-  </span>
-)}
+    <span className="text-red-500 font-medium">
+      Sin documentos
     </span>
   )}
-</td>
-                      <td className="px-4 py-4">
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button size="icon" variant="outline">
-        <MoreVertical className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
+      </span>
+    )}
+  </td>
+                        <td className="px-4 py-4">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="outline">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
 
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem
-  onClick={() => {
-    setSelectedValuation(item)
-    setIsViewOpen(true)
-  }}
->
-  Ver
-</DropdownMenuItem>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+    onClick={async () => {
+  const res = await fetch(
+    `/api/valorizaciones/${item.id}/documentos`
+  )
 
-      <DropdownMenuItem
-        onClick={() => editarValorizacion(item)}
-      >
-        Editar
-      </DropdownMenuItem>
+  const documentos =
+    await res.json()
 
-      <DropdownMenuItem
-        onClick={() => enviarRevision(item)}
-      >
-        Enviar a revisión
-      </DropdownMenuItem>
+  setSelectedValuation({
+    ...item,
+    documentos,
+  })
 
-      <DropdownMenuItem
-        onClick={() => descargarExcel(item)}
-      >
-        Descargar
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</td>
-                    </tr>
-                  ))}
-                </tbody>
+  setIsViewOpen(true)
+}}
+  >
+    Ver
+  </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => editarValorizacion(item)}
+        >
+          Editar
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => enviarRevision(item)}
+        >
+          Enviar a revisión
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => descargarExcel(item)}
+        >
+          Descargar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </td>
+                      </tr>
+                    ))}
+                  </tbody>
               </table>
             </div>
           </CardContent>
@@ -1091,53 +1122,42 @@ if (observacionAutomatica) {
                 DOCUMENTOS ADJUNTOS
               </p>
 
-              {selectedValuation.archivo_url ? (
-                <a
-                  href={selectedValuation.archivo_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-lg border bg-muted/30 p-4 hover:bg-muted/50"
-                >
-                  <span className="text-sm font-medium">
-                    {selectedValuation.archivo_nombre || "Documento adjunto"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Ver documento
-                  </span>
-                </a>
-              ) : (
-                <div className="space-y-2">
-  {[
-    { label: "Word/PDF A", value: selectedValuation?.pdf_a },
-    { label: "Word/PDF B", value: selectedValuation?.pdf_b },
-    { label: "Excel Valorización", value: selectedValuation?.excel_a },
-    { label: "Excel Check List", value: selectedValuation?.excel_b },
-  ].map((doc) => (
-    <div
-      key={doc.label}
-      className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2"
-    >
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">
-          {doc.label}
-        </p>
-        <p className="text-sm">
-          {doc.value || "No adjuntado"}
-        </p>
-      </div>
-
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!doc.value}
-      >
-        Vista previa
-      </Button>
-    </div>
-  ))}
+              
 </div>
-              )}
-            </div>
+              <div className="space-y-2">
+  {(selectedValuation.documentos || []).length > 0 ? (
+
+    (selectedValuation.documentos || []).map(
+      (doc: any, index: number) => (
+        <a
+          key={index}
+          href={doc.url || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2 hover:bg-muted/40"
+        >
+          <div>
+            <p className="text-sm font-medium">
+              {doc.nombre}
+            </p>
+          </div>
+
+          <span className="text-xs text-muted-foreground">
+            Abrir
+          </span>
+        </a>
+      )
+    )
+
+  ) : (
+
+    <div className="rounded-lg border border-border bg-muted/20 px-3 py-3">
+      No hay documentos adjuntos
+    </div>
+
+  )}
+</div>
+            
 
             <div className="space-y-4 pt-4">
               <p className="text-xs font-semibold tracking-widest text-muted-foreground">
@@ -1194,8 +1214,25 @@ if (observacionAutomatica) {
                 )}
 
                 <div className="mt-4 flex gap-2">
-                  <Input placeholder="Responder observación..." />
-                  <Button variant="outline">Enviar</Button>
+                  <Input
+  placeholder="Responder observación..."
+  value={comentarioObservacion}
+  onChange={(e) =>
+    setComentarioObservacion(e.target.value)
+  }
+/>
+
+<Button
+  variant="outline"
+  onClick={() =>
+    enviarAObservado(
+      selectedValuation,
+      comentarioObservacion
+    )
+  }
+>
+  Enviar
+</Button> 
                 </div>
               </div>
             </div>
@@ -1204,7 +1241,12 @@ if (observacionAutomatica) {
   <Button
     variant="outline"
     className="w-full"
-    onClick={() => enviarAObservado(selectedValuation)}
+    onClick={() =>
+  enviarAObservado(
+    selectedValuation,
+    comentarioObservacion
+  )
+}
   >
     Solicitar corrección
   </Button>

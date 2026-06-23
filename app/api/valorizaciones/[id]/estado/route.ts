@@ -101,14 +101,14 @@ if (body.observation_status === "in_progress") {
       const [rows]: any = await pool.query(
         `
         SELECT
-          numero_orden_servicio,
-          pdf_a,
-          pdf_b,
-          excel_a,
-          excel_b
-        FROM valorizaciones
-        WHERE id = ?
-        LIMIT 1
+  v.numero_orden_servicio,
+  COUNT(vd.id) AS documentos_adjuntos
+FROM valorizaciones v
+LEFT JOIN valorizacion_documentos vd
+  ON vd.valorizacion_id = v.id
+WHERE v.id = ?
+GROUP BY v.id, v.numero_orden_servicio
+LIMIT 1
         `,
         [id]
       );
@@ -121,29 +121,11 @@ if (body.observation_status === "in_progress") {
         );
       }
 
-      if (!valorizacion?.pdf_a) {
-        observacionesSistema.push(
-          "Falta documento PDF A"
-        );
-      }
-
-      if (!valorizacion?.pdf_b) {
-        observacionesSistema.push(
-          "Falta documento PDF B"
-        );
-      }
-
-      if (!valorizacion?.excel_a) {
-        observacionesSistema.push(
-          "Falta documento Excel A"
-        );
-      }
-
-      if (!valorizacion?.excel_b) {
-        observacionesSistema.push(
-          "Falta documento Excel B"
-        );
-      }
+      if (Number(valorizacion?.documentos_adjuntos || 0) === 0) {
+  observacionesSistema.push(
+    "No se encontraron documentos adjuntos"
+  );
+}
 
       if (observacionesSistema.length > 0) {
         estadoFinal = "OBSERVADO";
@@ -185,23 +167,31 @@ if (body.observation_status === "in_progress") {
           END,
 
         fecha_aprobacion =
-          CASE
-            WHEN ? = 'APROBADO'
-            THEN NOW()
-            ELSE fecha_aprobacion
-          END
+  CASE
+    WHEN ? = 'APROBADO'
+    THEN NOW()
+    ELSE fecha_aprobacion
+  END,
+
+dias_para_aprobar =
+  CASE
+    WHEN ? = 'APROBADO'
+    THEN TIMESTAMPDIFF(DAY, created_at, NOW())
+    ELSE dias_para_aprobar
+  END
 
       WHERE id = ?
       `,
       [
-        estadoFinal,
-        estadoFinal,
-        estadoFinal,
-        estadoFinal,
-        observacionFinal,
-        estadoFinal,
-        id,
-      ]
+  estadoFinal,
+  estadoFinal,
+  estadoFinal,
+  estadoFinal,
+  observacionFinal,
+  estadoFinal,
+  estadoFinal,
+  id,
+]
     );
 
     if (estadoFinal === "OBSERVADO") {

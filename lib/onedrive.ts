@@ -174,7 +174,7 @@ const ruta =
   `SistemaSeamar/Documentos/${nombreLimpio}`
 
   const response = await fetch(
-  `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.DOCUMENTOS}:/${nombreLimpio}:/content`,
+  `https://graph.microsoft.com/v1.0/users/${USER}/drive/root:/Documents/${ruta}:/content`,
   {
     method: "PUT",
     headers: {

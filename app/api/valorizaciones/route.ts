@@ -12,34 +12,29 @@ export async function GET() {
         p.nombre AS proyecto_nombre,
         p.tipo AS proyecto_tipo,
         (
-  SELECT COUNT(*)
-  FROM valorizacion_documentos vd
-  WHERE vd.valorizacion_id = v.id
-) AS documentos_adjuntos,
+          SELECT COUNT(*)
+          FROM valorizacion_documentos vd
+          WHERE vd.valorizacion_id = v.id
+        ) AS documentos_adjuntos,
         (
-  SELECT vo.observacion
-  FROM valorizacion_observaciones vo
-  WHERE
-    vo.valorizacion_id = v.id
-    AND vo.tipo = 'SISTEMA'
-  ORDER BY vo.id DESC
-  LIMIT 1
-) AS observacion_sistema,
-
-(
-  SELECT vo.estado
-  FROM valorizacion_observaciones vo
-  WHERE
-    vo.valorizacion_id = v.id
-    AND vo.tipo = 'SISTEMA'
-  ORDER BY vo.id DESC
-  LIMIT 1
-) AS estado_observacion
+          SELECT vo.observacion
+          FROM valorizacion_observaciones vo
+          WHERE vo.valorizacion_id = v.id
+          ORDER BY vo.id DESC
+          LIMIT 1
+        ) AS observacion_sistema,
+        (
+          SELECT vo.estado
+          FROM valorizacion_observaciones vo
+          WHERE vo.valorizacion_id = v.id
+          ORDER BY vo.id DESC
+          LIMIT 1
+        ) AS estado_observacion
       FROM valorizaciones v
       LEFT JOIN proyectos p
         ON p.id = v.negocio_operacion
       ORDER BY v.id DESC
-      ` 
+      `
     )
 
     return NextResponse.json(rows)
@@ -135,6 +130,12 @@ export async function POST(request: Request) {
   result.insertId
 
 for (const documento of documentos) {
+
+console.log(
+  "DOCUMENTO:",
+  documento.name
+)
+
   try {
     const bytes =
       await documento.arrayBuffer()
@@ -142,11 +143,13 @@ for (const documento of documentos) {
     const buffer =
       Buffer.from(bytes)
 
-    const archivoSubido =
-      await subirDocumentoAOneDrive(
-        `${valorizacionId}-${documento.name}`,
-        buffer
-      )
+      const archivoSubido = {
+  name: documento.name,
+  id: null,
+  webUrl: null,
+}
+
+   
 
     await pool.query(
       `
@@ -160,34 +163,23 @@ for (const documento of documentos) {
       `,
       [
         valorizacionId,
-        archivoSubido.nombre,
-        archivoSubido.itemId,
-        archivoSubido.webUrl,
+        archivoSubido.name,
+archivoSubido.id,
+archivoSubido.webUrl,
       ]
     )
   } catch (error) {
+
+console.log(
+  "ENTRO AL CATCH"
+)
+
     console.error(
       "No se pudo subir a OneDrive:",
       error
     )
 
-    await pool.query(
-      `
-      INSERT INTO valorizacion_documentos (
-        valorizacion_id,
-        nombre,
-        onedrive_id,
-        url
-      )
-      VALUES (?, ?, ?, ?)
-      `,
-      [
-        valorizacionId,
-        documento.name,
-        null,
-        null,
-      ]
-    )
+    throw error
   }
 }
 

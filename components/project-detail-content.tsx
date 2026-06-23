@@ -63,12 +63,12 @@ const defaultProject = {
   clientColor: "bg-gray-500",
   status: "active",
   description: "Project description not available.",
-  progress: 50,
-  budget: 100000,
-  spent: 50000,
-  dueDate: "2024-12-31",
-  startDate: "2024-01-01",
-  team: 5,
+  progress: 0,
+budget: 0,
+spent: 0,
+dueDate: "",
+startDate: "",
+team: 0,
   documents: [],
   costBreakdown: [],
   spendingTrend: [],
@@ -119,11 +119,9 @@ const cargarProyecto = async () => {
         data.descripcion ||
         "Sin descripción registrada.",
       startDate:
-        data.fecha_inicio?.slice(0, 10) ||
-        defaultProject.startDate,
-      dueDate:
-        data.fecha_fin?.slice(0, 10) ||
-        defaultProject.dueDate,
+  data.fecha_inicio?.slice(0, 10) || "",
+dueDate:
+  data.fecha_fin?.slice(0, 10) || "",
       budget:
         Number(data.monto || 0),
       spent: 0,
@@ -247,8 +245,12 @@ setValorizaciones(data)
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Started: {new Date(project.startDate).toLocaleDateString()}</span>
-                <span className="text-muted-foreground">Due: {new Date(project.dueDate).toLocaleDateString()}</span>
+                <span className="text-muted-foreground">
+  Started: {project.startDate ? new Date(project.startDate).toLocaleDateString() : "--"}
+</span>
+<span className="text-muted-foreground">
+  Due: {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : "--"}
+</span>
               </div>
             </div>
           </CardContent>
@@ -279,19 +281,7 @@ setValorizaciones(data)
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="rounded-md bg-success/10 p-3">
-                <Users className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-lg font-bold">{project.team}</p>
-                <p className="text-xs text-muted-foreground">Valorizaciones pactadas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {/* Tabs Content */}
