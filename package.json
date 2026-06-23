@@ -59,6 +59,7 @@
     "pdf2json": "^4.0.3",
     "pdfjs-dist": "^6.0.227",
     "pdfreader": "^3.0.8",
+    "python-shell": "^5.0.0",
     "react": "^19",
     "react-day-picker": "9.13.2",
     "react-dom": "^19",
