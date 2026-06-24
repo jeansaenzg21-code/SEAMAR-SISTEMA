@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
-import { subirDocumentoAOneDrive } from "@/lib/onedrive";
 
 
 export async function GET() {
@@ -32,7 +31,7 @@ export async function GET() {
         ) AS estado_observacion
       FROM valorizaciones v
       LEFT JOIN proyectos p
-        ON p.id = v.negocio_operacion
+  ON p.id = v.proyecto_id
       ORDER BY v.id DESC
       `
     )
@@ -68,6 +67,11 @@ export async function POST(request: Request) {
     const negocio_operacion =
       String(formData.get("negocio_operacion") || "")
 
+      const proyecto_id =
+  formData.get("proyecto_id")
+    ? Number(formData.get("proyecto_id"))
+    : null
+
     const numero_orden_servicio =
       String(formData.get("numero_orden_servicio") || "")
 
@@ -96,6 +100,7 @@ export async function POST(request: Request) {
         proveedor,
         ruc,
         negocio_operacion,
+        proyecto_id,
         numero_orden_servicio,
         descripcion,
         monto,
@@ -107,12 +112,13 @@ export async function POST(request: Request) {
         archivo_nombre,
         respaldo_nombre
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         proveedor,
         null,
         negocio_operacion,
+        proyecto_id,
         numero_orden_servicio,
         descripcion,
         monto,

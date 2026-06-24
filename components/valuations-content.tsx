@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { procesarDocumento } from "@/lib/openai-documentos";
+
 import {
   Select,
   SelectContent,
@@ -60,10 +60,8 @@ type Valuation = {
   observacion_sistema?: string
 archivo_url?: string
 
-pdf_a?: string
-pdf_b?: string
-excel_a?: string
-excel_b?: string
+
+
 
 documentos_completos: number  
 documentos_adjuntos?: number
@@ -323,10 +321,7 @@ const cargarValorizaciones = async () => {
   archivo_nombre:
     item.archivo_nombre || "",
 
-pdf_a: item.pdf_a || "",
-pdf_b: item.pdf_b || "",
-excel_a: item.excel_a || "",
-excel_b: item.excel_b || "",
+  archivo_url: item.archivo_url || "",
 
   observacion_sistema:
     item.observacion_sistema || "",
@@ -445,7 +440,18 @@ const formData = new FormData()
 
 formData.append("proveedor", client)
 formData.append("ruc", "")
-formData.append("negocio_operacion", type)
+formData.append("proyecto_id", type)
+
+const proyectoSeleccionado =
+  proyectosCliente.find(
+    (p: any) => String(p.id) === String(type)
+  )
+
+formData.append(
+  "negocio_operacion",
+  proyectoSeleccionado?.nombre || ""
+)
+
 formData.append("numero_orden_servicio", ordenServicio)
 formData.append("descripcion", description)
 formData.append("monto", String(amount))
