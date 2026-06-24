@@ -83,9 +83,9 @@ for _, fila in excel.iterrows():
             2
         )
 
-        fecha_excel = str(
-            fila["Fecha del emisión"]
-        )
+        fecha_excel = pd.to_datetime(
+    fila["Fecha del emisión"]
+).strftime("%Y-%m-%d")
 
         proveedor_excel = str(
             fila.get(
@@ -98,11 +98,15 @@ for _, fila in excel.iterrows():
         ).strip()
 
         ruc_excel = str(
+    int(
+        float(
             fila.get(
                 "Nro Doc Identidad",
-                ""
+                0
             )
-        ).strip()
+        )
+    )
+)
 
         cursor.execute(
             """

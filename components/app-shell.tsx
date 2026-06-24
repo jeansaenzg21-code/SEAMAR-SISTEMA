@@ -67,6 +67,10 @@ const providersSection = [
     name: "Cuentas por Pagar",
     href: "/accounts-payable",
   },
+  {
+    name: "Conciliación Facturas",
+    href: "/invoice-reconciliation",
+  },
 ]
 
 export function Sidebar() {

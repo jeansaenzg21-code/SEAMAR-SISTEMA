@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 
+import { AppShell } from "@/components/app-shell";
+
 import InvoiceReconciliationContent, {
   ReconciliationRecord,
   KPISummary,
 } from "@/components/invoice-reconciliation-content";
+
 
 export default function InvoiceReconciliationPage() {
 
@@ -43,29 +46,41 @@ export default function InvoiceReconciliationPage() {
 
     const data =
       await response.json();
+      
 
     console.log(data);
 
     const coincidencias =
-      (data.coincidenciasDetalle || [])
-      .map((item: any, index: number) => ({
-        id: `c-${index}`,
-        invoiceNumber:
-          item.factura,
-        status:
-          "COINCIDE",
-        amountExcel:
-          item.montoExcel,
-        amountSystem:
-          item.montoSistema,
-        supplier: "",
-        ruc: "",
-        date:
-          new Date()
-            .toISOString()
-            .split("T")[0],
-        observation: null,
-      }));
+  (data.coincidenciasDetalle || [])
+  .map((item: any, index: number) => ({
+
+    id: `c-${index}`,
+
+    invoiceNumber:
+      item.factura,
+
+    status:
+      "COINCIDE",
+
+    amountExcel:
+      item.montoExcel,
+
+    amountSystem:
+      item.montoSistema,
+
+    supplier:
+      item.proveedor || "",
+
+    ruc:
+      item.ruc || "",
+
+    date:
+      item.fecha || "",
+
+    observation:
+      null,
+
+  }));
 
     const noEncontradas =
   (data.noEncontradasDetalle || [])
@@ -75,7 +90,7 @@ export default function InvoiceReconciliationPage() {
     status: "NO_ENCONTRADA",
 
     amountExcel:
-      item.montoExcel || 0,
+  item.montoExcel,
 
     amountSystem: null,
 
@@ -93,25 +108,28 @@ export default function InvoiceReconciliationPage() {
   }));
 
     const diferencias =
-      (data.diferenciasMontoDetalle || [])
-      .map((item: any, index: number) => ({
-        id: `d-${index}`,
-        invoiceNumber:
-          item.factura,
-        status:
-          "DIFERENCIA_MONTO",
-        amountExcel:
-          item.montoExcel,
-        amountSystem:
-          item.montoSistema,
-        supplier: "",
-        ruc: "",
-        date:
-          new Date()
-            .toISOString()
-            .split("T")[0],
-        observation: null,
-      }));
+  (data.diferenciasMontoDetalle || [])
+  .map((item: any, index: number) => ({
+    id: `d-${index}`,
+    invoiceNumber: item.factura,
+    status: "DIFERENCIA_MONTO",
+
+    amountExcel: item.montoExcel,
+
+    amountSystem: item.montoSistema,
+
+    supplier:
+      item.proveedor || "",
+
+    ruc:
+      item.ruc || "",
+
+    date:
+      item.fecha || "",
+
+    observation:
+      "Monto distinto entre Excel y sistema",
+  }));
 
     setRecords([
       ...coincidencias,
@@ -133,14 +151,16 @@ export default function InvoiceReconciliationPage() {
         data.diferenciasMonto || 0,
     });
 
+ 
   }
 
   return (
-    <InvoiceReconciliationContent
-      records={records}
-      kpi={kpi}
-      onProcess={handleProcess}
-    />
+    <AppShell>
+      <InvoiceReconciliationContent
+        records={records}
+        kpi={kpi}
+        onProcess={handleProcess}
+      />
+    </AppShell>
   );
-
 }
