@@ -52,6 +52,7 @@ type Valuation = {
   orden_servicio: string
   type: string
   description: string
+  projectName: string
   amount: number
   status: Status
   date: string
@@ -59,7 +60,7 @@ type Valuation = {
   archivo_nombre?: string
   observacion_sistema?: string
 archivo_url?: string
-
+fecha_fin?: string | null
 
 
 
@@ -279,7 +280,7 @@ const cargarValorizaciones = async () => {
     const valorizaciones = data.map((item: any) => ({
   id: item.id,
 
-  projectName: item.proyecto_nombre,
+  projectName: item.proyecto_nombre || "",
 
   client: item.proveedor || "",
 
@@ -374,6 +375,9 @@ Nuevos archivos: ${data.nuevos}`
 }
 
   const filteredValuations = valuations.filter((v) => {
+
+
+
   if (statusFilter !== "all" && v.status !== statusFilter) return false
 
   if (
@@ -398,6 +402,11 @@ Nuevos archivos: ${data.nuevos}`
 
     return true
   })
+
+  const vistaCliente =
+  clientFilter?.toUpperCase().includes("REPSOL")
+    ? "repsol"
+    : "general"
 
   const limpiarFormulario = () => {
   setEditingValuation(null)
@@ -683,26 +692,25 @@ if (observacionAutomatica) {
                 <SelectItem value="invoiced">Facturado</SelectItem>
               </SelectContent>
             </Select>
+<Select value={clientFilter} onValueChange={setClientFilter}>
+  <SelectTrigger className="w-44 bg-secondary border-border">
+    <SelectValue placeholder="Clientes" />
+  </SelectTrigger>
 
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-44 bg-secondary border-border">
-                <SelectValue placeholder="Clientes" />
-                <SelectContent>
-  <SelectItem value="TODOS">Clientes</SelectItem>
+  <SelectContent>
+    <SelectItem value="all">Clientes</SelectItem>
 
-  {Array.isArray(clientes) &&
-  clientes.map((cliente) => (
-    <SelectItem
-      key={cliente.id}
-      value={cliente.razon_social}
-    >
-      {cliente.razon_social}
-    </SelectItem>
-  ))}
-  
-</SelectContent>
-              </SelectTrigger>
-            </Select>
+    {Array.isArray(clientes) &&
+      clientes.map((cliente) => (
+        <SelectItem
+          key={cliente.id}
+          value={cliente.razon_social}
+        >
+          {cliente.razon_social}
+        </SelectItem>
+      ))}
+  </SelectContent>
+</Select>
             <input
   type="month"
   value={selectedPeriod}
@@ -954,124 +962,197 @@ if (observacionAutomatica) {
 
           <Card className="bg-card border-border">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-md">
+                <table className="w-full table-auto text-sm">
                   <thead className="border-b bg-secondary">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium">ID</th>
-  <th className="px-4 py-3 text-left font-medium">Cliente</th>
-  <th className="px-4 py-3 text-left font-medium">Nombre P.</th>
-  <th className="px-4 py-3 text-left font-medium">N° O/S</th>
-  <th className="px-4 py-3 text-left font-medium">Tipo</th>
-  <th className="px-4 py-3 text-left font-medium">Monto</th>
-  <th className="px-4 py-3 text-left font-medium">Estado</th>
-  <th className="px-4 py-3 text-left font-medium">Encargado</th>
-  <th className="px-4 py-3 text-left font-medium">Fecha Inicio</th>
-  <th className="px-4 py-3 text-left font-medium">Documentos</th>
-  <th className="px-4 py-3 text-left font-medium">Acciones</th>
-                    </tr>
-                  </thead>
+  <tr>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide min-w-[120px] whitespace-nowrap">
+      ID
+    </th>
 
-                  <tbody>
-                    {filteredValuations.map((item) => (
-                      <tr key={item.id} className="border-b border-border">
-                        <td className="px-4 py-4 font-medium">
-                          VAL-2026-{String(item.id).padStart(3, "0")}
-                        </td>
-                        <td className="px-4 py-4">{item.client}</td>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Cliente
+    </th>
 
-  <td className="px-4 py-4 max-w-[220px]">
-    <p className="line-clamp-2 text-sm font-medium">
-      {item.description || "Sin proyecto"}
-    </p>
-  </td>
-
-  <td className="px-4 py-4">{item.orden_servicio}</td>
-  <td className="px-4 py-4">{item.type}</td>
-                        <td className="px-4 py-4">
-                          S/ {item.amount.toLocaleString("es-PE")}
-                        </td>
-                        <td className="px-4 py-4 min-w-[120px] whitespace-nowrap">
-    <StatusBadge status={item.status} />
-  </td>
-                        <td className="px-4 py-4">{item.encargado}</td>
-                        <td className="px-4 py-4">{item.date}</td>
-                        <td className="px-4 py-4">
-    {item.archivo_url ? (
-      <a
-        href={item.archivo_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 text-xs hover:underline"
-      >
-        Ver documento
-      </a>
-    ) : (
-      <span className="text-muted-foreground text-xs">
-        {(item.documentos_adjuntos || 0) > 0 ? (
-    <span className="text-green-500 font-medium">
-      Archivos completos
-    </span>
-  ) : (
-    <span className="text-red-500 font-medium">
-      Sin documentos
-    </span>
-  )}
-      </span>
+    {vistaCliente === "repsol" && (
+      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+        N° O/T
+      </th>
     )}
-  </td>
-                        <td className="px-4 py-4">
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="outline">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-    onClick={async () => {
-  const res = await fetch(
-    `/api/valorizaciones/${item.id}/documentos`
-  )
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Proyecto
+    </th>
 
-  const documentos =
-    await res.json()
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Descripción
+    </th>
 
-  setSelectedValuation({
-    ...item,
-    documentos,
-  })
+    {vistaCliente === "repsol" && (
+      <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+        P. U.
+      </th>
+    )}
 
-  setIsViewOpen(true)
-}}
-  >
-    Ver
-  </DropdownMenuItem>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Total
+    </th>
 
-        <DropdownMenuItem
-          onClick={() => editarValorizacion(item)}
-        >
-          Editar
-        </DropdownMenuItem>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Fecha Inicio
+    </th>
 
-        <DropdownMenuItem
-          onClick={() => enviarRevision(item)}
-        >
-          Enviar a revisión
-        </DropdownMenuItem>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Fecha Fin
+    </th>
 
-        <DropdownMenuItem
-          onClick={() => descargarExcel(item)}
-        >
-          Descargar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  </td>
-                      </tr>
-                    ))}
-                  </tbody>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Estado
+    </th>
+
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Encargado
+    </th>
+
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      Documentos
+    </th>
+
+    <th className="px-4 py-3 text-left font-medium">
+      Acciones
+    </th>
+  </tr>
+</thead>
+
+<tbody>
+  {filteredValuations.map((item) => (
+    <tr key={item.id} className="border-b border-border">
+      <td className="px-5 py-4 font-medium min-w-[120px] whitespace-nowrap">
+        VAL-2026-{String(item.id).padStart(3, "0")}
+      </td>
+
+      <td className="px-5 py-4 align-top">
+        {item.client || "-"}
+      </td>
+
+      {vistaCliente === "repsol" && (
+        <td className="px-5 py-4 whitespace-nowrap align-top">
+          {item.orden_servicio || "-"}
+        </td>
+      )}
+
+      <td className="px-5 py-4 max-w-[260px] align-top">
+        <p className="line-clamp-2 text-sm font-medium">
+          {item.projectName || "-"}
+        </p>
+      </td>
+
+      <td className="px-5 py-4 max-w-[320px] align-top">
+        <p className="line-clamp-2 text-sm">
+          {item.description || "-"}
+        </p>
+      </td>
+
+      {vistaCliente === "repsol" && (
+        <td className="px-5 py-4 whitespace-nowrap align-top">
+          {item.type || "-"}
+        </td>
+      )}
+
+      <td className="px-5 py-4 whitespace-nowrap align-top">
+        {item.amount != null
+          ? `S/ ${item.amount.toLocaleString("es-PE")}`
+          : "-"}
+      </td>
+
+      <td className="px-5 py-4 whitespace-nowrap align-top">
+        {item.date || "-"}
+      </td>
+
+      <td className="px-5 py-4 whitespace-nowrap align-top">
+        {item.fecha_fin
+          ? new Date(item.fecha_fin).toLocaleDateString("es-PE")
+          : "-"}
+      </td>
+
+      <td className="px-5 py-4 min-w-[120px] whitespace-nowrap align-top">
+        <StatusBadge status={item.status} />
+      </td>
+
+      <td className="px-5 py-4 whitespace-nowrap align-top">
+        {item.encargado || "-"}
+      </td>
+
+      <td className="px-5 py-4 align-top">
+        {item.archivo_url ? (
+          <a
+            href={item.archivo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 text-xs hover:underline"
+          >
+            Ver documento
+          </a>
+        ) : (
+          <span className="text-muted-foreground text-xs">
+            {(item.documentos_adjuntos || 0) > 0 ? (
+              <span className="text-green-500 font-medium">
+                Archivos completos
+              </span>
+            ) : (
+              <span className="text-red-500 font-medium">
+                Sin documentos
+              </span>
+            )}
+          </span>
+        )}
+      </td>
+
+      <td className="px-4 py-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="outline">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={async () => {
+                const res = await fetch(
+                  `/api/valorizaciones/${item.id}/documentos`
+                )
+
+                const documentos = await res.json()
+
+                setSelectedValuation({
+                  ...item,
+                  documentos,
+                })
+
+                setIsViewOpen(true)
+              }}
+            >
+              Ver
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={() => editarValorizacion(item)}>
+              Editar
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={() => enviarRevision(item)}>
+              Enviar a revisión
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={() => descargarExcel(item)}>
+              Descargar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </tr>
+  ))}
+</tbody>
               </table>
             </div>
           </CardContent>
