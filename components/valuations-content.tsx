@@ -47,7 +47,10 @@ import {
 type Status = "draft" | "under_review" | "observed" | "approved" | "invoiced"
 
 type Valuation = {
-  id: number
+  id: string
+
+  codigo: string
+
   client: string
   orden_servicio: string
   type: string
@@ -62,7 +65,9 @@ type Valuation = {
 archivo_url?: string
 fecha_fin?: string | null
 
+ pu: number
 
+  
 
 documentos_completos: number  
 documentos_adjuntos?: number
@@ -278,7 +283,7 @@ const cargarValorizaciones = async () => {
 
 
     const valorizaciones = data.map((item: any) => ({
-  id: item.id,
+  codigo: item.codigo || "",
 
   projectName: item.proyecto_nombre || "",
 
@@ -295,6 +300,12 @@ const cargarValorizaciones = async () => {
 
   amount:
     Number(item.monto || 0),
+
+    id: item.id,
+  
+  pu:
+  Number(item.pu || 0),
+  
 
   documentos_adjuntos:
   Number(item.documentos_adjuntos || 0),
@@ -1028,7 +1039,7 @@ if (observacionAutomatica) {
   {filteredValuations.map((item) => (
     <tr key={item.id} className="border-b border-border">
       <td className="px-5 py-4 font-medium min-w-[120px] whitespace-nowrap">
-        VAL-2026-{String(item.id).padStart(3, "0")}
+        {item.codigo || `VAL-2026-${String(item.id).padStart(3, "0")}`}
       </td>
 
       <td className="px-5 py-4 align-top">
@@ -1054,10 +1065,12 @@ if (observacionAutomatica) {
       </td>
 
       {vistaCliente === "repsol" && (
-        <td className="px-5 py-4 whitespace-nowrap align-top">
-          {item.type || "-"}
-        </td>
-      )}
+  <td className="px-5 py-4 whitespace-nowrap align-top">
+    {item.pu
+      ? `S/ ${Number(item.pu).toLocaleString("es-PE")}`
+      : "-"}
+  </td>
+)}
 
       <td className="px-5 py-4 whitespace-nowrap align-top">
         {item.amount != null

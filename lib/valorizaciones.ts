@@ -11,7 +11,7 @@ export async function guardarValorizacion(
   );
 
   const codigo =
-    `VAL-${Date.now()}`;
+  data.codigo || `VAL-${Date.now()}`;
 
     
   const [result]: any =
@@ -28,6 +28,7 @@ export async function guardarValorizacion(
       numero_orden_servicio,
 
       descripcion,
+      pu,
 
       monto,
       moneda,
@@ -48,7 +49,7 @@ respaldo_nombre,
       observaciones
 
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
 
@@ -62,7 +63,9 @@ data.numeroOrdenServicio || "",
 
 data.descripcion || data.archivoNombre || "Valorización sin descripción",
 
-data.monto || 0,
+Number(Number(data.pu || 0).toFixed(2)),
+
+Number(Number(data.monto || 0).toFixed(2)),
 data.moneda || "PEN",
 data.periodo || "",
 

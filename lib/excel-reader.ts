@@ -34,15 +34,38 @@ function valorComoTexto(valor: any) {
 }
 
 function valorComoNumero(valor: any) {
-  if (!valor) return 0;
+  if (valor === null || valor === undefined || valor === "") return 0;
 
-  const texto = valorComoTexto(valor)
+  if (typeof valor === "number") {
+    return Number(valor.toFixed(2));
+  }
+
+  if (typeof valor === "object") {
+    if ("result" in valor && typeof valor.result === "number") {
+      return Number(valor.result.toFixed(2));
+    }
+
+    if ("value" in valor && typeof valor.value === "number") {
+      return Number(valor.value.toFixed(2));
+    }
+  }
+
+  let texto = valorComoTexto(valor)
     .replace("S/.", "")
     .replace("S/", "")
-    .replace(",", ".")
     .trim();
 
-  return Number(texto) || 0;
+  if (texto.includes(",") && texto.includes(".")) {
+    texto = texto.replace(/\./g, "").replace(",", ".");
+  } else if (texto.includes(",")) {
+    texto = texto.replace(",", ".");
+  }
+
+  const numero = Number(texto);
+
+  return Number.isFinite(numero)
+    ? Number(numero.toFixed(2))
+    : 0;
 }
 
 function normalizarFecha(fecha: any) {
@@ -124,24 +147,122 @@ function buscarFilaTitulos(sheet: ExcelJS.Worksheet) {
 function buscarColumnaPorTitulo(
   sheet: ExcelJS.Worksheet,
   filaTitulo: number,
-  titulo: string
+  tipo: "descripcion" | "pu" | "total"
 ) {
   const row = sheet.getRow(filaTitulo);
 
   for (let c = 1; c <= sheet.columnCount; c++) {
-    const texto = valorComoTexto(
-      row.getCell(c).value
-    )
+    const texto = valorComoTexto(row.getCell(c).value)
       .toLowerCase()
+      .replace(/\s/g, "")
       .trim();
 
-    if (texto.includes(titulo)) {
+    if (
+      tipo === "descripcion" &&
+      (texto.includes("descripción") || texto.includes("descripcion"))
+    ) {
+      return c;
+    }
+
+    if (
+      tipo === "pu" &&
+      (texto === "p.u." || texto === "p.u" || texto === "pu")
+    ) {
+      return c;
+    }
+
+    if (
+      tipo === "total" &&
+      texto.includes("total") &&
+      !texto.includes("subtotal")
+    ) {
       return c;
     }
   }
 
   return null;
 }
+
+function buscarFilaDatosReal(
+  sheet: ExcelJS.Worksheet,
+  filaTitulos: number,
+  colDescripcion: number,
+  colPU: number,
+  colTotal: number
+) {
+  for (let r = filaTitulos + 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+
+    const descripcion = valorComoTexto(
+      row.getCell(colDescripcion).value
+    ).trim();
+
+    const pu = valorComoNumero(
+      row.getCell(colPU).value
+    );
+
+    const total = valorComoNumero(
+      row.getCell(colTotal).value
+    );
+
+    if (!descripcion) continue;
+
+    if (
+      descripcion.toLowerCase().includes("repsol") ||
+      descripcion.toLowerCase().includes("subtotal") ||
+      descripcion.toLowerCase().includes("total")
+    ) {
+      continue;
+    }
+
+    if (pu > 0) {
+  return row;
+} 
+  }
+
+  return null;
+}
+
+function buscarTotalFinalHoja(sheet: ExcelJS.Worksheet) {
+  let totalFinal = 0;
+
+  for (let r = 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+
+    for (let c = 1; c <= sheet.columnCount; c++) {
+      const texto = valorComoTexto(row.getCell(c).value)
+        .toLowerCase()
+        .replace(/\s/g, "")
+        .trim();
+
+      if (texto === "totals/." || texto === "total" || texto.includes("totals/")) {
+        for (let rr = r + 1; rr <= sheet.rowCount; rr++) {
+          const posibleTotal = valorComoNumero(
+            sheet.getRow(rr).getCell(c).value
+          );
+
+          if (posibleTotal > totalFinal) {
+            totalFinal = posibleTotal;
+          }
+        }
+
+        for (let cc = c; cc <= sheet.columnCount; cc++) {
+          const posibleTotal = valorComoNumero(
+            row.getCell(cc).value
+          );
+
+          if (posibleTotal > totalFinal) {
+            totalFinal = posibleTotal;
+          }
+        }
+      }
+    }
+  }
+
+  return totalFinal;
+}
+
+
 
 export async function leerValorizacionesExcel(
   buffer: any,
@@ -153,15 +274,28 @@ export async function leerValorizacionesExcel(
 
   const valorizaciones: any[] = [];
 
-  const hojasValor =
-    workbook.worksheets.filter((sheet) =>
-      sheet.name.toLowerCase().startsWith("valor")
-    );
+    const hojasValor =
+  workbook.worksheets.filter((sheet) =>
+    /^valor\s*\d+/i.test(sheet.name.trim())
+  );
+  
+
+hojasValor.sort((a, b) => {
+  const numA = Number(a.name.replace(/\D/g, ""));
+  const numB = Number(b.name.replace(/\D/g, ""));
+
+  return numA - numB;
+});
 
   for (const sheet of hojasValor) {
     const otTexto = valorComoTexto(
       sheet.getCell("B1").value
     );
+
+    console.log(
+  "Hojas Valor detectadas:",
+  hojasValor.map((h) => h.name)
+);
 
     const numeroOT =
       otTexto
@@ -176,22 +310,31 @@ export async function leerValorizacionesExcel(
       continue;
     }
 
-    const colDescripcion =
-      buscarColumnaPorTitulo(sheet, filaTitulos, "descrip");
 
-    const colPU =
-      buscarColumnaPorTitulo(sheet, filaTitulos, "p.u") ||
-      buscarColumnaPorTitulo(sheet, filaTitulos, "pu");
 
-    const colTotal =
-      buscarColumnaPorTitulo(sheet, filaTitulos, "total");
+
+    const colDescripcion = 2; // B = Descripción
+const colPU = 3;          // C = P.U
+
+const colTotal =
+  buscarColumnaPorTitulo(sheet, filaTitulos, "total") || 6;
 
     if (!colDescripcion || !colPU || !colTotal) {
       continue;
     }
 
     const filaDatos =
-      sheet.getRow(filaTitulos + 1);
+  buscarFilaDatosReal(
+    sheet,
+    filaTitulos,
+    colDescripcion,
+    colPU,
+    colTotal
+  );
+
+if (!filaDatos) {
+  continue;
+}
 
     const descripcion =
       valorComoTexto(
@@ -203,19 +346,37 @@ export async function leerValorizacionesExcel(
         filaDatos.getCell(colPU).value
       );
 
-    const total =
-      valorComoNumero(
-        filaDatos.getCell(colTotal).value
-      );
+    const totalFinalHoja =
+  buscarTotalFinalHoja(sheet);
+
+const total =
+  totalFinalHoja > 0
+    ? totalFinalHoja
+    : valorComoNumero(filaDatos.getCell(colTotal).value);
 
     const fechaInicio =
       buscarPrimeraFecha(sheet);
 
-    if (!descripcion || !total) {
-      continue;
-    }
+       const numeroValor =
+  sheet.name.match(/\d+/)?.[0];
+
+if (!numeroValor) {
+  continue;
+}
+
+const anioValor =
+  fechaInicio?.getFullYear() ??
+  new Date().getFullYear();
+
+const codigoValorizacion =
+  `VAL-${anioValor}-${numeroValor}`;
+
+    if (!descripcion) {
+  continue;
+}
 
     valorizaciones.push({
+      codigo: codigoValorizacion,
       tipoDocumento: "valorizacion",
 
       proveedor: "REPSOL COMERCIAL SAC",
@@ -236,7 +397,7 @@ ruc: "20503840121",
       numeroOrdenServicio: numeroOT,
 
       archivoNombre: archivo.nombre,
-      archivoOnedriveId: archivo.itemId,
+      archivoOnedriveId: archivo.itemId || archivo.id,
       archivoUrl: archivo.webUrl,
 
       hojaExcel: sheet.name,

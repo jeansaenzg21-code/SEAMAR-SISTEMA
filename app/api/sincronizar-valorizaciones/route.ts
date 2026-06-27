@@ -61,9 +61,24 @@ if (esExcel) {
     );
 
   for (const val of valorizacionesExcel) {
-    await guardarValorizacion(val);
-    nuevos++;
+  const [existeCodigo]: any =
+    await pool.query(
+      `
+      SELECT id
+      FROM valorizaciones
+      WHERE codigo = ?
+      LIMIT 1
+      `,
+      [val.codigo]
+    );
+    
+  if (existeCodigo.length > 0) {
+    continue;
   }
+
+  await guardarValorizacion(val);
+  nuevos++;
+}
 
   continue;
 }
