@@ -49,7 +49,7 @@ if (body.observation_status === "in_progress") {
       estado = 'EN_PROGRESO',
       fecha_en_progreso = NOW()
     WHERE valorizacion_id = ?
-      AND estado = 'PENDIENTE'
+      AND estado <> 'RESUELTA'
     `,
     [id]
   );
@@ -115,15 +115,11 @@ LIMIT 1
 
       const valorizacion = rows[0];
 
-      if (!valorizacion?.numero_orden_servicio) {
-        observacionesSistema.push(
-          "Orden de servicio no fue encontrada"
-        );
-      }
+    
 
-      if (Number(valorizacion?.documentos_adjuntos || 0) === 0) {
+      if (Number(valorizacion?.documentos_adjuntos || 0) < 4) {
   observacionesSistema.push(
-    "No se encontraron documentos adjuntos"
+    "Documentos incompletos para REPSOL"
   );
 }
 
@@ -137,7 +133,7 @@ LIMIT 1
         ? observacionesSistema.join("\n")
         : observacion && observacion.trim() !== ""
           ? observacion
-          : "Orden de servicio no fue encontrada";
+          : "";
 
     await pool.query(
       `

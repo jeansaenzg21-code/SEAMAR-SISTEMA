@@ -555,10 +555,9 @@ const response = await fetch(url, {
 
   try {
     const observacionAutomatica =
-  item.observacion_sistema ||
-  (!item.archivo_nombre
+  !item.archivo_nombre
     ? "Falta adjuntar el documento principal de valorización"
-    : "")
+    : ""
 
 if (observacionAutomatica) {
   const enviarAObservaciones = confirm(

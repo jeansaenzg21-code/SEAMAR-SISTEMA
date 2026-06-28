@@ -6,9 +6,20 @@ export async function guardarValorizacion(
   data: any
 ) {
 
-  const os = await buscarOSPorNumero(
-    data.numeroOrdenServicio
-  );
+  const esRepsol =
+  (data.proveedor || "")
+    .toUpperCase()
+    .includes("REPSOL");
+
+const documentosCompletos =
+  Number(data.documentosAdjuntos || 0) >= 4;
+
+const os =
+  esRepsol && documentosCompletos
+    ? { name: null, id: null, webUrl: null }
+    : await buscarOSPorNumero(
+        data.numeroOrdenServicio
+      );
 
   const codigo =
   data.codigo || `VAL-${Date.now()}`;
@@ -84,8 +95,8 @@ os?.name ?? null,
       os?.webUrl ?? null,
 
       os
-        ? null
-        : "Orden de servicio no encontrada"
+  ? null
+  : "Documentos incompletos"
 
     ]
   );
@@ -115,7 +126,7 @@ if (!os) {
 
       "SISTEMA",
 
-      "Orden de servicio no encontrada",
+      "Documentos incompletos",
 
       "Sistema"
     ]

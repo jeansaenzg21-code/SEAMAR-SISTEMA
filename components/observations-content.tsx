@@ -283,7 +283,7 @@ const cargarObservaciones =
                            onClick={async () => {
   if (observation.status === "pending") {
     await fetch(
-  `/api/valorizaciones/${observation.valuationId}/estado`,
+  `/api/valorizaciones/${observation.valuation}/estado`,
   {
     method: "PATCH",
     headers: {

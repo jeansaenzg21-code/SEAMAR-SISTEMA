@@ -25,20 +25,6 @@ export async function POST() {
 
     for (const archivo of lista) {
 
-  const [rows]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM valorizaciones
-      WHERE archivo_onedrive_id = ?
-      `,
-      [archivo.id]
-    );
-
-  if (rows.length > 0) {
-    continue;
-  }
-
   const archivoCompleto =
   await descargarArchivo(
     archivo.id
