@@ -32,11 +32,13 @@ import {
   CheckCircle,
   MessageSquareWarning,
 } from "lucide-react"
+import { Landmark } from "lucide-react"
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
+  { name: "Conciliación Bancaria", href: "/bank-reconciliation", icon: Landmark },
 ]
 
 const aiSection = [
