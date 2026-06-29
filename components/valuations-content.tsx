@@ -646,7 +646,7 @@ if (observacionAutomatica) {
 ]
 
     const datos = [
-      `VAL-2026-${String(item.id).padStart(3, "0")}`,
+      item.codigo,
       item.client,
       item.orden_servicio,
       item.type,
@@ -1177,8 +1177,8 @@ if (observacionAutomatica) {
             <DialogHeader>
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  VAL-2026-{String(selectedValuation.id).padStart(3, "0")}
-                </p>
+  {selectedValuation.codigo}
+</p>
 
                 <DialogTitle className="text-xl">
                   {selectedValuation.description || "Sin proyecto"}

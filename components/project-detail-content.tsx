@@ -467,7 +467,9 @@ setValorizaciones(data)
           <tbody>
             {valorizaciones.map((v) => (
               <tr key={v.id} className="border-b border-border">
-                <td className="px-4 py-4 font-medium">{v.codigo || `VAL-${v.id}`}</td>
+                <td className="px-4 py-4 font-medium">
+  {v.codigo}
+</td>
                 <td className="px-4 py-4">{v.proveedor}</td>
                 <td className="px-4 py-4">{v.negocio_operacion}</td>
                 <td className="px-4 py-4">{v.numero_orden_servicio}</td>

@@ -22,6 +22,7 @@ type Status = "under_review" | "observed" | "approved"
 type Approval = {
   id: string
   client: string
+  codigo: string
   description: string
   amount: string
   status: Status
@@ -76,6 +77,8 @@ export function ApprovalsContent() {
         .map((v: any) => ({
 
           id: v.id,
+          
+          codigo: v.codigo,
 
           client:
             v.proveedor,
@@ -256,7 +259,7 @@ const abrirDetalle = async (item: Approval) => {
           <div className="space-y-2">
             <div className="flex items-center gap-3"> 
               <h3 className="font-semibold">
-  VAL-{new Date(item.submittedDate).getFullYear()}-{String(item.id).padStart(3, "0")}
+  {item.codigo}
 </h3>
               <StatusBadge status={item.status} />
             </div>

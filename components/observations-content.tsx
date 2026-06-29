@@ -75,7 +75,10 @@ const cargarObservaciones =
                 `OBS-${v.id}`,
 
               valuation:
-                v.id,
+v.id,
+
+valuationId:
+  v.id,
 
               client:
                 v.proveedor,
@@ -104,7 +107,10 @@ const cargarObservaciones =
                 v.encargado || "-",
 
               response:
-                v.respuesta_observacion
+  v.respuesta_observacion,
+
+documentos_respuesta:
+  v.documentos_respuesta || []
 
             })
           )
@@ -126,7 +132,7 @@ const cargarObservaciones =
   const [selectedObservation, setSelectedObservation] =
     useState<(typeof observations)[0] | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const [response, setResponse] = useState("")
 
   const filteredObservations = observations.filter((o) => {
@@ -261,6 +267,19 @@ const cargarObservaciones =
                             </p>
                             <p className="text-sm">{observation.response}</p>
 
+                            {observation.documentos_respuesta?.map(
+(doc:any,index:number)=>(
+<a
+key={index}
+href={doc.url}
+target="_blank"
+className="text-primary underline text-sm block"
+>
+📎 {doc.nombre}
+</a>
+)
+)}
+
                             {observation.resolvedDate && (
                               <p className="text-xs text-muted-foreground mt-2">
                                 Resuelto el {observation.resolvedDate}
@@ -283,7 +302,7 @@ const cargarObservaciones =
                            onClick={async () => {
   if (observation.status === "pending") {
     await fetch(
-  `/api/valorizaciones/${observation.valuation}/estado`,
+  `/api/valorizaciones/${observation.valuationId}/estado`,
   {
     method: "PATCH",
     headers: {
@@ -357,17 +376,24 @@ const cargarObservaciones =
   <Label htmlFor="observation-file">Adjuntar documento</Label>
 
   <Input
-    id="observation-file"
-    type="file"
-    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-    onChange={(e) => setAttachedFile(e.target.files?.[0] || null)}
-  />
+ id="observation-file"
+ type="file"
+ multiple
+ accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+ onChange={(e)=>
+   setAttachedFiles(
+     Array.from(e.target.files || [])
+   )
+ }
+/>
 
-  {attachedFile && (
-    <p className="text-xs text-muted-foreground">
-      Archivo seleccionado: {attachedFile.name}
-    </p>
-  )}
+{attachedFiles.map((file,index)=>(
+<p key={index} className="text-xs">
+📎 {file.name}
+</p>
+))}
+
+  
 </div>
                 </div>
               ) : (
@@ -398,13 +424,64 @@ const cargarObservaciones =
 
   const valuations = JSON.parse(data)
 
+  let documentoUrl = ""
+
+
+const documentosSubidos: any[] = []
+
+
+for (const file of attachedFiles) {
+
+
+const form =
+new FormData()
+
+
+form.append(
+ "file",
+ file
+)
+
+
+form.append(
+ "valorizacionId",
+ String(selectedObservation.valuation)
+)
+
+
+const upload =
+await fetch(
+ "/api/observaciones/documento",
+ {
+  method:"POST",
+  body:form
+ }
+)
+
+
+const result =
+await upload.json()
+
+
+documentosSubidos.push({
+
+ nombre:file.name,
+
+ url:result.url
+
+})
+
+
+}
+
   const updatedValuations = valuations.map((item: any) =>
     String(item.id) === String(selectedObservation.valuation)
       ? {
     ...item,
     status: "resolved",
     respuesta_observacion: response,
-    archivo_respuesta_nombre: attachedFile?.name || "",
+    documentos_respuesta:
+ documentosSubidos
   }
       : item
   )
@@ -413,6 +490,8 @@ const cargarObservaciones =
     "fincontrol_valuations",
     JSON.stringify(updatedValuations)
   )
+
+
 
   await fetch(
   `/api/valorizaciones/${selectedObservation.valuation}/estado`,
@@ -437,7 +516,7 @@ setObservations((prev) =>
 
 setIsDetailModalOpen(false)
 setResponse("")
-setAttachedFile(null)
+setAttachedFiles([])
 
 await cargarObservaciones()
 }}>
