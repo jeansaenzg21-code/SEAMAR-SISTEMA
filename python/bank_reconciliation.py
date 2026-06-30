@@ -186,10 +186,9 @@ for index, fila in excel.iterrows():
         registros = cursor.fetchall()
 
         coincidencias_exactas = []
-        coincidencias_fecha   = []
         coincidencias         = []
 
-        # =========================
+                # =========================
         # BÚSQUEDA
         # =========================
 
@@ -199,25 +198,59 @@ for index, fila in excel.iterrows():
                 reg["fecha_emision"]
             )
 
-            dias = abs(
-                (fecha_mov - fecha_reg).days
-            )
-
             monto_reg = round(
                 float(reg["monto"]),
                 2
             )
 
-            # MISMA FECHA (±5 días) Y MISMO MONTO
+            misma_fecha = (
+                fecha_mov.date() ==
+                fecha_reg.date()
+            )
 
-            if dias <= 5 and monto_reg == monto:
+            mismo_monto = (
+                monto_reg == monto
+            )
+
+            if misma_fecha and mismo_monto:
+
                 coincidencias_exactas.append(reg)
+                
+                        # =========================
+        # CONCILIADO
+        # =========================
 
-            # FECHA PARECIDA PERO MONTO DISTINTO
+        if len(coincidencias_exactas) == 1:
 
-            elif dias <= 5:
-                coincidencias_fecha.append(reg)
+            estado = "conciliado"
 
+            coincidencias.append(
+                construir_coincidencia(
+                    coincidencias_exactas[0]
+                )
+            )
+
+        # =========================
+        # OBSERVACION
+        # =========================
+
+        elif len(coincidencias_exactas) > 1:
+
+            estado = "observacion"
+
+            for reg in coincidencias_exactas:
+
+                coincidencias.append(
+                    construir_coincidencia(reg)
+                )
+
+        # =========================
+        # PENDIENTE
+        # =========================
+
+        else:
+
+            estado = "pendiente"
         # =========================
         # CONCILIADO
         # =========================
@@ -245,23 +278,7 @@ for index, fila in excel.iterrows():
                     construir_coincidencia(reg)
                 )
 
-        # =========================
-        # DIFERENCIA
-        # =========================
-
-        elif len(coincidencias_fecha) > 0:
-
-            estado = "diferencia"
-            reg    = coincidencias_fecha[0]
-
-            diferencia = round(
-                monto - float(reg["monto"]),
-                2
-            )
-
-            coincidencias.append(
-                construir_coincidencia(reg)
-            )
+        
 
         # =========================
         # PENDIENTE

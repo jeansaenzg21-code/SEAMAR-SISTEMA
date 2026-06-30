@@ -158,7 +158,7 @@ Valores posibles:
 - PAGAR
 
 Nunca devolver null.
-Siempre devolver COBRAR o PAGAR. 
+Siempre devolver COBRAR o PAGAR.
 
 REGLA OBLIGATORIA:
 
@@ -219,21 +219,45 @@ PAGAR:
 SEAMAR DIVERS INTERNATIONAL S.A.C.
 es la empresa cliente o receptora.
 
-Verificar razon social, ruc y contexto del documento.
-
 No asumir únicamente por coincidencia parcial del nombre.
-
-Priorizar siempre el RUC y la razón social completa.
 
 No determinar destino únicamente porque aparezca la palabra "SEAMAR" en una descripción o texto del documento.
 
 Si no es posible identificar con certeza el destino,
-priorizar la razón social y RUC de:
-
-- empresaEmisora
-- empresaCliente
-
+priorizar empresaEmisora y empresaCliente
 antes que cualquier descripción del servicio.
+
+IDENTIFICACIÓN DE EMPRESAS Y RUC
+
+Todo documento financiero peruano contiene normalmente dos RUC: el del emisor
+y el del cliente/receptor. Un RUC nunca debe quedar como null si está visible
+en el documento, sin importar el formato en que aparezca (RUC, R.U.C.,
+R.U.C. Nº, RUC N°, Registro Único de Contribuyentes), ni si el documento es un
+estado de cuenta bancario, un comprobante de pago, o una factura de servicios.
+
+Proceso de validación obligatorio antes de devolver el JSON de FACTURA:
+
+PASO 1: Identificar empresa emisora (quien emite o factura).
+PASO 2: Buscar el RUC más cercano al nombre de la empresa emisora, en el
+        encabezado, membrete o bloque de datos del emisor. Asignarlo a rucEmisor.
+PASO 3: Identificar empresa cliente (quien recibe el documento o el cobro).
+PASO 4: Buscar el RUC más cercano al nombre de la empresa cliente, usualmente
+        en la sección "Señor(es)", "Cliente", "Razón Social del Cliente" o
+        similar. Asignarlo a rucCliente.
+PASO 5: Verificar que todo RUC visible en el documento haya sido asignado a
+        rucEmisor o rucCliente. Si un RUC aparece en el texto y ninguno de los
+        dos campos lo contiene, repetir los pasos 2 y 4 antes de continuar.
+PASO 6: Generar el JSON final solo después de completar los pasos anteriores.
+
+Reglas de desambiguación cuando hay dos o más RUC:
+- El RUC ubicado junto al nombre o membrete de quien emite el documento
+  corresponde a rucEmisor.
+- El RUC ubicado junto a la sección de datos del destinatario o cliente
+  corresponde a rucCliente.
+- Nunca dejar rucEmisor o rucCliente como null si el documento contiene un
+  RUC asociado, aunque el documento no sea estrictamente una factura de venta
+  (por ejemplo, estados de cuenta, comprobantes bancarios u otros documentos
+  con formato distinto).
 
 Para VALORIZACION responde exactamente con esta estructura:
 {

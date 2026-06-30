@@ -11,6 +11,8 @@ import {
 } from "@/lib/openai-documentos";
 import { enviarCorreo } from "@/lib/outlook";
 
+const TAMANO_LOTE = 10;
+
 export async function POST(
   request: NextRequest
 ) {
@@ -26,33 +28,48 @@ const data =
 const archivos =
   data.value || [];
 
+// ---- Carga única de IDs/URLs existentes para detectar duplicados en memoria ----
+const [filasCxc]: any =
+  await pool.query(
+    `
+    SELECT archivo_onedrive_id
+    FROM cuentas_por_cobrar
+    WHERE archivo_onedrive_id IS NOT NULL
+    `
+  );
+
+const [filasCxp]: any =
+  await pool.query(
+    `
+    SELECT archivo_url
+    FROM cuentas_por_pagar
+    WHERE archivo_url IS NOT NULL
+    `
+  );
+
+const cuentasCobrarExistentes =
+  new Set<string>(
+    filasCxc.map((fila: any) => fila.archivo_onedrive_id)
+  );
+
+const cuentasPagarExistentes =
+  new Set<string>(
+    filasCxp.map((fila: any) => fila.archivo_url)
+  );
+
   const archivosNuevos = [];
 
 for (const archivo of archivos) {
 
-  const [cxc]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM cuentas_por_cobrar
-      WHERE archivo_onedrive_id = ?
-      `,
-      [archivo.id]
-    );
+  const yaExisteComoCxc =
+    cuentasCobrarExistentes.has(archivo.id);
 
-  const [cxp]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM cuentas_por_pagar
-      WHERE archivo_url = ?
-      `,
-      [archivo.webUrl]
-    );
+  const yaExisteComoCxp =
+    cuentasPagarExistentes.has(archivo.webUrl);
 
   if (
-    cxc.length === 0 &&
-    cxp.length === 0
+    !yaExisteComoCxc &&
+    !yaExisteComoCxp
   ) {
     archivosNuevos.push(archivo);
   }
@@ -83,10 +100,55 @@ WHERE id = ?
 ]
 );
 
-for (const archivo of archivosNuevos) {
+// ---- Correlativos calculados UNA SOLA VEZ antes del loop ----
+const [ultimoCxc]: any =
+  await pool.query(
+    `
+    SELECT codigo
+    FROM cuentas_por_cobrar
+    ORDER BY id DESC
+    LIMIT 1
+    `
+  );
 
-  
+let correlativoCxc = 1;
 
+if (ultimoCxc.length > 0) {
+  const codigoAnterior = ultimoCxc[0].codigo;
+  if (codigoAnterior?.startsWith("CXC-")) {
+    const partes = codigoAnterior.split("-");
+    correlativoCxc = Number(partes[2]) + 1;
+  }
+}
+
+const [ultimoCxp]: any =
+  await pool.query(
+    `
+    SELECT codigo
+    FROM cuentas_por_pagar
+    ORDER BY id DESC
+    LIMIT 1
+    `
+  );
+
+let correlativoCxp = 1;
+
+if (ultimoCxp.length > 0) {
+  const codigoAnterior = ultimoCxp[0].codigo;
+  if (codigoAnterior?.startsWith("CXP-")) {
+    correlativoCxp = Number(codigoAnterior.split("-")[2]) + 1;
+  }
+}
+
+// ---- Cachés en memoria para evitar consultas duplicadas ----
+const clientesCache = new Map<string, number | null>();
+const proveedoresCache = new Map<string, number | null>();
+const proyectosCache = new Map<string, number | null>();
+
+const UPDATE_CADA_N_DOCUMENTOS = 25;
+
+// ---- Lógica de procesamiento de un archivo individual (sin cambios de negocio) ----
+const procesarArchivo = async (archivo: any) => {
 
   const archivoCompleto =
     await descargarArchivo(
@@ -179,20 +241,27 @@ else if (
 
   procesados++;
 
-await pool.query(
-`
-UPDATE sincronizaciones
-SET
-  procesados = ?,
-  mensaje = ?
-WHERE id = ?
-`,
-[
-  procesados,
-  archivo.name,
-  sincronizacionId
-]
-);
+if (
+  procesados % UPDATE_CADA_N_DOCUMENTOS === 0 ||
+  procesados === archivosNuevos.length
+) {
+
+  await pool.query(
+  `
+  UPDATE sincronizaciones
+  SET
+    procesados = ?,
+    mensaje = ?
+  WHERE id = ?
+  `,
+  [
+    procesados,
+    archivo.name,
+    sincronizacionId
+  ]
+  );
+
+}
 
 console.log(
   "JSON EXTRAIDO:",
@@ -219,7 +288,7 @@ if (
   );
 
 if (existe.length > 0) {
-  continue;
+  return;
 }
 
 let clienteId = null;
@@ -227,117 +296,112 @@ let proyectoId = null;
 
 if (json.rucCliente) {
 
-  const [clientes]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM clientes
-      WHERE ruc = ?
-      LIMIT 1
-      `,
-      [json.rucCliente]
-    );
+  if (clientesCache.has(json.rucCliente)) {
 
-  if (clientes.length > 0) {
-
-  clienteId =
-    clientes[0].id;
-
-} else {
-
-  console.log(
-    "Creando cliente automáticamente:",
-    json.empresaCliente
-  );
-
-  const [nuevoCliente]: any =
-    await pool.query(
-      `
-      INSERT INTO clientes (
-        razon_social,
-        ruc,
-        estado
-      )
-      VALUES (?, ?, ?)
-      `,
-      [
-        json.empresaCliente,
-        json.rucCliente,
-        "ACTIVO"
-      ]
-    );
-
-  clienteId =
-    nuevoCliente.insertId;
-
-}
-
-}
-
-if (json.proyecto) {
-
-  const [proyectos]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM proyectos
-      WHERE nombre = ?
-      LIMIT 1
-      `,
-      [json.proyecto]
-    );
-
-  if (proyectos.length > 0) {
-
-    proyectoId =
-      proyectos[0].id;
+    clienteId = clientesCache.get(json.rucCliente)!;
 
   } else {
 
-    console.log(
-  "Proyecto no encontrado:",
-  json.proyecto
-);
+    const [clientes]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM clientes
+        WHERE ruc = ?
+        LIMIT 1
+        `,
+        [json.rucCliente]
+      );
 
-proyectosNoEncontrados++;
+    if (clientes.length > 0) {
+
+      clienteId =
+        clientes[0].id;
+
+    } else {
+
+      console.log(
+        "Creando cliente automáticamente:",
+        json.empresaCliente
+      );
+
+      const [nuevoCliente]: any =
+        await pool.query(
+          `
+          INSERT INTO clientes (
+            razon_social,
+            ruc,
+            estado
+          )
+          VALUES (?, ?, ?)
+          `,
+          [
+            json.empresaCliente,
+            json.rucCliente,
+            "ACTIVO"
+          ]
+        );
+
+      clienteId =
+        nuevoCliente.insertId;
+
+    }
+
+    clientesCache.set(json.rucCliente, clienteId);
 
   }
 
 }
 
-const [ultimo]: any =
-  await pool.query(
-    `
-    SELECT codigo
-    FROM cuentas_por_cobrar
-    ORDER BY id DESC
-    LIMIT 1
-    `
+if (json.proyecto) {
+
+  if (proyectosCache.has(json.proyecto)) {
+
+    proyectoId = proyectosCache.get(json.proyecto)!;
+
+    if (proyectoId === null) {
+      proyectosNoEncontrados++;
+    }
+
+  } else {
+
+    const [proyectos]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM proyectos
+        WHERE nombre = ?
+        LIMIT 1
+        `,
+        [json.proyecto]
+      );
+
+    if (proyectos.length > 0) {
+
+      proyectoId =
+        proyectos[0].id;
+
+    } else {
+
+      console.log(
+    "Proyecto no encontrado:",
+    json.proyecto
   );
 
-let correlativo = 1;
+  proyectosNoEncontrados++;
 
-if (ultimo.length > 0) {
+    }
 
-  const codigoAnterior =
-    ultimo[0].codigo;
-
-  if (
-    codigoAnterior?.startsWith("CXC-")
-  ) {
-
-    const partes =
-      codigoAnterior.split("-");
-
-    correlativo =
-      Number(partes[2]) + 1;
+    proyectosCache.set(json.proyecto, proyectoId);
 
   }
 
 }
 
 const codigo =
-  `CXC-${new Date().getFullYear()}-${String(correlativo).padStart(4, "0")}`;
+  `CXC-${new Date().getFullYear()}-${String(correlativoCxc).padStart(4, "0")}`;
+
+correlativoCxc++;
 
 await pool.query(
     `
@@ -407,19 +471,6 @@ await pool.query(
 
   nuevasCxc++;
 
-await pool.query(
-`
-UPDATE sincronizaciones
-SET
-  cuentas_cobrar = ?
-WHERE id = ?
-`,
-[
-  nuevasCxc,
-  sincronizacionId
-]
-);
-
   }
 
   else if (json.destino === "PAGAR") {
@@ -438,57 +489,67 @@ WHERE id = ?
   );
 
 if (existe.length > 0) {
-  continue;
+  return;
 }
 
 let proveedorId = null;
 
 if (json.rucEmisor) {
 
-  const [proveedores]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM proveedores
-      WHERE ruc = ?
-      LIMIT 1
-      `,
-      [json.rucEmisor]
-    );
+  if (proveedoresCache.has(json.rucEmisor)) {
 
-  if (proveedores.length > 0) {
-
-    proveedorId =
-      proveedores[0].id;
+    proveedorId = proveedoresCache.get(json.rucEmisor)!;
 
   } else {
 
-  console.log(
-    "Creando proveedor automáticamente:",
-    json.empresaEmisora
-  );
+    const [proveedores]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM proveedores
+        WHERE ruc = ?
+        LIMIT 1
+        `,
+        [json.rucEmisor]
+      );
 
-  const [nuevoProveedor]: any =
-    await pool.query(
-      `
-      INSERT INTO proveedores (
-        razon_social,
-        ruc,
-        estado
-      )
-      VALUES (?, ?, ?)
-      `,
-      [
-        json.empresaEmisora,
-        json.rucEmisor,
-        "ACTIVO"
-      ]
+    if (proveedores.length > 0) {
+
+      proveedorId =
+        proveedores[0].id;
+
+    } else {
+
+    console.log(
+      "Creando proveedor automáticamente:",
+      json.empresaEmisora
     );
 
-  proveedorId =
-    nuevoProveedor.insertId;
+    const [nuevoProveedor]: any =
+      await pool.query(
+        `
+        INSERT INTO proveedores (
+          razon_social,
+          ruc,
+          estado
+        )
+        VALUES (?, ?, ?)
+        `,
+        [
+          json.empresaEmisora,
+          json.rucEmisor,
+          "ACTIVO"
+        ]
+      );
 
-}
+    proveedorId =
+      nuevoProveedor.insertId;
+
+  }
+
+  proveedoresCache.set(json.rucEmisor, proveedorId);
+
+  }
 
 }
 
@@ -496,58 +557,40 @@ let proyectoId = null;
 
 if (json.proyecto) {
 
-  const [proyectos]: any =
-    await pool.query(
-      `
-      SELECT id
-      FROM proyectos
-      WHERE nombre = ?
-      LIMIT 1
-      `,
-      [json.proyecto]
-    );
+  if (proyectosCache.has(json.proyecto)) {
 
-  if (proyectos.length > 0) {
+    proyectoId = proyectosCache.get(json.proyecto)!;
 
-    proyectoId =
-      proyectos[0].id;
+  } else {
 
-  }
+    const [proyectos]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM proyectos
+        WHERE nombre = ?
+        LIMIT 1
+        `,
+        [json.proyecto]
+      );
 
-}
+    if (proyectos.length > 0) {
 
-const [ultimo]: any =
-  await pool.query(
-    `
-    SELECT codigo
-    FROM cuentas_por_pagar
-    ORDER BY id DESC
-    LIMIT 1
-    `
-  );
+      proyectoId =
+        proyectos[0].id;
 
-let correlativo = 1;
+    }
 
-if (ultimo.length > 0) {
-
-  const codigoAnterior =
-    ultimo[0].codigo;
-
-  if (
-    codigoAnterior?.startsWith("CXP-")
-  ) {
-
-    correlativo =
-      Number(
-        codigoAnterior.split("-")[2]
-      ) + 1;
+    proyectosCache.set(json.proyecto, proyectoId);
 
   }
 
 }
 
 const codigo =
-  `CXP-${new Date().getFullYear()}-${String(correlativo).padStart(4, "0")}`;
+  `CXP-${new Date().getFullYear()}-${String(correlativoCxp).padStart(4, "0")}`;
+
+correlativoCxp++;
 
   await pool.query(
   `
@@ -557,7 +600,6 @@ const codigo =
     proveedor_id,
     proyecto_id,
 
-    tipo_documento,
     numero_documento,
 
     descripcion,
@@ -573,7 +615,7 @@ const codigo =
     archivo_url
 
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   [
 
@@ -582,8 +624,6 @@ const codigo =
     proveedorId,
 
     proyectoId,
-
-    "FACTURA",
 
     json.numeroFactura,
 
@@ -612,21 +652,22 @@ nuevos++;
 
 nuevasCxp++;
 
-await pool.query(
-`
-UPDATE sincronizaciones
-SET
-  cuentas_pagar = ?
-WHERE id = ?
-`,
-[
-  nuevasCxp,
-  sincronizacionId
-]
-);
   }
 
 }
+
+};
+
+// ---- Procesamiento por lotes en paralelo ----
+for (let i = 0; i < archivosNuevos.length; i += TAMANO_LOTE) {
+
+  const lote =
+    archivosNuevos.slice(i, i + TAMANO_LOTE);
+
+  await Promise.all(
+    lote.map((archivo) => procesarArchivo(archivo))
+  );
+
 }
 
 await pool.query(
@@ -638,13 +679,19 @@ SET
   mensaje = 'Sincronización completada',
   clientes_no_encontrados = ?,
   proveedores_no_encontrados = ?,
-  proyectos_no_encontrados = ?
+  proyectos_no_encontrados = ?,
+  cuentas_cobrar = ?,
+  cuentas_pagar = ?,
+  procesados = ?
 WHERE id = ?
 `,
 [
   clientesNoEncontrados,
   proveedoresNoEncontrados,
   proyectosNoEncontrados,
+  nuevasCxc,
+  nuevasCxp,
+  procesados,
   sincronizacionId
 ]
 );

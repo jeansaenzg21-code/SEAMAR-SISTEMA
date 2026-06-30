@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Filter,
   Download,
   Search,
   Eye,
   RefreshCw,
+  CalendarDays,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,8 +30,7 @@ type CuentaPorPagar = {
   id: string
   codigo: string
   proveedor: string
-  proyecto: string
-  tipo_documento: string
+  servicio?: string | null
   numero_documento: string
   monto: number
   saldo: number
@@ -39,6 +39,11 @@ type CuentaPorPagar = {
   fecha_vencimiento: string
   archivo_url: string
 }
+
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+]
 
 function StatusBadge({ status }: { status: Status }) {
   const label = {
@@ -60,6 +65,34 @@ function StatusBadge({ status }: { status: Status }) {
       {label[status]}
     </span>
   )
+}
+
+function ServicioBadge({ servicio }: { servicio?: string | null }) {
+  if (!servicio) {
+    return (
+      <span className="rounded-md border border-border bg-secondary/60 px-2 py-0.5 text-xs text-muted-foreground">
+        Sin asignar
+      </span>
+    )
+  }
+
+  return (
+    <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-foreground/90">
+      {servicio}
+    </span>
+  )
+}
+
+// Helper: obtiene año/mes/día locales a partir de fecha_emision
+function partesFecha(fecha: string) {
+  if (!fecha) return null
+  const d = new Date(fecha)
+  if (isNaN(d.getTime())) return null
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth(), // 0-11
+    day: d.getDate(),
+  }
 }
 
 export function AccountsPayableContent() {
@@ -88,6 +121,11 @@ const [mensajeProgreso, setMensajeProgreso] =
 
 const [documentosDetectados, setDocumentosDetectados] =
   useState(0);
+
+  // ---- Navegación documental: año / mes / día ----
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
 
   useEffect(() => {
     cargarCuentasPorPagar()
@@ -368,37 +406,129 @@ const modalResumen = (
   )
 );
 
-  const filteredAccounts = accountsPayable.filter((item) => {
-    if (statusFilter !== "all" && item.estado !== statusFilter) return false
-    if (supplierFilter !== "all" && item.proveedor !== supplierFilter) return false
+  // ---- Filtros base: estado, proveedor, búsqueda (sin fecha) ----
+  const baseFiltered = useMemo(() => {
+    return accountsPayable.filter((item) => {
+      if (statusFilter !== "all" && item.estado !== statusFilter) return false
+      if (supplierFilter !== "all" && item.proveedor !== supplierFilter) return false
 
-    if (
-      searchQuery &&
-      !String(item.codigo || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) &&
-      !String(item.proveedor || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) &&
-      !String(item.tipo_documento || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) &&
-      !String(item.numero_documento || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
-    ) {
-      return false
+      if (
+        searchQuery &&
+        !String(item.codigo || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) &&
+        !String(item.proveedor || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) &&
+        !String(item.servicio || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) &&
+        !String(item.numero_documento || "")
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      ) {
+        return false
+      }
+
+      return true
+    })
+  }, [accountsPayable, statusFilter, supplierFilter, searchQuery])
+
+  // ---- Años disponibles ----
+  const years = useMemo(() => {
+    const map = new Map<number, number>()
+
+    baseFiltered.forEach((item) => {
+      const partes = partesFecha(item.fecha_emision)
+      if (!partes) return
+      map.set(partes.year, (map.get(partes.year) || 0) + 1)
+    })
+
+    return Array.from(map.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([year, count]) => ({ year, count }))
+  }, [baseFiltered])
+
+  // Auto-seleccionar el año más reciente disponible
+  useEffect(() => {
+    if (selectedYear === null && years.length > 0) {
+      setSelectedYear(years[0].year)
     }
+  }, [years, selectedYear])
 
-    return true
-  })
+  // ---- Meses disponibles dentro del año seleccionado (todos visibles a la vez) ----
+  const months = useMemo(() => {
+    if (selectedYear === null) return []
+
+    const map = new Map<number, number>()
+
+    baseFiltered.forEach((item) => {
+      const partes = partesFecha(item.fecha_emision)
+      if (!partes || partes.year !== selectedYear) return
+      map.set(partes.month, (map.get(partes.month) || 0) + 1)
+    })
+
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([month, count]) => ({ month, count }))
+  }, [baseFiltered, selectedYear])
+
+  // ---- Días del mes seleccionado: SIEMPRE todos los días del mes, sin paginación ----
+  const days = useMemo(() => {
+    if (selectedYear === null || selectedMonth === null) return []
+
+    const counts = new Map<number, number>()
+
+    baseFiltered.forEach((item) => {
+      const partes = partesFecha(item.fecha_emision)
+      if (!partes || partes.year !== selectedYear || partes.month !== selectedMonth) return
+      counts.set(partes.day, (counts.get(partes.day) || 0) + 1)
+    })
+
+    const totalDiasMes = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+
+    return Array.from({ length: totalDiasMes }, (_, i) => {
+      const day = i + 1
+      return { day, count: counts.get(day) || 0 }
+    })
+  }, [baseFiltered, selectedYear, selectedMonth])
+
+  // Al cambiar de año, resetear mes/día
+  const handleSelectYear = (year: number) => {
+    setSelectedYear(year)
+    setSelectedMonth(null)
+    setSelectedDay(null)
+  }
+
+  // Al cambiar de mes, resetear día
+  const handleSelectMonth = (month: number) => {
+    setSelectedMonth((prev) => (prev === month ? null : month))
+    setSelectedDay(null)
+  }
+
+  const handleSelectDay = (day: number) => {
+    setSelectedDay((prev) => (prev === day ? null : day))
+  }
+
+  // ---- Filtrado final mostrado en la tabla ----
+  const filteredAccounts = useMemo(() => {
+    return baseFiltered.filter((item) => {
+      const partes = partesFecha(item.fecha_emision)
+      if (!partes) return false
+
+      if (selectedYear !== null && partes.year !== selectedYear) return false
+      if (selectedMonth !== null && partes.month !== selectedMonth) return false
+      if (selectedDay !== null && partes.day !== selectedDay) return false
+
+      return true
+    })
+  }, [baseFiltered, selectedYear, selectedMonth, selectedDay])
 
   const descargarExcel = (item: CuentaPorPagar) => {
     const encabezados = [
       "Código",
       "Proveedor",
-      "Proyecto",
-      "Tipo Documento",
+      "Servicio",
       "Número Documento",
       "Monto",
       "Saldo",
@@ -410,8 +540,7 @@ const modalResumen = (
     const datos = [
       item.codigo,
       item.proveedor,
-      item.proyecto,
-      item.tipo_documento,
+      item.servicio || "Sin asignar",
       item.numero_documento,
       item.monto,
       item.saldo,
@@ -438,6 +567,14 @@ const modalResumen = (
 
     window.URL.revokeObjectURL(url)
   }
+
+  const tituloSeleccion = useMemo(() => {
+    if (selectedYear === null) return null
+    const partes: string[] = [String(selectedYear)]
+    if (selectedMonth !== null) partes.push(MESES[selectedMonth])
+    if (selectedDay !== null) partes.push(`Día ${String(selectedDay).padStart(2, "0")}`)
+    return partes.join(" · ")
+  }, [selectedYear, selectedMonth, selectedDay])
 
   return (
   <>
@@ -526,19 +663,116 @@ const modalResumen = (
           </div>
         </div>
 
+        {/* ---- Navegación documental: Año / Mes / Día ---- */}
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              <span>Navegación documental</span>
+              {tituloSeleccion && (
+                <span className="ml-2 text-foreground font-medium">
+                  {tituloSeleccion}
+                </span>
+              )}
+            </div>
+
+            {/* Nivel 1: años */}
+            <div className="flex flex-wrap gap-2">
+              {years.map(({ year, count }) => (
+                <button
+                  key={year}
+                  onClick={() => handleSelectYear(year)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    selectedYear === year
+                      ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                      : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                  }`}
+                >
+                  {year}
+                  <span className="ml-1.5 text-xs opacity-70">
+                    ({count})
+                  </span>
+                </button>
+              ))}
+
+              {years.length === 0 && (
+                <span className="text-sm text-muted-foreground">
+                  Sin documentos disponibles.
+                </span>
+              )}
+            </div>
+
+            {/* Nivel 2: TODOS los meses del año visibles simultáneamente */}
+            {selectedYear !== null && months.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-2 border-t border-border">
+                {months.map(({ month, count }) => (
+                  <button
+                    key={month}
+                    onClick={() => handleSelectMonth(month)}
+                    className={`flex items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                      selectedMonth === month
+                        ? "bg-blue-500/15 text-blue-400"
+                        : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    <span>{MESES[month]}</span>
+                    <span className="opacity-70">
+                      ({count})
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Nivel 3: TODOS los días del mes, grilla compacta tipo calendario */}
+            {selectedMonth !== null && days.length > 0 && (
+              <div className="pt-2 border-t border-border">
+                <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-14 lg:grid-cols-16 gap-1.5">
+                  {days.map(({ day, count }) => {
+                    const sinDocumentos = count === 0
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => !sinDocumentos && handleSelectDay(day)}
+                        disabled={sinDocumentos}
+                        className={`flex flex-col items-center justify-center rounded-md py-1.5 px-1 text-xs font-mono transition-colors ${
+                          selectedDay === day
+                            ? "bg-blue-500 text-white"
+                            : sinDocumentos
+                            ? "bg-secondary/30 text-muted-foreground/40 cursor-default"
+                            : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <span>{String(day).padStart(2, "0")}</span>
+                        <span className="text-[10px] opacity-70">
+                          {sinDocumentos ? "—" : count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <p className="text-sm text-muted-foreground">
+          Mostrando {filteredAccounts.length} documentos
+          {tituloSeleccion ? ` · ${tituloSeleccion}` : ""}
+        </p>
+
         <Card className="bg-card border-border">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-secondary">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Código</th>
+                    <th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">Código</th>
                     <th className="px-4 py-3 text-left font-medium">Proveedor</th>
-                    <th className="px-4 py-3 text-left font-medium">Proyecto</th>
-                    <th className="px-4 py-3 text-left font-medium">Tipo Doc.</th>
+                    <th className="px-4 py-3 text-left font-medium">Servicio</th>
                     <th className="px-4 py-3 text-left font-medium">N° Documento</th>
-                    <th className="px-4 py-3 text-left font-medium">Monto</th>
-                    <th className="px-4 py-3 text-left font-medium">Saldo</th>
+                    <th className="px-4 py-3 text-right font-medium">Monto</th>
+                    <th className="px-4 py-3 text-right font-medium">Saldo</th>
                     <th className="px-4 py-3 text-left font-medium">Estado</th>
                     <th className="px-4 py-3 text-left font-medium">Emisión</th>
                     <th className="px-4 py-3 text-left font-medium">Vencimiento</th>
@@ -548,9 +782,12 @@ const modalResumen = (
 
                 <tbody>
                   {filteredAccounts.map((item) => (
-                    <tr key={item.id} className="border-b border-border">
+                    <tr
+                      key={item.id}
+                      className="border-b border-border transition-colors hover:bg-secondary/40"
+                    >
 
-  <td className="px-4 py-4 font-medium">
+  <td className="px-4 py-3 text-xs text-muted-foreground">
 
     <div className="flex items-center gap-2">
 
@@ -569,47 +806,43 @@ const modalResumen = (
     </div>
 
   </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3 font-medium text-foreground">
                         {item.proveedor}
                       </td>
 
-                      <td className="px-4 py-4">
-                        {item.proyecto}
+                      <td className="px-4 py-3">
+                        <ServicioBadge servicio={item.servicio} />
                       </td>
 
-                      <td className="px-4 py-4">
-                        {item.tipo_documento || "-"}
-                      </td>
-
-                      <td className="px-4 py-4 font-medium">
+                      <td className="px-4 py-3 font-mono text-xs">
                         {item.numero_documento || "-"}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3 text-right tabular-nums">
                         S/ {Number(item.monto).toLocaleString("es-PE")}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3 text-right tabular-nums">
                         S/ {Number(item.saldo).toLocaleString("es-PE")}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <StatusBadge status={item.estado} />
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         {item.fecha_emision
                           ? new Date(item.fecha_emision).toLocaleDateString("es-PE")
                           : "-"}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         {item.fecha_vencimiento
                           ? new Date(item.fecha_vencimiento).toLocaleDateString("es-PE")
                           : "-"}
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <Button
                             size="icon"
@@ -638,10 +871,10 @@ const modalResumen = (
                   {filteredAccounts.length === 0 && (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={10}
                         className="px-4 py-8 text-center text-muted-foreground"
                       >
-                        No hay cuentas por pagar registradas.
+                        No hay cuentas por pagar registradas para esta selección.
                       </td>
                     </tr>
                   )}
