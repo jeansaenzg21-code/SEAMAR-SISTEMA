@@ -149,6 +149,7 @@ const UPDATE_CADA_N_DOCUMENTOS = 25;
 
 // ---- Lógica de procesamiento de un archivo individual (sin cambios de negocio) ----
 const procesarArchivo = async (archivo: any) => {
+  try {
 
   const archivoCompleto =
     await descargarArchivo(
@@ -268,10 +269,32 @@ console.log(
   json
 );
 
-if (
-  json.tipoDocumento?.toLowerCase() ===
-  "factura"
-) {
+const esFactura =
+
+json.numeroFactura &&
+
+json.montoTotal &&
+
+(
+json.destino === "PAGAR" ||
+json.destino === "COBRAR"
+);
+
+if (!esFactura) {
+
+  console.log(
+    "[NO REGISTRADA]",
+    archivo.name,
+    {
+      numeroFactura: json.numeroFactura,
+      montoTotal: json.montoTotal,
+      destino: json.destino
+    }
+  );
+
+}
+
+if (esFactura) {
 
   if (json.destino === "COBRAR") {
 
@@ -288,7 +311,13 @@ if (
   );
 
 if (existe.length > 0) {
-  return;
+
+console.log(
+  "[DUPLICADA]",
+  json.numeroFactura
+);
+
+return;
 }
 
 let clienteId = null;
@@ -489,7 +518,13 @@ await pool.query(
   );
 
 if (existe.length > 0) {
-  return;
+
+console.log(
+  "[DUPLICADA]",
+  json.numeroFactura
+);
+
+return;
 }
 
 let proveedorId = null;
@@ -656,6 +691,16 @@ nuevasCxp++;
 
 }
 
+  } catch (error) {
+
+    console.error(
+      "[ERROR ARCHIVO]",
+      archivo.name,
+      error
+    );
+
+  }
+
 };
 
 // ---- Procesamiento por lotes en paralelo ----
@@ -669,6 +714,8 @@ for (let i = 0; i < archivosNuevos.length; i += TAMANO_LOTE) {
   );
 
 }
+
+
 
 await pool.query(
 `
