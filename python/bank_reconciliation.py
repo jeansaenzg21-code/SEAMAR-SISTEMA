@@ -216,41 +216,7 @@ for index, fila in excel.iterrows():
 
                 coincidencias_exactas.append(reg)
                 
-                        # =========================
-        # CONCILIADO
-        # =========================
-
-        if len(coincidencias_exactas) == 1:
-
-            estado = "conciliado"
-
-            coincidencias.append(
-                construir_coincidencia(
-                    coincidencias_exactas[0]
-                )
-            )
-
-        # =========================
-        # OBSERVACION
-        # =========================
-
-        elif len(coincidencias_exactas) > 1:
-
-            estado = "observacion"
-
-            for reg in coincidencias_exactas:
-
-                coincidencias.append(
-                    construir_coincidencia(reg)
-                )
-
-        # =========================
-        # PENDIENTE
-        # =========================
-
-        else:
-
-            estado = "pendiente"
+                       
         # =========================
         # CONCILIADO
         # =========================

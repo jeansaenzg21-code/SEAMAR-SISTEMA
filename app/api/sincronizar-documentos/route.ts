@@ -531,6 +531,8 @@ let proveedorId = null;
 
 if (json.rucEmisor) {
 
+  // ---- PASO 1: búsqueda/creación por RUC ----
+
   if (proveedoresCache.has(json.rucEmisor)) {
 
     proveedorId = proveedoresCache.get(json.rucEmisor)!;
@@ -552,6 +554,12 @@ if (json.rucEmisor) {
 
       proveedorId =
         proveedores[0].id;
+
+      console.log(
+        "[PROVEEDOR POR RUC]",
+        json.rucEmisor,
+        proveedorId
+      );
 
     } else {
 
@@ -580,11 +588,98 @@ if (json.rucEmisor) {
     proveedorId =
       nuevoProveedor.insertId;
 
+    console.log(
+      "[PROVEEDOR CREADO]",
+      json.rucEmisor,
+      proveedorId
+    );
+
   }
 
   proveedoresCache.set(json.rucEmisor, proveedorId);
 
   }
+
+} else if (json.empresaEmisora) {
+
+  // ---- PASO 2: sin RUC, fallback por razón social ----
+
+  const claveCache =
+    `nombre:${json.empresaEmisora}`;
+
+  if (proveedoresCache.has(claveCache)) {
+
+    proveedorId = proveedoresCache.get(claveCache)!;
+
+  } else {
+
+    const [proveedoresPorNombre]: any =
+      await pool.query(
+        `
+        SELECT id
+        FROM proveedores
+        WHERE razon_social = ?
+        LIMIT 1
+        `,
+        [json.empresaEmisora]
+      );
+
+    if (proveedoresPorNombre.length > 0) {
+
+      proveedorId =
+        proveedoresPorNombre[0].id;
+
+      console.log(
+        "[PROVEEDOR POR NOMBRE]",
+        json.empresaEmisora,
+        proveedorId
+      );
+
+    } else {
+
+      console.log(
+        "Creando proveedor automáticamente (sin RUC):",
+        json.empresaEmisora
+      );
+
+      const [nuevoProveedorSinRuc]: any =
+        await pool.query(
+          `
+          INSERT INTO proveedores (
+            razon_social,
+            ruc,
+            estado
+          )
+          VALUES (?, ?, ?)
+          `,
+          [
+            json.empresaEmisora,
+            null,
+            "ACTIVO"
+          ]
+        );
+
+      proveedorId =
+        nuevoProveedorSinRuc.insertId;
+
+      console.log(
+        "[PROVEEDOR CREADO]",
+        json.empresaEmisora,
+        proveedorId
+      );
+
+    }
+
+    proveedoresCache.set(claveCache, proveedorId);
+
+  }
+
+} else {
+
+  console.log(
+    "[PROVEEDOR NO ENCONTRADO]",
+    archivo.name
+  );
 
 }
 
