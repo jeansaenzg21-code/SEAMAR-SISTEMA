@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DocumentosPreview } from "@/components/DocumentosPreview"
 
 type ObservationStatus = "pending" | "in_progress" | "resolved"
 
@@ -267,18 +268,7 @@ documentos_respuesta:
                             </p>
                             <p className="text-sm">{observation.response}</p>
 
-                            {observation.documentos_respuesta?.map(
-(doc:any,index:number)=>(
-<a
-key={index}
-href={doc.url}
-target="_blank"
-className="text-primary underline text-sm block"
->
-📎 {doc.nombre}
-</a>
-)
-)}
+                            <DocumentosPreview documentos={observation.documentos_respuesta} />
 
                             {observation.resolvedDate && (
                               <p className="text-xs text-muted-foreground mt-2">
@@ -358,6 +348,7 @@ className="text-primary underline text-sm block"
 
             <div className="space-y-4 py-4">
               <div className="bg-secondary/50 rounded-lg p-4">
+              <DocumentosPreview documentos={selectedObservation?.documentos_respuesta} />
                 <p className="text-sm font-medium mb-1">Observación original</p>
                 <p className="text-sm text-muted-foreground">
                   {selectedObservation?.observation}
@@ -372,6 +363,7 @@ className="text-primary underline text-sm block"
   value={response}
   onChange={(e) => setResponse(e.target.value)}
 />
+
                   <div className="space-y-2 mt-3">
   <Label htmlFor="observation-file">Adjuntar documento</Label>
 

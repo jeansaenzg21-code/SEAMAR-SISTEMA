@@ -22,7 +22,12 @@ const os =
       );
 
   const codigo =
-  data.codigo || `VAL-${Date.now()}`;
+  data.codigo ||
+  (
+    data.numeroRequerimiento
+      ? `VAL-${new Date(data.fechaEjecucion).getFullYear()}-${data.numeroRequerimiento}`
+      : `VAL-${Date.now()}`
+  );
 
     
   const [result]: any =
@@ -36,10 +41,13 @@ const os =
       ruc,
       negocio_operacion,
 
-      numero_orden_servicio,
+        numero_orden_servicio,
 
-      descripcion,
-      pu,
+numero_requerimiento,
+
+descripcion,
+
+pu,
 
       monto,
       moneda,
@@ -60,7 +68,7 @@ respaldo_nombre,
       observaciones
 
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
 
@@ -71,6 +79,8 @@ data.ruc || "",
 data.negocioOperacion || "",
 
 data.numeroOrdenServicio || "",
+
+data.numeroRequerimiento || "",
 
 data.descripcion || data.archivoNombre || "Valorización sin descripción",
 
@@ -91,10 +101,10 @@ data.archivoOnedriveId ?? null,
 data.archivoUrl ?? null,
 
 os?.name ?? null,
-      os?.id ?? null,
-      os?.webUrl ?? null,
+os?.id ?? null,
+os?.webUrl ?? null,
 
-      os
+os
   ? null
   : "Documentos incompletos"
 
@@ -240,7 +250,7 @@ export async function guardarContrato(
         archivo_url,
         estado
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         proyectoId,

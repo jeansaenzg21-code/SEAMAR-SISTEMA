@@ -80,9 +80,14 @@ console.log(json);
 const esValorizacion =
   json.tipoDocumento?.toLowerCase() ===
   "valorizacion" ||
+
+  json.tipoDocumento?.toLowerCase() ===
+  "contrato" ||
+
   archivoCompleto.nombre
     .toLowerCase()
     .includes("valorización") ||
+
   archivoCompleto.nombre
     .toLowerCase()
     .includes("valorizacion");
@@ -98,11 +103,66 @@ if (esValorizacion) {
   json.archivoUrl =
     archivoCompleto.webUrl;
 
-  await guardarValorizacion(
-    json
-  );
+  if (
+  json.tipoDocumento?.toLowerCase() === "contrato" &&
+  json.servicios?.length
+) {
 
+  for (const servicio of json.servicios) {
+
+    await guardarValorizacion({
+
+      proveedor:
+  servicio.numeroRequerimiento
+    ? json.cliente
+    : json.proveedor,
+
+      ruc:
+  servicio.numeroRequerimiento
+    ? json.rucCliente
+    : json.rucProveedor,
+
+      negocioOperacion: json.proyecto,
+
+      numeroOrdenServicio:
+  json.numeroOrdenCompra,
+
+      numeroRequerimiento:
+        servicio.numeroRequerimiento,
+
+      descripcion:
+        servicio.descripcion,
+
+      monto:
+        servicio.montoPactado,
+
+      moneda:
+        json.moneda,
+
+      fechaEjecucion:
+        servicio.fechaProgramada,
+
+      archivoNombre:
+        archivoCompleto.nombre,
+
+      archivoOnedriveId:
+        archivoCompleto.itemId,
+
+      archivoUrl:
+        archivoCompleto.webUrl
+
+    });
+
+    nuevos++;
+
+  }
+
+} else {
+
+  await guardarValorizacion(json);
   nuevos++;
+
+}
 
 }
     }
@@ -112,20 +172,24 @@ if (esValorizacion) {
       nuevos
     });
 
-  } catch (error) {
+  } catch (error: any) {
 
-    console.error(error);
+  console.error(
+    "ERROR SINCRONIZANDO:",
+    error
+  );
 
-    return NextResponse.json(
-      {
-        success: false
-      },
-      {
-        status: 500
-      }
-    );
+  return NextResponse.json(
+    {
+      success: false,
+      error: error.message
+    },
+    {
+      status: 500
+    }
+  );
 
-  }
+}
 
 }
 export async function GET() {

@@ -43,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { DocumentosPreview } from "@/components/DocumentosPreview"
 
 type Status = "draft" | "under_review" | "observed" | "approved" | "invoiced"
 
@@ -66,8 +67,9 @@ archivo_url?: string
 fecha_fin?: string | null
 
  pu: number
-
-  
+numero_oc?: string
+numero_requerimiento?: string
+  proveedor?: string
 
 documentos_completos: number  
 documentos_adjuntos?: number
@@ -386,16 +388,25 @@ Nuevos archivos: ${data.nuevos}`
 }
 
   const filteredValuations = valuations.filter((v) => {
-
+    console.log("CLIENTE FILTRO:", clientFilter)
+console.log(
+  "TDP EN ARRAY:",
+  valuations.filter(v =>
+    JSON.stringify(v).toUpperCase().includes("TERMINALES")
+  )
+)
 
 
   if (statusFilter !== "all" && v.status !== statusFilter) return false
 
   if (
-    clientFilter !== "all" &&
-    clientFilter !== "TODOS" &&
-    v.client !== clientFilter
-  ) return false
+  clientFilter !== "all" &&
+  clientFilter !== "TODOS" &&
+  v.client?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+ !==
+clientFilter.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() &&
+  v.proveedor !== clientFilter
+) return false
 
   if (
     selectedPeriod &&
@@ -417,6 +428,9 @@ Nuevos archivos: ${data.nuevos}`
   const vistaCliente =
   clientFilter?.toUpperCase().includes("REPSOL")
     ? "repsol"
+    : clientFilter?.toUpperCase().includes("TERMINALES") ||
+      clientFilter?.toUpperCase().includes("TDP")
+    ? "tdp"
     : "general"
 
   const limpiarFormulario = () => {
@@ -490,28 +504,11 @@ documentos.forEach((doc) => {
 
 const response = await fetch(url, {
   method,
-  headers:
-    editingValuation
-      ? {
-          "Content-Type":
-            "application/json",
-        }
-      : undefined,
+  headers: undefined,
 
   body: editingValuation
-    ? JSON.stringify({
-        proveedor: client,
-        negocio_operacion: type,
-        numero_orden_servicio:
-          ordenServicio,
-        descripcion: description,
-        monto: Number(amount),
-        moneda: "PEN",
-        periodo: fecha,
-        fecha_ejecucion: fecha,
-        encargado,
-      })
-    : formData,
+? formData
+: formData,
 })
 
 
@@ -989,7 +986,14 @@ if (observacionAutomatica) {
         N° O/T
       </th>
     )}
+{vistaCliente === "tdp" && (
+  <>
+    <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
+      N° OC
+    </th>
 
+  </>
+)}
     <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
       Proyecto
     </th>
@@ -1050,6 +1054,13 @@ if (observacionAutomatica) {
           {item.orden_servicio || "-"}
         </td>
       )}
+      {vistaCliente === "tdp" && (
+  <>
+    <td className="px-5 py-4 whitespace-nowrap align-top">
+      {item.orden_servicio || "-"}
+    </td>
+  </>
+)}
 
       <td className="px-5 py-4 max-w-[260px] align-top">
         <p className="line-clamp-2 text-sm font-medium">
@@ -1217,45 +1228,13 @@ if (observacionAutomatica) {
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-semibold tracking-widest text-muted-foreground">
-                DOCUMENTOS ADJUNTOS
-              </p>
+  <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+    DOCUMENTOS ADJUNTOS
+  </p>
 
-              
+  <DocumentosPreview documentos={selectedValuation.documentos} />
 </div>
-              <div className="space-y-2">
-  {(selectedValuation.documentos || []).length > 0 ? (
 
-    (selectedValuation.documentos || []).map(
-      (doc: any, index: number) => (
-        <a
-          key={index}
-          href={doc.url || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2 hover:bg-muted/40"
-        >
-          <div>
-            <p className="text-sm font-medium">
-              {doc.nombre}
-            </p>
-          </div>
-
-          <span className="text-xs text-muted-foreground">
-            Abrir
-          </span>
-        </a>
-      )
-    )
-
-  ) : (
-
-    <div className="rounded-lg border border-border bg-muted/20 px-3 py-3">
-      No hay documentos adjuntos
-    </div>
-
-  )}
-</div>
             
 
             <div className="space-y-4 pt-4">

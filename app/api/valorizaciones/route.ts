@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { subirDocumentoAOneDrive } from "@/lib/onedrive";
 
 
 export async function GET() {
@@ -7,6 +8,12 @@ export async function GET() {
     const [rows] = await pool.query(
       `
       SELECT
+       CASE
+    WHEN v.numero_requerimiento IS NOT NULL
+      AND v.numero_requerimiento != ''
+    THEN 'TERMINALES DEL PERU'
+    ELSE c.razon_social
+  END AS client,
         v.*,
         p.nombre AS proyecto_nombre,
         p.tipo AS proyecto_tipo,
@@ -15,6 +22,16 @@ export async function GET() {
           FROM valorizacion_documentos vd
           WHERE vd.valorizacion_id = v.id
         ) AS documentos_adjuntos,
+         (
+ SELECT JSON_ARRAYAGG(
+   JSON_OBJECT(
+     'nombre', vd.nombre,
+     'url', vd.url
+   )
+ )
+ FROM valorizacion_documentos vd
+ WHERE vd.valorizacion_id = v.id
+) AS documentos,
         (
           SELECT vo.observacion
           FROM valorizacion_observaciones vo
@@ -31,7 +48,10 @@ export async function GET() {
         ) AS estado_observacion
       FROM valorizaciones v
       LEFT JOIN proyectos p
-  ON p.id = v.proyecto_id
+ON p.id = v.proyecto_id
+
+LEFT JOIN clientes c
+ON c.id = p.cliente_id
       ORDER BY v.id DESC
       `
     )
@@ -135,25 +155,20 @@ export async function POST(request: Request) {
     const valorizacionId =
   result.insertId
 
+
 for (const documento of documentos) {
 
-console.log(
-  "DOCUMENTO:",
-  documento.name
-)
-
   try {
-    const bytes =
-      await documento.arrayBuffer()
 
-    const buffer =
-      Buffer.from(bytes)
+    const bytes = await documento.arrayBuffer()
 
-      const archivoSubido = {
-  name: documento.name,
-  id: null,
-  webUrl: null,
-}
+    const buffer = Buffer.from(bytes)
+
+    const archivoSubido =
+      await subirDocumentoAOneDrive(
+        documento.name,
+        buffer
+      )
 
    
 
@@ -168,11 +183,11 @@ console.log(
       VALUES (?, ?, ?, ?)
       `,
       [
-        valorizacionId,
-        archivoSubido.name,
-archivoSubido.id,
-archivoSubido.webUrl,
-      ]
+  valorizacionId,
+  archivoSubido.nombre,
+  archivoSubido.itemId,
+  archivoSubido.webUrl,
+]
     )
   } catch (error) {
 

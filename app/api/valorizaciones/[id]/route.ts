@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
-
+import { subirDocumentoAOneDrive } from "@/lib/onedrive";
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const body = await req.json();
+    const formData = await req.formData();
+
+const proveedor = String(formData.get("proveedor") || "");
+const negocio_operacion = String(formData.get("negocio_operacion") || "");
+const numero_orden_servicio = String(formData.get("numero_orden_servicio") || "");
+const descripcion = String(formData.get("descripcion") || "");
+const monto = Number(formData.get("monto") || 0);
+const moneda = String(formData.get("moneda") || "PEN");
+const periodo = String(formData.get("periodo") || "");
+const fecha_ejecucion = String(formData.get("fecha_ejecucion") || "");
+const encargado = String(formData.get("encargado") || "");
+
+const documentos =
+  formData.getAll("documentos") as File[];
 
     await pool.query(
       `
@@ -25,18 +38,52 @@ export async function PATCH(
       WHERE id = ?
       `,
       [
-        body.proveedor,
-        body.negocio_operacion,
-        body.numero_orden_servicio,
-        body.descripcion,
-        body.monto,
-        body.moneda,
-        body.periodo,
-        body.fecha_ejecucion,
-        body.encargado,
-        id,
+        proveedor,
+negocio_operacion,
+numero_orden_servicio,
+descripcion,
+monto,
+moneda,
+periodo,
+fecha_ejecucion,
+encargado,
+id,
       ]
     );
+
+for (const documento of documentos) {
+
+  const bytes = await documento.arrayBuffer();
+
+  const buffer = Buffer.from(bytes);
+
+  const archivoSubido =
+    await subirDocumentoAOneDrive(
+      documento.name,
+      buffer
+    );
+
+
+  await pool.query(
+    `
+    INSERT INTO valorizacion_documentos
+    (
+      valorizacion_id,
+      nombre,
+      onedrive_id,
+      url
+    )
+    VALUES (?, ?, ?, ?)
+    `,
+    [
+      id,
+      archivoSubido.nombre,
+      archivoSubido.itemId,
+      archivoSubido.webUrl,
+    ]
+  );
+}
+
 
     return NextResponse.json({ success: true });
   } catch (error) {

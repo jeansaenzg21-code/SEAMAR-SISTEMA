@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { DocumentosPreview } from "@/components/DocumentosPreview"
 
 type Status = "under_review" | "observed" | "approved"
 
@@ -499,25 +500,13 @@ const abrirDetalle = async (item: Approval) => {
 
     <div className="space-y-3">
       <p className="text-xs font-se mibold tracking-widest text-muted-foreground">
-        DOCUMENTOS ADJUNTOS
+        <DocumentosPreview documentos={selectedApproval?.documentos} />
       </p>
 
       {selectedApproval?.documentos &&
 selectedApproval.documentos.length > 0 ? (
   <div className="space-y-2">
-    {selectedApproval.documentos.map((doc: any) => (
-      <a
-        key={doc.id}
-        href={doc.url || "#"}
-        target="_blank"
-        className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted/40"
-      >
-        <span>{doc.nombre}</span>
-        <span className="text-xs text-muted-foreground">
-          Abrir
-        </span>
-      </a>
-    ))}
+    <DocumentosPreview documentos={selectedApproval.documentos} />
   </div>
 ) : (
   <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">

@@ -238,6 +238,63 @@ if (
     }
   );
 
+
+  // CASO TDP
+  if (
+    json.proyecto?.toUpperCase().includes("TDP") ||
+    json.cliente?.toUpperCase().includes("TERMINALES")
+  ) {
+
+
+    for (const servicio of json.servicios || []) {
+
+
+      await guardarValorizacion({
+
+        proveedor:
+          json.proveedor,
+
+        ruc:
+          json.rucProveedor,
+
+        negocioOperacion:
+          json.proyecto,
+
+        numeroOrdenServicio:
+          json.numeroOrdenCompra,
+
+
+        numeroRequerimiento:
+          servicio.numeroRequerimiento,
+
+
+        descripcion:
+          servicio.descripcion,
+
+
+        monto:
+          servicio.montoPactado,
+
+
+        moneda:
+          json.moneda,
+
+
+        fechaEjecucion:
+          servicio.fechaProgramada,
+
+
+        archivoNombre:
+          file.name
+
+      });
+
+
+    }
+
+
+  }
+
 }
 
 } catch (e) {

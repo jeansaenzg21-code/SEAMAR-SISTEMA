@@ -171,10 +171,12 @@ export async function subirDocumentoAOneDrive(
   nombreArchivo.replace(/[<>:"/\\|?*]/g, "-")
 
 const ruta =
-  `SistemaSeamar/Documentos/${nombreLimpio}`
+`SistemaSeamar/Documentos/${nombreLimpio}`
+
+  console.log("SUBIENDO A:", USER, ruta)
 
   const response = await fetch(
-  `https://graph.microsoft.com/v1.0/users/${USER}/drive/root:/Documents/${ruta}:/content`,
+  `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.VALORIZACIONES}:/${nombreLimpio}:/content`,
   {
     method: "PUT",
     headers: {
@@ -186,12 +188,13 @@ const ruta =
 )
 
   if (!response.ok) {
-    const error = await response.text()
+  const error = await response.text()
 
-    throw new Error(
-      `Error al subir documento a OneDrive: ${error}`
-    )
-  }
+  console.log("STATUS ONEDRIVE:", response.status)
+  console.log("RESPUESTA ONEDRIVE:", error)
+
+  throw new Error(error)
+}
 
   const archivo = await response.json()
 
