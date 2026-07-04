@@ -18,7 +18,7 @@ archivo = sys.argv[1]
 conexion = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="MYSQL",
+    password="123456",
     database="seamar"
 )
 
