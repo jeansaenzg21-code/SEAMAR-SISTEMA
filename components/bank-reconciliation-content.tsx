@@ -55,6 +55,7 @@ export interface Coincidencia {
   proveedor?: string; // presente cuando origen = CUENTA_POR_PAGAR
   proyecto: string;
   documento: string;
+  descripcion?: string;
   fecha: string;
   monto: number;
 }
@@ -103,6 +104,7 @@ interface RawCoincidencia {
   proveedor?: string;
   proyecto?: string;
   documento?: string;
+  descripcion?: string;
   fecha?: string;
   monto?: number;
 }
@@ -260,6 +262,7 @@ function mapCoincidenciaFromApi(c: RawCoincidencia, index: number): Coincidencia
     proveedor: c.proveedor,
     proyecto:  c.proyecto ?? "-",
     documento: c.documento ?? "-",
+    descripcion: c.descripcion ?? "",
     fecha:     c.fecha ?? "",
     monto:     typeof c.monto === "number" ? c.monto : 0,
   };
@@ -411,6 +414,14 @@ function CoincidenciaCard({
       </div>
 
       <div className="text-[11px] text-slate-600">{match.fecha}</div>
+
+      {/* Glosa (descripción) — solo si el backend la envía */}
+      {match.descripcion && (
+        <div className="space-y-0.5">
+          <div className="text-[10px] text-slate-600 uppercase tracking-wider">Glosa</div>
+          <div className="text-xs text-slate-400">{match.descripcion}</div>
+        </div>
+      )}
 
       {/* Acción opcional (Seleccionar en observacion) */}
       {accionLabel && onAccion && (
@@ -851,6 +862,7 @@ function MovementDetail({
                   No se encontraron coincidencias en el sistema. Asigna manualmente o marca como excepción.
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  
                   <button className="py-2.5 rounded-xl border border-white/[0.08] text-slate-400 text-sm hover:border-white/15 hover:text-slate-200 transition-all">
                     Asignar manual
                   </button>

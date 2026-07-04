@@ -32,6 +32,9 @@ type CuentaPorPagar = {
   proveedor: string
   servicio?: string | null
   numero_documento: string
+  detraccion?: boolean
+  forma_pago?: string | null
+  categorizacion?: string | null
   monto: number
   saldo: number
   estado: Status
@@ -79,6 +82,23 @@ function ServicioBadge({ servicio }: { servicio?: string | null }) {
   return (
     <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-foreground/90">
       {servicio}
+    </span>
+  )
+}
+
+// Badge de detracción: Sí (true) / No (false o null/undefined)
+function DetraccionBadge({ detraccion }: { detraccion?: boolean }) {
+  const activa = detraccion === true
+
+  return (
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+        activa
+          ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+          : "bg-secondary/60 text-muted-foreground border-border"
+      }`}
+    >
+      {activa ? "Sí" : "No"}
     </span>
   )
 }
@@ -530,6 +550,9 @@ const modalResumen = (
       "Proveedor",
       "Servicio",
       "Número Documento",
+      "Detracción",
+      "Forma de Pago",
+      "Categorización",
       "Monto",
       "Saldo",
       "Estado",
@@ -542,6 +565,9 @@ const modalResumen = (
       item.proveedor,
       item.servicio || "Sin asignar",
       item.numero_documento,
+      item.detraccion === true ? "Sí" : "No",
+      item.forma_pago || "-",
+      item.categorizacion || "-",
       item.monto,
       item.saldo,
       item.estado,
@@ -771,6 +797,9 @@ const modalResumen = (
                     <th className="px-4 py-3 text-left font-medium">Proveedor</th>
                     <th className="px-4 py-3 text-left font-medium">Servicio</th>
                     <th className="px-4 py-3 text-left font-medium">N° Documento</th>
+                    <th className="px-4 py-3 text-left font-medium">Detracción</th>
+                    <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
+                    <th className="px-4 py-3 text-left font-medium">Categorización</th>
                     <th className="px-4 py-3 text-right font-medium">Monto</th>
                     <th className="px-4 py-3 text-right font-medium">Saldo</th>
                     <th className="px-4 py-3 text-left font-medium">Estado</th>
@@ -816,6 +845,18 @@ const modalResumen = (
 
                       <td className="px-4 py-3 font-mono text-xs">
                         {item.numero_documento || "-"}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <DetraccionBadge detraccion={item.detraccion} />
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {item.forma_pago || "-"}
+                      </td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {item.categorizacion || "-"}
                       </td>
 
                       <td className="px-4 py-3 text-right tabular-nums">
@@ -871,7 +912,7 @@ const modalResumen = (
                   {filteredAccounts.length === 0 && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={13}
                         className="px-4 py-8 text-center text-muted-foreground"
                       >
                         No hay cuentas por pagar registradas para esta selección.

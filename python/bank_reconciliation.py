@@ -68,6 +68,7 @@ def construir_coincidencia_cobrar(reg):
         "cliente":   safe_str(reg.get("cliente_nombre")),
         "proyecto":  safe_str(reg.get("proyecto_nombre")),
         "documento": safe_str(reg.get("numero_factura")),
+        "descripcion": safe_str(reg.get("descripcion")),
         "fecha":     str(reg["fecha_emision"]),
         "monto":     float(reg["monto"]),
     }
@@ -87,6 +88,7 @@ def construir_coincidencia_pagar(reg):
         "proveedor": safe_str(reg.get("proveedor_nombre")),
         "proyecto":  safe_str(reg.get("proyecto_nombre")),
         "documento": safe_str(reg.get("numero_documento")),
+        "descripcion": safe_str(reg.get("descripcion")),
         "fecha":     str(reg["fecha_emision"]),
         "monto":     float(reg["monto"]),
     }
@@ -97,12 +99,13 @@ def construir_coincidencia_pagar(reg):
 
 QUERY_COBRAR = """
     SELECT
-        cxc.id,
-        cxc.numero_factura,
-        cxc.monto,
-        cxc.fecha_emision,
-        COALESCE(c.razon_social, 'Sin cliente')  AS cliente_nombre,
-        COALESCE(p.nombre, 'Sin proyecto')        AS proyecto_nombre
+    cxc.id,
+    cxc.numero_factura,
+    cxc.descripcion,
+    cxc.monto,
+    cxc.fecha_emision,
+    COALESCE(c.razon_social, 'Sin cliente') AS cliente_nombre,
+    COALESCE(p.nombre, 'Sin proyecto') AS proyecto_nombre
     FROM cuentas_por_cobrar cxc
     LEFT JOIN clientes  c ON c.id = cxc.cliente_id
     LEFT JOIN proyectos p ON p.id = cxc.proyecto_id
@@ -111,12 +114,13 @@ QUERY_COBRAR = """
 
 QUERY_PAGAR = """
     SELECT
-        cxp.id,
-        cxp.numero_documento,
-        cxp.monto,
-        cxp.fecha_emision,
-        COALESCE(v.razon_social, 'Sin proveedor') AS proveedor_nombre,
-        COALESCE(p.nombre, 'Sin proyecto')         AS proyecto_nombre
+    cxp.id,
+    cxp.numero_documento,
+    cxp.descripcion,
+    cxp.monto,
+    cxp.fecha_emision,
+    COALESCE(v.razon_social, 'Sin proveedor') AS proveedor_nombre,
+    COALESCE(p.nombre, 'Sin proyecto') AS proyecto_nombre
     FROM cuentas_por_pagar cxp
     LEFT JOIN proveedores v ON v.id = cxp.proveedor_id
     LEFT JOIN proyectos   p ON p.id = cxp.proyecto_id
@@ -300,6 +304,8 @@ for index, fila in excel.iterrows():
 # =========================
 
 resultado = {
+    
+    
 
     "success": True,
 
