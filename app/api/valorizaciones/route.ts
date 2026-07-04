@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
 import { subirDocumentoAOneDrive } from "@/lib/onedrive";
+import { Buffer } from "buffer";
+import { getAccessToken } from "@/lib/msal";
+
+
 
 
 export async function GET() {
+  console.log("API VALORIZACIONES FUNCIONANDO");
   try {
     const [rows] = await pool.query(
       `
@@ -76,10 +81,13 @@ ON c.id = p.cliente_id
 
 export async function POST(request: Request) {
   try {
+
+    const token = await getAccessToken();
     const formData = await request.formData()
 
     const documentos =
       formData.getAll("documentos") as File[]
+
 
     const proveedor =
       String(formData.get("proveedor") || "")
@@ -165,12 +173,11 @@ for (const documento of documentos) {
     const buffer = Buffer.from(bytes)
 
     const archivoSubido =
-      await subirDocumentoAOneDrive(
-        documento.name,
-        buffer
-      )
-
-   
+  await subirDocumentoAOneDrive(
+    documento.name,
+    buffer,
+    token
+  )
 
     await pool.query(
       `

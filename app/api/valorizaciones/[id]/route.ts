@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
-import { subirDocumentoAOneDrive } from "@/lib/onedrive";
+import { subirArchivoAOneDrive } from "@/lib/onedrive";
+import { ONEDRIVE_FOLDERS } from "@/lib/onedrive-config";
+import { getAccessToken } from "@/lib/msal";
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,8 +21,9 @@ const periodo = String(formData.get("periodo") || "");
 const fecha_ejecucion = String(formData.get("fecha_ejecucion") || "");
 const encargado = String(formData.get("encargado") || "");
 
-const documentos =
-  formData.getAll("documentos") as File[];
+const documentos = formData.getAll("documentos") as unknown as File[];
+
+const token = await getAccessToken();
 
     await pool.query(
       `
@@ -51,18 +54,16 @@ id,
       ]
     );
 
-for (const documento of documentos) {
-
+for (const documento of documentos as any[]) {
   const bytes = await documento.arrayBuffer();
-
   const buffer = Buffer.from(bytes);
 
-  const archivoSubido =
-    await subirDocumentoAOneDrive(
-      documento.name,
-      buffer
-    );
-
+  const archivoSubido = await subirArchivoAOneDrive(
+    documento.name,
+    buffer,
+    ONEDRIVE_FOLDERS.VALORIZACIONES,
+    token
+  );
 
   await pool.query(
     `
@@ -83,7 +84,6 @@ for (const documento of documentos) {
     ]
   );
 }
-
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -175,7 +175,7 @@ if (esValorizacion) {
   } catch (error: any) {
 
   console.error(
-    "ERROR SINCRONIZANDO:",
+    "Falta de datos o error al procesar valorizaciones:",
     error
   );
 
