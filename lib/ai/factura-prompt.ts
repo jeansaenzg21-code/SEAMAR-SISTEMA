@@ -149,9 +149,69 @@ Determina destino únicamente con empresaEmisora, empresaCliente, rucEmisor y ru
 
 entidadPrincipal: si destino = "COBRAR", usa empresaCliente; si "PAGAR", usa empresaEmisora; si destino = null, entidadPrincipal también es null.
 
+## PASO 5 — DETRACCIÓN, FORMA DE PAGO Y CATEGORIZACIÓN
+
+A) DETRACCION
+
+Extrae el monto de detracción cuando exista. Búscalo cerca de menciones a:
+- "Detracción"
+- "Sistema de Pago de Obligaciones Tributarias"
+- "SPOT"
+- "Banco de la Nación"
+- "Cuenta de detracciones"
+
+Si existe monto de detracción, conviértelo a número siguiendo las reglas de PASO 2:
+{ "detraccion": numero }
+
+Si no existe ninguna evidencia de detracción:
+{ "detraccion": null }
+
+B) FORMA DE PAGO
+
+Extrae formaPago usando exclusivamente uno de estos valores: "CONTADO", "CREDITO", "TRANSFERENCIA", "DEPOSITO", "EFECTIVO", "CHEQUE".
+
+Prioridad ESTRICTA, en este orden:
+1. Si el documento indica explícitamente la forma de pago (por ejemplo "Forma de Pago: Contado", "Condición de Pago: Crédito", "Transferencia", "Depósito", "Efectivo", "Cheque"), usa ese valor.
+2. Si no hay forma de pago explícita pero existe un plazo de pago o una fechaVencimiento posterior a fechaEmision → "CREDITO".
+3. Si no existe ninguna evidencia de lo anterior → null.
+
+No inventes ni asumas "CONTADO" por defecto; solo asígnalo si está explícito en el documento.
+
+C) CATEGORIZACION
+
+Determina UNA sola categoría en el campo categorizacion usando:
+- empresaEmisora
+- descripcionServicio
+- proyecto
+- cualquier detalle visible de la factura.
+
+Las categorías válidas son exactamente:
+"ALIMENTACION", "COMBUSTIBLE", "HOSPEDAJE", "TRANSPORTE", "SERVICIOS_PROFESIONALES", "MATERIALES", "EPP", "TELECOMUNICACIONES", "BANCARIOS", "MANTENIMIENTO", "ALQUILERES", "IMPUESTOS", "OTROS".
+
+Guía de mapeo (no exhaustiva, usa criterio análogo para casos similares):
+- Restaurante, catering, alimentación → ALIMENTACION
+- Grifo, combustible, diesel, gasolina → COMBUSTIBLE
+- Hotel, hospedaje → HOSPEDAJE
+- Courier, transporte, flete → TRANSPORTE
+- Abogado, consultoría, ingeniería → SERVICIOS_PROFESIONALES
+- Ferretería, materiales → MATERIALES
+- EPP, seguridad industrial → EPP
+- Claro, Movistar, internet → TELECOMUNICACIONES
+- BCP, BBVA, comisiones bancarias → BANCARIOS
+- Mantenimiento de equipos, mantenimiento industrial, mantenimiento marítimo → MANTENIMIENTO
+- Alquiler de equipos, alquiler de vehículos → ALQUILERES
+- SUNAT, tributos → IMPUESTOS
+
+Si el documento es de un banco (ver PASO 3-D), categorizacion = "BANCARIOS".
+
+Si no encaja claramente en ninguna categoría anterior:
+{ "categorizacion": "OTROS" }
+
+Nunca dejes categorizacion en null — siempre debe tener uno de los valores válidos, usando "OTROS" como última opción.
+
 ## ESTRUCTURA DE SALIDA
 
-FACTURA — extrae: destino, entidadPrincipal, tipoDocumento, numeroFactura, empresaEmisora, rucEmisor, empresaCliente, rucCliente, fechaEmision, fechaVencimiento, subtotal, igv, montoTotal, detraccion, ordenCompra, proyecto, descripcionServicio.
+FACTURA — extrae: destino, entidadPrincipal, tipoDocumento, numeroFactura, empresaEmisora, rucEmisor, empresaCliente, rucCliente, fechaEmision, fechaVencimiento, subtotal, igv, montoTotal, detraccion, formaPago, categorizacion, ordenCompra, proyecto, descripcionServicio.
 
 - proyecto: nombre corto del proyecto o trabajo ejecutado (ej: "MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS").
 - descripcionServicio: descripción completa del servicio facturado.
@@ -172,6 +232,8 @@ Ejemplo de respuesta válida:
   "igv": 63664.81,
   "montoTotal": 417358.18,
   "detraccion": 50083,
+  "formaPago": "CREDITO",
+  "categorizacion": "MANTENIMIENTO",
   "ordenCompra": "4501549555",
   "proyecto": "MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS",
   "descripcionServicio": "..."

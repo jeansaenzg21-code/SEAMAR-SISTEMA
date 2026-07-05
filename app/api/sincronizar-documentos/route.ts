@@ -727,51 +727,59 @@ correlativoCxp++;
   `
   INSERT INTO cuentas_por_pagar (
 
-    codigo,
-    proveedor_id,
-    proyecto_id,
+  codigo,
+  proveedor_id,
+  proyecto_id,
 
-    numero_documento,
+  numero_documento,
 
-    descripcion,
+  descripcion,
 
-    monto,
-    saldo,
+  monto,
+  saldo,
 
-    fecha_emision,
-    fecha_vencimiento,
+  fecha_emision,
+  fecha_vencimiento,
 
-    estado,
+  detraccion,
+  forma_pago,
+  categorizacion,
 
-    archivo_url
+  estado,
 
-  )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  archivo_url
+
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   [
+  codigo,
 
-    codigo,
+  proveedorId,
 
-    proveedorId,
+  proyectoId,
 
-    proyectoId,
+  json.numeroFactura,
 
-    json.numeroFactura,
+  json.descripcionServicio,
 
-    json.descripcionServicio,
+  json.montoTotal,
+  json.montoTotal,
 
-    json.montoTotal,
-    json.montoTotal,
+  json.fechaEmision,
 
-    json.fechaEmision,
+  json.fechaVencimiento,
 
-    json.fechaVencimiento,
+  json.detraccion,
 
-    "PENDIENTE",
+  json.formaPago,
 
-    archivoCompleto.webUrl
+  json.categorizacion,
 
-  ]
+  "PENDIENTE",
+
+  archivoCompleto.webUrl
+]
 );
 
 console.log(

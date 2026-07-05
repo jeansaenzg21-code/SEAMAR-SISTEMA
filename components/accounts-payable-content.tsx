@@ -32,7 +32,7 @@ type CuentaPorPagar = {
   proveedor: string
   servicio?: string | null
   numero_documento: string
-  detraccion?: boolean
+  detraccion?: number | null
   forma_pago?: string | null
   categorizacion?: string | null
   monto: number
@@ -87,18 +87,28 @@ function ServicioBadge({ servicio }: { servicio?: string | null }) {
 }
 
 // Badge de detracción: Sí (true) / No (false o null/undefined)
-function DetraccionBadge({ detraccion }: { detraccion?: boolean }) {
-  const activa = detraccion === true
+function DetraccionBadge({
+  detraccion,
+}: {
+  detraccion?: number | null
+}) {
+
+  const tieneDetraccion =
+    detraccion !== null &&
+    detraccion !== undefined &&
+    Number(detraccion) > 0
 
   return (
     <span
       className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-        activa
+        tieneDetraccion
           ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
           : "bg-secondary/60 text-muted-foreground border-border"
       }`}
     >
-      {activa ? "Sí" : "No"}
+      {tieneDetraccion
+        ? `S/ ${Number(detraccion).toLocaleString("es-PE")}`
+        : "No"}
     </span>
   )
 }
@@ -565,7 +575,9 @@ const modalResumen = (
       item.proveedor,
       item.servicio || "Sin asignar",
       item.numero_documento,
-      item.detraccion === true ? "Sí" : "No",
+      item.detraccion != null
+  ? `S/ ${Number(item.detraccion).toLocaleString("es-PE")}`
+  : "No",
       item.forma_pago || "-",
       item.categorizacion || "-",
       item.monto,
@@ -593,6 +605,18 @@ const modalResumen = (
 
     window.URL.revokeObjectURL(url)
   }
+
+  const exportarMesExcel = () => {
+  if (selectedYear === null || selectedMonth === null) {
+    alert("Seleccione un año y un mes")
+    return
+  }
+
+  window.open(
+    `/api/cuentas-por-pagar/export?year=${selectedYear}&month=${selectedMonth + 1}`,
+    "_blank"
+  )
+}
 
   const tituloSeleccion = useMemo(() => {
     if (selectedYear === null) return null
@@ -678,14 +702,14 @@ const modalResumen = (
             >
               <RefreshCw className="h-4 w-4 text-blue-500" />
             </Button>
-
-            <Button
-              variant="outline"
-              className="border-border"
-            >
-              <Download />
-              Exportar
-            </Button>
+<Button
+  variant="outline"
+  className="border-border"
+  onClick={exportarMesExcel}
+>
+  <Download className="mr-2 h-4 w-4" />
+  Exportar
+</Button>
           </div>
         </div>
 
@@ -898,12 +922,24 @@ const modalResumen = (
                           </Button>
 
                           <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => descargarExcel(item)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
+  size="icon"
+  variant="outline"
+  onClick={() => {
+    if (item.archivo_url) {
+      window.open(item.archivo_url, "_blank")
+    }
+  }}
+>
+  <Eye className="h-4 w-4" />
+</Button>
+
+<Button
+  size="icon"
+  variant="outline"
+  onClick={() => descargarExcel(item)}
+>
+  <Download className="h-4 w-4" />
+</Button>
                         </div>
                       </td>
                     </tr>
