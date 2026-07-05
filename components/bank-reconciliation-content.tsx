@@ -127,10 +127,11 @@ interface RawMovimientoBancario {
 interface RawHistorialConciliacion {
   id?: string;
   banco?: string;
+  archivoNombre?: string;
   fecha?: string;
   moneda?: Moneda;
   totalMovimientos?: number;
-  estado?: EstadoConciliacion;
+  estado?: string;
 }
 
 interface ApiErrorResponse {
@@ -254,17 +255,45 @@ const progressWidthClass = (pct: number) => {
 // CORRECCIÓN 2: mapCoincidenciaFromApi — nuevo mapper que normaliza cada
 // coincidencia del backend aplicando fallbacks seguros para origen, cliente,
 // proveedor, proyecto y documento.
-function mapCoincidenciaFromApi(c: RawCoincidencia, index: number): Coincidencia {
+function mapCoincidenciaFromApi(
+  c: any,
+  index: number
+): Coincidencia {
+
   return {
-    id:        c.id ?? `C-${index}`,
-    origen:    c.origen ?? "CUENTA_POR_COBRAR",
-    cliente:   c.cliente,
-    proveedor: c.proveedor,
-    proyecto:  c.proyecto ?? "-",
-    documento: c.documento ?? "-",
-    descripcion: c.descripcion ?? "",
-    fecha:     c.fecha ?? "",
-    monto:     typeof c.monto === "number" ? c.monto : 0,
+    id:
+      String(
+        c.id ??
+        c.coincidencia_id ??
+        `C-${index}`
+      ),
+
+    origen:
+      c.origen ??
+      "CUENTA_POR_COBRAR",
+
+    cliente:
+      c.cliente,
+
+    proveedor:
+      c.proveedor,
+
+    proyecto:
+      c.proyecto ??
+      "-",
+
+    documento:
+      c.documento ??
+      "-",
+
+    descripcion:
+      c.descripcion ?? "",
+
+    fecha:
+      c.fecha ?? "",
+
+    monto:
+      Number(c.monto ?? 0),
   };
 }
 
@@ -278,7 +307,10 @@ function mapMovimientoFromApi(
     fecha:          m.fecha ?? "",
     referencia:     m.referencia ?? "-",
     descripcion:    m.descripcion ?? "-",
-    monto:          typeof m.monto === "number" ? m.monto : 0,
+    monto:
+  isNaN(Number(m.monto))
+    ? 0
+    : Number(m.monto),
     moneda:         m.moneda ?? fallbackMoneda,
     estado:         m.estado ?? "pendiente",
     tipo:           m.tipo ?? "debito",
@@ -296,16 +328,46 @@ function mapHistorialFromApi(
   index: number,
   fallbackMoneda: Moneda
 ): HistorialConciliacion {
+
+  let estado: EstadoConciliacion = "en_proceso";
+
+  if (
+    h.estado === "PROCESADA" ||
+    h.estado === "completado"
+  ) {
+    estado = "completado";
+  }
+
+  if (
+    h.estado === "OBSERVACION" ||
+    h.estado === "con_observaciones"
+  ) {
+    estado = "con_observaciones";
+  }
+
+  const fechaFormateada = h.fecha
+  ? new Date(h.fecha).toLocaleDateString("es-PE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  : "";
+
   return {
-    id:               h.id ?? `H-${index}`,
-    banco:            h.banco ?? "-",
-    fecha:            h.fecha ?? "",
-    moneda:           h.moneda ?? fallbackMoneda,
-    totalMovimientos: typeof h.totalMovimientos === "number" ? h.totalMovimientos : 0,
-    estado:           h.estado ?? "en_proceso",
+    id: h.id ?? `H-${index}`,
+    banco:
+  h.archivoNombre ??
+  h.banco ??
+  `Conciliación ${index + 1}`,
+    fecha: fechaFormateada,
+    moneda: h.moneda ?? fallbackMoneda,
+    totalMovimientos:
+      typeof h.totalMovimientos === "number"
+        ? h.totalMovimientos
+        : 0,
+    estado,
   };
 }
-
 async function extractErrorMessage(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as ApiErrorResponse;
@@ -413,7 +475,18 @@ function CoincidenciaCard({
         </div>
       </div>
 
-      <div className="text-[11px] text-slate-600">{match.fecha}</div>
+      <div className="text-[11px] text-slate-600">
+  {match.fecha
+    ? new Date(match.fecha).toLocaleDateString(
+        "es-PE",
+        {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        }
+      )
+    : "-"}
+</div>
 
       {/* Glosa (descripción) — solo si el backend la envía */}
       {match.descripcion && (
@@ -590,10 +663,12 @@ function MovementRow({
   movimiento,
   selected,
   onClick,
+  esReciente,
 }: {
   movimiento: MovimientoBancario;
   selected: boolean;
   onClick: () => void;
+  esReciente: boolean;
 }) {
   const meta = statusMeta[movimiento.estado];
   return (
@@ -610,6 +685,20 @@ function MovementRow({
         <span className="text-[11px] text-slate-600 font-mono">{movimiento.referencia}</span>
       </div>
       <div className="flex items-center gap-2 min-w-0">
+
+  {esReciente && (
+    <span
+      className="
+        h-2
+        w-2
+        rounded-full
+        bg-sky-400
+        animate-pulse
+        flex-shrink-0
+      "
+    />
+  )}
+
         <span className="text-sm text-slate-200 truncate">{movimiento.descripcion}</span>
       </div>
       <div className="flex flex-col items-end gap-0.5">
@@ -706,8 +795,25 @@ function DifferencePanel({ movimiento }: { movimiento: MovimientoBancario }) {
 // "Seleccionar" y muestra origen por cada coincidencia.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ObservationPanel({ movimiento }: { movimiento: MovimientoBancario }) {
+function ObservationPanel({
+  movimiento,
+  onSeleccionarCoincidencia,
+}: {
+  movimiento: MovimientoBancario;
+  onSeleccionarCoincidencia: (
+    movimientoId: number,
+    documentoId: number,
+    origen: string
+  ) => void;
+}) {
   const coincidencias = movimiento.coincidencias ?? [];
+
+  console.log(
+  "DETAIL",
+  movimiento.id,
+  movimiento.estado,
+  coincidencias
+);
 
   return (
     <div className="space-y-4">
@@ -726,13 +832,19 @@ function ObservationPanel({ movimiento }: { movimiento: MovimientoBancario }) {
       <div className="space-y-2">
         {coincidencias.map((match) => (
           <CoincidenciaCard
-            key={match.id}
-            match={match}
-            moneda={movimiento.moneda}
-            accionLabel="Seleccionar esta coincidencia"
-            accionColor="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-            onAccion={() => {/* TODO: confirmar selección manual */}}
-          />
+  key={match.id}
+  match={match}
+  moneda={movimiento.moneda}
+  accionLabel="Seleccionar esta coincidencia"
+  accionColor="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+  onAccion={() =>
+    onSeleccionarCoincidencia(
+      Number(movimiento.id),
+      Number(match.id),
+      match.origen
+    )
+  }
+/>
         ))}
       </div>
     </div>
@@ -748,9 +860,15 @@ function ObservationPanel({ movimiento }: { movimiento: MovimientoBancario }) {
 function MovementDetail({
   movimiento,
   onClose,
+  onSeleccionarCoincidencia,
 }: {
   movimiento: MovimientoBancario;
   onClose: () => void;
+  onSeleccionarCoincidencia: (
+    movimientoId: number,
+    documentoId: number,
+    origen: string
+  ) => void;
 }) {
   const coincidencias = movimiento.coincidencias ?? [];
 
@@ -772,23 +890,42 @@ function MovementDetail({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Metadata del movimiento */}
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             {[
-              { label: "Fecha",     value: movimiento.fecha },
-              { label: "Banco",     value: movimiento.banco ?? "—" },
-              { label: "Referencia",value: movimiento.referencia },
-              { label: "Moneda",    value: movimiento.moneda },
-            ].map(({ label, value }) => (
+  {
+    label: "Fecha",
+    value: new Date(
+      movimiento.fecha
+    ).toLocaleDateString(
+      "es-PE",
+      {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }
+    ),
+  },
+  {
+    label: "Referencia",
+    value: movimiento.referencia,
+  },
+  {
+    label: "Moneda",
+    value: movimiento.moneda,
+  },
+  {
+    label: "Descripción",
+    value: movimiento.descripcion,
+  },
+
+].map(({ label, value }) => (
               <div key={label} className="space-y-1">
                 <div className="text-[10px] text-slate-600 uppercase tracking-wider">{label}</div>
                 <div className="text-sm text-slate-200">{value}</div>
               </div>
             ))}
           </div>
-          <div className="space-y-1">
-            <div className="text-[10px] text-slate-600 uppercase tracking-wider">Descripción</div>
-            <div className="text-sm text-slate-200">{movimiento.descripcion}</div>
-          </div>
+          
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <span className="text-xs text-slate-500">Importe</span>
             <span className={cn("text-xl font-light tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-white")}>
@@ -801,7 +938,12 @@ function MovementDetail({
 
         {/* ── Panel OBSERVACIÓN ── */}
         {movimiento.estado === "observacion" && (
-          <ObservationPanel movimiento={movimiento} />
+          <ObservationPanel
+  movimiento={movimiento}
+  onSeleccionarCoincidencia={
+    onSeleccionarCoincidencia
+  }
+/>
         )}
 
         {/* ── Panel DIFERENCIA ── */}
@@ -978,9 +1120,13 @@ function UploadZone({ onFileSelected }: { onFileSelected: (file: File) => void }
 function HistorySection({
   historial,
   isLoading,
+  onOpenHistorial,
 }: {
   historial: HistorialConciliacion[];
   isLoading: boolean;
+  onOpenHistorial: (
+    id: string
+  ) => void;
 }) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
@@ -1012,8 +1158,11 @@ function HistorySection({
             const meta = statusHistoryMeta[h.estado];
             return (
               <div
-                key={h.id}
-                className={cn(
+  key={h.id}
+  onClick={() =>
+    onOpenHistorial(h.id)
+  }
+  className={cn(
                   "flex items-center gap-4 px-5 py-4 border-b border-l-2 border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition-all cursor-pointer",
                   meta.ring
                 )}
@@ -1058,6 +1207,8 @@ export default function BankReconciliationContent() {
 
   const [movimientos, setMovimientos]         = useState<MovimientoBancario[]>([]);
   const [historial, setHistorial]             = useState<HistorialConciliacion[]>([]);
+  const [historialSeleccionado, setHistorialSeleccionado] =useState<string | null>(null);
+  const [conciliadosRecientes,setConciliadosRecientes] = useState<number[]>([]);
   const [extracto, setExtracto]               = useState<ExtractoCargado | null>(null);
   const [isLoadingMovimientos, setIsLoadingMovimientos] = useState(false);
   const [isLoadingHistorial, setIsLoadingHistorial]     = useState(false);
@@ -1130,6 +1281,187 @@ export default function BankReconciliationContent() {
     setSelectedMovimiento(null);
     setActiveFilter(null);
   }, []);
+
+  const abrirHistorial = async (
+  conciliacionId: string
+) => {
+
+  try {
+
+    const response =
+      await fetch(
+        `/api/bank-reconciliation/${conciliacionId}`
+      );
+
+    const data =
+      await response.json();
+
+    console.log(
+      "HISTORIAL CARGADO",
+      data
+    );
+
+    console.log(
+  "MOVIMIENTOS",
+  data.movimientos?.length
+);
+
+console.log(
+  "COINCIDENCIAS",
+  data.coincidencias?.length
+);
+
+    const movimientosHistorial =
+  (data.movimientos ?? []).map(
+    (m: any, index: number) => {
+
+      const coincidenciasMovimiento =
+  (data.coincidencias ?? [])
+    .filter(
+      (c: any) =>
+        Number(c.movimiento_id) === Number(m.id)
+    );
+
+    if (coincidenciasMovimiento.length > 0) {
+  console.log("MATCH", {
+    movimiento: m.id,
+    coincidencias: coincidenciasMovimiento,
+  });
+}
+
+if (coincidenciasMovimiento.length > 0) {
+  console.log(
+    "COINCIDENCIA COMPLETA",
+    JSON.stringify(
+      coincidenciasMovimiento[0],
+      null,
+      2
+    )
+  );
+}
+
+console.log(
+  "COINCIDENCIA EJEMPLO",
+  data.coincidencias?.[0]
+);
+
+console.log(
+  "COINCIDENCIAS",
+  data.coincidencias?.length
+);
+
+      return mapMovimientoFromApi(
+        {
+          ...m,
+          coincidencias:
+            coincidenciasMovimiento
+        },
+        index,
+        currency
+      );
+
+    }
+  );
+
+  console.log(
+  "PRIMER MOVIMIENTO",
+  movimientosHistorial[0]
+);
+
+const movimientoConciliado =
+  movimientosHistorial.find(
+    (m: any) =>
+      m.coincidencias?.length > 0
+  );
+
+console.log(
+  "MOVIMIENTO CONCILIADO",
+  JSON.stringify(
+    movimientoConciliado,
+    null,
+    2
+  )
+);
+    setMovimientos(
+      movimientosHistorial
+    );
+
+    const primerConciliado =
+  movimientosHistorial.find(
+    (m: any) => m.coincidencias?.length
+  );
+
+setSelectedMovimiento(
+  primerConciliado ??
+  movimientosHistorial[0] ??
+  null
+);
+
+    setHistorialSeleccionado(
+      conciliacionId
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+};
+
+const seleccionarCoincidencia = async (
+  movimientoId: number,
+  documentoId: number,
+  origen: string
+) => {
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/bank-reconciliation/select-match",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            movimientoId,
+            documentoId,
+            origen,
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error);
+    }
+
+    if (historialSeleccionado) {
+
+      await abrirHistorial(
+        historialSeleccionado
+      );
+
+    }
+
+
+    setConciliadosRecientes(prev => [
+  ...prev,
+  movimientoId
+]);
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+};
 
   const handleCurrencyChange = useCallback((nuevaMoneda: Moneda) => {
     setCurrency(nuevaMoneda);
@@ -1296,12 +1628,20 @@ export default function BankReconciliationContent() {
                 />
               ) : (
                 filtered.map((m) => (
-                  <MovementRow
-                    key={m.id}
-                    movimiento={m}
-                    selected={selectedMovimiento?.id === m.id}
-                    onClick={() => setSelectedMovimiento((prev) => (prev?.id === m.id ? null : m))}
-                  />
+  <MovementRow
+    key={m.id}
+    movimiento={m}
+    selected={
+      selectedMovimiento?.id === m.id
+    }
+    onClick={() =>
+      setSelectedMovimiento(m)
+    }
+    esReciente={conciliadosRecientes.includes(
+      Number(m.id)
+    )}
+  />
+
                 ))
               )}
             </div>
@@ -1309,7 +1649,11 @@ export default function BankReconciliationContent() {
 
           {/* Historial */}
           <div className="space-y-2">
-            <HistorySection historial={historial} isLoading={isLoadingHistorial} />
+            <HistorySection
+  historial={historial}
+  isLoading={isLoadingHistorial}
+  onOpenHistorial={abrirHistorial}
+/>
           </div>
         </div>
 
@@ -1318,9 +1662,14 @@ export default function BankReconciliationContent() {
           {selectedMovimiento && (
             <div className="w-[380px] rounded-2xl border border-white/[0.06] bg-[#0d1117] h-fit sticky top-24 overflow-hidden">
               <MovementDetail
-                movimiento={selectedMovimiento}
-                onClose={() => setSelectedMovimiento(null)}
-              />
+  movimiento={selectedMovimiento}
+  onClose={() =>
+    setSelectedMovimiento(null)
+  }
+  onSeleccionarCoincidencia={
+    seleccionarCoincidencia
+  }
+/>
             </div>
           )}
         </div>

@@ -158,7 +158,8 @@ const procesarArchivo = async (archivo: any) => {
     const json =
   await procesarDocumento(
     archivoCompleto.buffer,
-    archivo.name
+    archivo.name,
+    "factura"
   );
 
   const RUC_SEAMAR =

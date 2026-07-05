@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
-import { subirDocumentoAOneDrive } from "@/lib/onedrive";
+import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive";
 import { Buffer } from "buffer";
 import { getAccessToken } from "@/lib/msal";
 
@@ -173,7 +173,7 @@ for (const documento of documentos) {
     const buffer = Buffer.from(bytes)
 
     const archivoSubido =
-  await subirDocumentoAOneDrive(
+  await subirDocumentoRespaldoAOneDrive(
     documento.name,
     buffer,
     token

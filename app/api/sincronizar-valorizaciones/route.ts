@@ -72,7 +72,8 @@ if (esExcel) {
 const json =
   await procesarDocumento(
     archivoCompleto.buffer,
-    archivoCompleto.nombre
+    archivoCompleto.nombre,
+    "valorizacion"
   );
 
 console.log(json);

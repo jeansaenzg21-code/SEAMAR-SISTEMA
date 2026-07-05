@@ -59,6 +59,15 @@ export async function POST(
         resultado.join("")
       );
 
+      console.log(
+  "JSON CONCILIACION:",
+  JSON.stringify(
+    json,
+    null,
+    2
+  )
+);
+
     const [insertResult]: any =
       await pool.query(
         `
@@ -90,12 +99,96 @@ export async function POST(
     const conciliacionId =
       insertResult.insertId;
 
-    return NextResponse.json({
-      ...json,
-      conciliacionId
-    });
+    const movimientos =
+  Array.isArray(json.movimientos)
+    ? json.movimientos
+    : [];
 
-  } catch (error: any) {
+    for (const movimiento of movimientos) {
+
+  const [movResult]: any =
+    await pool.query(
+      `
+      INSERT INTO conciliacion_movimientos
+      (
+        conciliacion_id,
+        fecha,
+        referencia,
+        descripcion,
+        monto,
+        moneda,
+        tipo,
+        estado,
+        origen,
+        documento_id,
+        conciliado_manual,
+        diferencia,
+        causa_diferencia,
+        fecha_registro
+      )
+      VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      `,
+      [
+        conciliacionId,
+        movimiento.fecha ?? null,
+        movimiento.referencia ?? null,
+        movimiento.descripcion ?? null,
+        movimiento.monto ?? 0,
+        movimiento.moneda ?? null,
+        movimiento.tipo ?? null,
+        movimiento.estado ?? "pendiente",
+        null,
+        null,
+        0,
+        null,
+        null
+      ]
+    );
+
+  const movimientoId = movResult.insertId;
+
+  const coincidencias =
+    Array.isArray(movimiento.coincidencias)
+      ? movimiento.coincidencias
+      : [];
+
+  for (const coincidencia of coincidencias) {
+
+    await pool.query(
+      `
+      INSERT INTO conciliacion_movimiento_coincidencias
+      (
+        movimiento_id,
+        documento_id,
+        origen,
+        score,
+        tipo,
+        fecha_registro
+      )
+      VALUES
+      (?, ?, ?, ?, ?, NOW())
+      `,
+      [
+        movimientoId,
+        Number(coincidencia.id),
+        coincidencia.origen ?? null,
+        null,
+        null
+      ]
+    );
+
+  }
+
+} // <-- EL FOR CIERRA AQUÍ
+
+return NextResponse.json({
+  ...json,
+  conciliacionId
+});
+
+
+} catch (error: any) {
 
     console.error(error);
 

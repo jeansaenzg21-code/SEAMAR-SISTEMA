@@ -26,7 +26,8 @@ export async function POST() {
 
       const json = await procesarDocumento(
   archivoCompleto.buffer,
-  archivoCompleto.nombre
+  archivoCompleto.nombre,
+  "contrato"
 );
 
       console.log("JSON CONTRATO:", json);

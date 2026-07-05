@@ -19,7 +19,20 @@ export async function listarOrdenesServicio() {
 
   return response.json();
 }
+export async function listarValorizaciones() {
+  const token = await getAccessToken();
 
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.VALORIZACIONES}/children`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return response.json();
+}
 export async function listarDocumentos() {
   const token = await getAccessToken();
 
@@ -173,7 +186,7 @@ export async function subirContratoAOneDrive(
   );
 }
 
-export async function subirDocumentoAOneDrive(
+export async function subirDocumentoRespaldoAOneDrive(
   nombreArchivo: string,
   buffer: Buffer,
   token: string
@@ -181,7 +194,7 @@ export async function subirDocumentoAOneDrive(
   return subirArchivoAOneDrive(
     nombreArchivo,
     buffer,
-    ONEDRIVE_FOLDERS.VALORIZACIONES,
+    ONEDRIVE_FOLDERS.DOCUMENTOS_RESPALDO,
     token
   );
 }
