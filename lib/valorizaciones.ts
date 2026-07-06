@@ -21,13 +21,48 @@ const os =
         data.numeroOrdenServicio
       );
 
-  const codigo =
-  data.codigo ||
-  (
-    data.numeroRequerimiento
-      ? `VAL-${new Date(data.fechaEjecucion).getFullYear()}-${data.numeroRequerimiento}`
-      : `VAL-${Date.now()}`
+  const fechaBase =
+  data.fechaValorizacion ||
+  data.fechaEjecucion ||
+  new Date().toISOString().slice(0, 10);
+
+const anio =
+  new Date(fechaBase).getFullYear();
+
+let codigo = data.codigo;
+
+if (!codigo) {
+
+  const [rows]: any = await pool.query(
+    `
+    SELECT codigo
+    FROM valorizaciones
+    WHERE codigo LIKE ?
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [`VAL-${anio}-%`]
   );
+
+  let correlativo = 1;
+
+  if (rows.length > 0) {
+
+    const ultimo =
+      rows[0].codigo;
+
+    const partes =
+      ultimo.split("-");
+
+    correlativo =
+      Number(partes[2]) + 1;
+
+  }
+
+  codigo =
+    `VAL-${anio}-${String(correlativo).padStart(2, "0")}`;
+
+}
 
     
   const [result]: any =
@@ -74,9 +109,15 @@ respaldo_nombre,
 
       codigo,
 
-      data.proveedor || "SIN PROVEEDOR",
+      data.empresaCliente ??
+data.proveedor ??
+"SIN PROVEEDOR",
 data.ruc || "",
-data.negocioOperacion || "",
+
+data.proyecto ??
+data.negocioOperacion ??
+data.descripcion ??
+"",
 
 data.numeroOrdenServicio || "",
 
@@ -86,13 +127,21 @@ data.descripcion || data.archivoNombre || "Valorización sin descripción",
 
 Number(Number(data.pu || 0).toFixed(2)),
 
-Number(Number(data.monto || 0).toFixed(2)),
+Number(
+  Number(
+    data.montoValorizado ??
+    data.monto ??
+    0
+  ).toFixed(2)
+),
+
 data.moneda || "PEN",
+
 data.periodo || "",
 
-      data.fechaEjecucion
-  ? data.fechaEjecucion
-  : null,
+data.fechaValorizacion ??
+data.fechaEjecucion ??
+null,
 
       "BORRADOR",
 

@@ -9,7 +9,16 @@ import { guardarValorizacion } from "@/lib/valorizaciones";
 import { procesarDocumento } from "@/lib/openai-documentos";
 import { leerValorizacionesExcel } from "@/lib/excel-reader";
 
-
+function enviarProgreso(
+  controller: ReadableStreamDefaultController,
+  data: any
+) {
+  controller.enqueue(
+    new TextEncoder().encode(
+      `data: ${JSON.stringify(data)}\n\n`
+    )
+  );
+}
 
 export async function POST() {
 
@@ -68,13 +77,23 @@ if (esExcel) {
 
   continue;
 }
+console.log("Procesando:", archivoCompleto.nombre);
 
-const json =
-  await procesarDocumento(
-    archivoCompleto.buffer,
-    archivoCompleto.nombre,
-    "valorizacion"
-  );
+const extension = archivoCompleto.nombre
+  .toLowerCase()
+  .split(".")
+  .pop();
+
+if (extension !== "pdf") {
+  console.log("Archivo omitido:", archivoCompleto.nombre);
+  continue;
+}
+
+const json = await procesarDocumento(
+  archivoCompleto.buffer,
+  archivoCompleto.nombre,
+  "valorizacion"
+);
 
 console.log(json);
 

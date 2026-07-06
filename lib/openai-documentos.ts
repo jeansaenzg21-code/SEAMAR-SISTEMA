@@ -94,13 +94,21 @@ const esExcel =
   nombre.endsWith(".xls") ||
   nombre.endsWith(".csv");
 
-  const textoDocumento =
-    esExcel
-      ? leerExcel(buffer)
-      : await leerPdf(buffer);
+  let textoDocumento = "";
 
-  const esEscaneado =
-    textoDocumento.trim().length < 100;
+if (esExcel) {
+  textoDocumento = leerExcel(buffer);
+} else {
+  textoDocumento = await leerPdf(buffer);
+}
+
+const esEscaneado = textoDocumento.trim().length < 100;
+
+const esPdf =
+  nombre.endsWith(".pdf");
+
+console.log("ES ESCANEADO:", esEscaneado);
+console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
   if (esEscaneado) {
     console.log(
@@ -120,12 +128,13 @@ const esExcel =
 
       const prompt = obtenerPrompt(tipo);
 
-      const response =
-  await openai.responses.create({
+      console.log("================================");
+console.log(textoDocumento);
+console.log("================================");
 
-    model: "gpt-5-mini",
-
-    input: `
+const response = await openai.responses.create({
+  model: "gpt-5-mini",
+  input: `
 ${prompt}
 
 EL NOMBRE DEL ARCHIVO ES: ${nombreArchivo}
@@ -133,8 +142,9 @@ EL NOMBRE DEL ARCHIVO ES: ${nombreArchivo}
 ## DOCUMENTO A ANALIZAR
 
 ${textoDocumento}
-  `
-            });
+`,
+});
+
 
       return parsearJson(
   response.output_text ?? "{}"

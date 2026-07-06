@@ -1,42 +1,23 @@
 import { PdfReader } from "pdfreader";
 
-export async function leerPdf(
-  buffer: Buffer
-) {
+export async function leerPdf(buffer: Buffer) {
+  return new Promise<string>((resolve, reject) => {
+    let texto = "";
 
-  return new Promise<string>(
-    (resolve, reject) => {
+    new PdfReader().parseBuffer(buffer, (error, item) => {
+      if (error) {
+        reject(error);
+        return;
+      }
 
-      let texto = "";
+      if (!item) {
+        resolve(texto);
+        return;
+      }
 
-      new PdfReader().parseBuffer(
-        buffer,
-        (error, item) => {
-
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          if (!item) {
-
-            resolve(texto);
-
-            return;
-
-          }
-
-          if (item.text) {
-
-            texto +=
-              item.text + " ";
-
-          }
-
-        }
-      );
-
-    }
-  );
-
+      if (item.text) {
+        texto += item.text + " ";
+      }
+    });
+  });
 }

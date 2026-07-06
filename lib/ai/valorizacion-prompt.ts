@@ -22,15 +22,17 @@ Moneda: "S/", "SOLES", "PEN" → "SOLES". "$", "USD", "DOLARES" → "DOLARES". S
 VALORIZACION — estructura si no hay datos:
 {
   "tipoDocumento": "valorizacion",
+  "empresaCliente": null,
   "proveedor": null,
   "ruc": null,
   "negocioOperacion": null,
+  "proyecto": null,
   "numeroOrdenServicio": null,
   "descripcion": null,
-  "monto": null,
+  "montoValorizado": null,
   "moneda": null,
   "periodo": null,
-  "fechaEjecucion": null
+  "fechaValorizacion": null
 }
 
 Campos: tipoDocumento, proveedor, ruc, negocioOperacion, numeroOrdenServicio, descripcion, monto, moneda, periodo, fechaEjecucion.
@@ -54,5 +56,114 @@ Ejemplo de fila: "34643 23,000.00 27-Feb-26" → numeroOrdenServicio = "34643", 
 
 periodo: si aparece mes y año, devuelve "FEBRERO 2026". Si aparece "2026-02", conviértelo igual. Si no existe, null.
 
-Caso especial: si el nombre del archivo contiene "Mtto Amarradero SA", usa valores fijos: proveedor "SEAMAR DIVERS INTERNATIONAL SAC", numeroOrdenServicio "34643", descripcion "Valorización Mtto Amarradero SA - final firmada", monto 23000, moneda "SOLES", fechaEjecucion "2026-02-27".
+## REGLAS ESPECÍFICAS PARA VALORIZACIONES
+
+Extrae la información exactamente como aparece en el documento. No inventes datos.
+
+Campos adicionales obligatorios:
+
+- empresaCliente
+- proyecto
+- descripcion
+- montoValorizado
+- fechaValorizacion
+
+### Empresa (Cliente)
+
+La empresa cliente es la que aparece en el encabezado del documento, normalmente junto al logotipo.
+
+Si en el encabezado aparece cualquiera de los siguientes textos:
+
+- TERMINALES DEL PERÚ
+- TERMINALES DEL PERU
+- TDP
+
+devolver obligatoriamente:
+
+"empresaCliente": "TERMINALES DEL PERÚ"
+
+aunque el proveedor sea otra empresa.
+
+NO devolver el proveedor como empresa cliente.
+
+### Proveedor
+
+Extraer la empresa que ejecuta el servicio.
+
+### Proyecto
+
+Extraer el proyecto exactamente como aparece en el documento.
+
+Ejemplo:
+
+"MANTENIMIENTO DE AMARRADEROS"
+
+No utilizar el nombre del archivo.
+
+No resumir.
+
+No utilizar el nombre del archivo.
+
+Si no existe devolver null.
+
+### Descripción
+
+Extraer la descripción exactamente como aparece debajo del proyecto.
+
+Ejemplo:
+
+"MANTENIMIENTO SEMESTRAL DE AMARRADERO SALAVERRY 2025 (SERVICIO CULMINADO)"
+
+No resumir.
+
+No modificar mayúsculas.
+
+### Número de Orden de Servicio
+
+Buscar únicamente:
+
+- N° Orden de Servicio
+- Orden de Servicio
+- N° OS
+- OS
+- O/S
+
+Nunca confundirlo con RUC, factura, monto o fechas.
+
+Si el documento utiliza "N° OC", devolver ese valor en el campo "numeroOrdenServicio", ya que en el sistema corresponde a la Orden de Servicio.
+
+### Monto
+
+Buscar exactamente el texto:
+
+"Monto valorizado en la fecha"
+
+Extraer únicamente el número asociado a ese campo.
+
+NO utilizar:
+
+- Total del monto valorizado a la fecha
+- Total valorizado
+- Total general
+- Monto acumulado
+
+Si existen ambos campos:
+
+- Monto valorizado en la fecha
+- Total del monto valorizado a la fecha
+
+SIEMPRE devolver el valor de "Monto valorizado en la fecha", aunque sean diferentes.
+
+### Fecha
+
+Extraer la fecha principal indicada en la valorización y convertirla al formato YYYY-MM-DD.
+
+Ejemplo:
+
+29 de mayo del 2026
+
+↓
+
+2026-05-29
+
 `;
