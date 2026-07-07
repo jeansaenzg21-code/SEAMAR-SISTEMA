@@ -35,8 +35,12 @@ type CuentaPorPagar = {
   detraccion?: number | null
   forma_pago?: string | null
   categorizacion?: string | null
+
   monto: number
+  moneda: "SOLES" | "DOLARES"
+
   saldo: number
+
   estado: Status
   fecha_emision: string
   fecha_vencimiento: string
@@ -151,6 +155,12 @@ const [mensajeProgreso, setMensajeProgreso] =
 
 const [documentosDetectados, setDocumentosDetectados] =
   useState(0);
+
+const [mostrarExportar, setMostrarExportar] =
+  useState(false);
+
+const [monedaExportar, setMonedaExportar] =
+  useState<"SOLES" | "DOLARES">("SOLES");
 
   // ---- Navegación documental: año / mes / día ----
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -312,7 +322,19 @@ setResultadoSync(sync);
   }
 
 }
+const exportarMesExcel = () => {
+  if (selectedYear === null || selectedMonth === null) {
+    alert("Seleccione un año y un mes");
+    return;
+  }
 
+  window.open(
+    `/api/cuentas-por-pagar/export?year=${selectedYear}&month=${selectedMonth + 1}&moneda=${monedaExportar}`,
+    "_blank"
+  );
+
+  setMostrarExportar(false);
+};
 const modalProgreso = (
   sincronizando && (
 
@@ -433,6 +455,71 @@ const modalResumen = (
 
     </div>
 
+  )
+);
+
+const modalExportar = (
+  mostrarExportar && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+      <div className="bg-card border rounded-xl p-6 w-[420px]">
+
+        <h2 className="text-xl font-bold mb-2">
+          Exportar Excel
+        </h2>
+
+        <p className="text-sm text-muted-foreground mb-5">
+          Selecciona la moneda que deseas exportar.
+        </p>
+
+        <div className="space-y-3">
+
+          <label className="flex items-center gap-3 cursor-pointer">
+
+            <input
+              type="radio"
+              checked={monedaExportar === "SOLES"}
+              onChange={() => setMonedaExportar("SOLES")}
+            />
+
+            <span>SOLES (S/)</span>
+
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+
+            <input
+              type="radio"
+              checked={monedaExportar === "DOLARES"}
+              onChange={() => setMonedaExportar("DOLARES")}
+            />
+
+            <span>DÓLARES (US$)</span>
+
+          </label>
+
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+
+          <Button
+            variant="outline"
+            onClick={() => setMostrarExportar(false)}
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            onClick={exportarMesExcel}
+          >
+            Exportar
+          </Button>
+
+        </div>
+
+      </div>
+
+    </div>
   )
 );
 
@@ -580,8 +667,9 @@ const modalResumen = (
   : "No",
       item.forma_pago || "-",
       item.categorizacion || "-",
-      item.monto,
-      item.saldo,
+      `${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.monto).toLocaleString("es-PE")}`,
+
+`${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.saldo).toLocaleString("es-PE")}`,
       item.estado,
       item.fecha_emision,
       item.fecha_vencimiento,
@@ -606,17 +694,7 @@ const modalResumen = (
     window.URL.revokeObjectURL(url)
   }
 
-  const exportarMesExcel = () => {
-  if (selectedYear === null || selectedMonth === null) {
-    alert("Seleccione un año y un mes")
-    return
-  }
-
-  window.open(
-    `/api/cuentas-por-pagar/export?year=${selectedYear}&month=${selectedMonth + 1}`,
-    "_blank"
-  )
-}
+  
 
   const tituloSeleccion = useMemo(() => {
     if (selectedYear === null) return null
@@ -630,6 +708,7 @@ const modalResumen = (
   <>
     {modalProgreso}
     {modalResumen}
+    {modalExportar}
 
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
@@ -705,7 +784,7 @@ const modalResumen = (
 <Button
   variant="outline"
   className="border-border"
-  onClick={exportarMesExcel}
+  onClick={() => setMostrarExportar(true)}
 >
   <Download className="mr-2 h-4 w-4" />
   Exportar
@@ -884,12 +963,20 @@ const modalResumen = (
                       </td>
 
                       <td className="px-4 py-3 text-right tabular-nums">
-                        S/ {Number(item.monto).toLocaleString("es-PE")}
-                      </td>
+  {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+  {Number(item.monto).toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}
+</td>
 
                       <td className="px-4 py-3 text-right tabular-nums">
-                        S/ {Number(item.saldo).toLocaleString("es-PE")}
-                      </td>
+  {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+  {Number(item.saldo).toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}
+</td>
 
                       <td className="px-4 py-3">
                         <StatusBadge status={item.estado} />
@@ -918,18 +1005,7 @@ const modalResumen = (
                               }
                             }}
                           >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-
-                          <Button
-  size="icon"
-  variant="outline"
-  onClick={() => {
-    if (item.archivo_url) {
-      window.open(item.archivo_url, "_blank")
-    }
-  }}
->
+                            
   <Eye className="h-4 w-4" />
 </Button>
 

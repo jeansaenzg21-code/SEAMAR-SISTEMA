@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useEffect } from "react"
 import {
   LayoutDashboard,
 
@@ -34,12 +35,12 @@ import {
 } from "lucide-react"
 import { Landmark } from "lucide-react"
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
   { name: "Observaciones", href: "/observations", icon: MessageSquareWarning },
   { name: "Conciliación Bancaria", href: "/bank-reconciliation", icon: Landmark },
-]
+] 
 
 const aiSection = [
   { name: "Subir Documento", href: "/upload", icon: Sparkles },
@@ -77,6 +78,8 @@ const providersSection = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter(); 
+  
   const [expandedSections, setExpandedSections] = useState({
   analytics: true,
   clients: true,
@@ -88,6 +91,8 @@ const toggleSection = (section: keyof typeof expandedSections) => {
     [section]: !prev[section],
   }))
 }
+
+
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">

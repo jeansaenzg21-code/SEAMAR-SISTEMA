@@ -27,6 +27,100 @@ Montos: número, no texto. Quita "S/", "$", "USD", comas y símbolos. Ej: "S/ 23
 
 Moneda: "S/", "SOLES", "PEN" → "SOLES". "$", "USD", "DOLARES" → "DOLARES". Si no aparece, null.
 
+VALIDACIÓN DE MONEDA
+
+Antes de responder revisa todo el documento.
+
+Buscar cualquiera de estas evidencias:
+
+- S/
+- SOLES
+- PEN
+- MONEDA: SOLES
+
+Si aparece cualquiera de ellas:
+
+"moneda": "SOLES"
+
+Buscar cualquiera de estas evidencias:
+
+- $
+- US$
+- USD
+- U.S.$
+- DOLAR
+- DÓLAR
+- DOLAR AMERICANO
+- DÓLAR AMERICANO
+- DOLARES
+- DÓLARES
+- MONEDA: USD
+- MONEDA: DOLARES
+
+Si aparece cualquiera de ellas:
+
+"moneda": "DOLARES"
+
+Si la representación textual del importe dice:
+
+- SON: ... DOLAR AMERICANO
+- SON: ... DÓLAR AMERICANO
+
+la moneda es obligatoriamente:
+
+"moneda": "DOLARES"
+
+Si todos los importes del documento utilizan el símbolo "$", devolver:
+
+"moneda": "DOLARES"
+
+Nunca asumir "SOLES" únicamente porque el documento sea peruano.
+
+Solo devolver null cuando no exista ninguna evidencia de la moneda.
+
+REGLA DE PRIORIDAD PARA MONEDA
+
+El símbolo "$" tiene prioridad absoluta sobre cualquier otra inferencia.
+
+Si cualquier importe del documento aparece como:
+
+$424.80
+$64.80
+$0.00
+
+entonces:
+
+"moneda": "DOLARES"
+
+aunque el documento sea peruano.
+
+Si además aparece el texto:
+
+- DOLAR AMERICANO
+- DÓLAR AMERICANO
+
+la moneda es obligatoriamente:
+
+"moneda": "DOLARES"
+
+No devolver "SOLES" si existe alguna evidencia de dólares.
+
+VALIDACIÓN FINAL OBLIGATORIA DE MONEDA
+
+Antes de generar el JSON realiza esta verificación final:
+
+1. Revisa nuevamente TODOS los importes del documento.
+
+2. Si cualquier importe utiliza el símbolo "$", "US$" o aparece el texto "DÓLAR AMERICANO", la moneda debe ser:
+
+"moneda": "DOLARES"
+
+3. Esta validación tiene prioridad absoluta sobre cualquier regla anterior.
+
+4. Nunca devolver "SOLES" si existe al menos una evidencia clara de dólares.
+
+5. Antes de responder verifica que el campo "moneda" sea consistente con los importes mostrados en la factura.
+
 ## PASO 3 — RUC Y NÚMERO DE DOCUMENTO (crítico, aplica a FACTURA)
 
 A) IDENTIFICAR RUC
@@ -151,20 +245,71 @@ entidadPrincipal: si destino = "COBRAR", usa empresaCliente; si "PAGAR", usa emp
 
 ## PASO 5 — DETRACCIÓN, FORMA DE PAGO Y CATEGORIZACIÓN
 
-A) DETRACCION
+A) DETRACCIÓN
 
-Extrae el monto de detracción cuando exista. Búscalo cerca de menciones a:
-- "Detracción"
-- "Sistema de Pago de Obligaciones Tributarias"
-- "SPOT"
-- "Banco de la Nación"
-- "Cuenta de detracciones"
+Determina primero si la operación está afecta al Sistema de Detracciones (SPOT).
 
-Si existe monto de detracción, conviértelo a número siguiendo las reglas de PASO 2:
-{ "detraccion": numero }
+Busca cualquiera de las siguientes evidencias:
 
-Si no existe ninguna evidencia de detracción:
-{ "detraccion": null }
+- Detracción
+- SPOT
+- Sistema de Pago de Obligaciones Tributarias
+- Operación sujeta al SPOT
+- Banco de la Nación
+- Cuenta de detracciones
+- Cuenta Banco de la Nación
+- Código de bien
+- Código de servicio
+- Porcentaje de detracción
+- % detracción
+- Importe detracción
+- Monto detracción
+- Monto a depositar
+- Depósito de detracción
+
+Si existe un monto asociado a cualquiera de esos conceptos, devolver:
+
+"detraccion": numero
+
+Ejemplo:
+
+Detracción 10% .......... S/ 1,254.70
+
+↓
+
+"detraccion": 1254.70
+
+Si el documento solamente indica el porcentaje (por ejemplo 10%) y también existe el monto total de la factura, calcula el monto de la detracción.
+
+Ejemplo:
+
+Total: 10,000.00
+
+Detracción: 10%
+
+↓
+
+"detraccion": 1000
+
+Si existe evidencia de SPOT o detracción pero el monto no puede determinarse con certeza, devolver:
+
+"detraccion": null
+
+Nunca devolver true, false, "Sí", "No" ni textos.
+Siempre devolver un número o null.
+
+VALIDACIÓN FINAL DE DETRACCIÓN
+
+Antes de responder verifica:
+
+- Si existe una sección SPOT.
+- Si existe una Cuenta de Detracciones.
+- Si existe un porcentaje de detracción.
+- Si existe un monto a depositar.
+
+Si cualquiera de esos elementos aparece, revisa nuevamente el documento antes de devolver "detraccion": null.
+
+Solo devolver null cuando realmente no exista ninguna evidencia de detracción.
 
 B) FORMA DE PAGO
 
@@ -194,8 +339,60 @@ Guía de mapeo (no exhaustiva, usa criterio análogo para casos similares):
 - Hotel, hospedaje → HOSPEDAJE
 - Courier, transporte, flete → TRANSPORTE
 - Abogado, consultoría, ingeniería → SERVICIOS_PROFESIONALES
-- Ferretería, materiales → MATERIALES
-- EPP, seguridad industrial → EPP
+MATERIALES
+
+Incluye, entre otros:
+
+- Ferretería
+- Tuberías
+- Válvulas
+- Pernos
+- Tornillos
+- Herramientas
+- Equipos de buceo
+- Botellas de buceo
+- Reguladores
+- Mangueras
+- Cabos
+- Cadenas
+- Boyas
+- Pinturas
+- Lubricantes
+- Repuestos
+- Material eléctrico
+- Material industrial
+- Material naval
+
+→ MATERIALES
+EPP:
+
+- Casco
+- Chaleco
+- Botas
+- Zapatos de seguridad
+- Lentes
+- Guantes
+- Arnés
+- Respirador
+- Protector auditivo
+- Overol
+- Uniforme
+- Seguridad industrial
+
+→ EPP
+
+MANTENIMIENTO:
+
+- Buceo
+- Inspección
+- Limpieza industrial
+- Soldadura
+- Reparación
+- Mantenimiento preventivo
+- Mantenimiento correctivo
+- Mantenimiento marítimo
+
+→ MANTENIMIENTO
 - Claro, Movistar, internet → TELECOMUNICACIONES
 - BCP, BBVA, comisiones bancarias → BANCARIOS
 - Mantenimiento de equipos, mantenimiento industrial, mantenimiento marítimo → MANTENIMIENTO
@@ -209,9 +406,40 @@ Si no encaja claramente en ninguna categoría anterior:
 
 Nunca dejes categorizacion en null — siempre debe tener uno de los valores válidos, usando "OTROS" como última opción.
 
+VALIDACIÓN FINAL DE CATEGORIZACIÓN
+
+Antes de responder:
+
+Si la empresaEmisora vende materiales o equipos industriales y la descripción corresponde a bienes físicos, priorizar "MATERIALES".
+
+Solo utilizar "EPP" cuando el producto sea un elemento de protección personal utilizado directamente por el trabajador.
+
+Nunca clasificar como EPP un equipo de trabajo, una herramienta, un repuesto o un material industrial.
+
 ## ESTRUCTURA DE SALIDA
 
-FACTURA — extrae: destino, entidadPrincipal, tipoDocumento, numeroFactura, empresaEmisora, rucEmisor, empresaCliente, rucCliente, fechaEmision, fechaVencimiento, subtotal, igv, montoTotal, detraccion, formaPago, categorizacion, ordenCompra, proyecto, descripcionServicio.
+FACTURA — extrae:
+
+destino,
+entidadPrincipal,
+tipoDocumento,
+numeroFactura,
+empresaEmisora,
+rucEmisor,
+empresaCliente,
+rucCliente,
+fechaEmision,
+fechaVencimiento,
+subtotal,
+igv,
+montoTotal,
+moneda,
+detraccion,
+formaPago,
+categorizacion,
+ordenCompra,
+proyecto,
+descripcionServicio.
 
 - proyecto: nombre corto del proyecto o trabajo ejecutado (ej: "MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS").
 - descripcionServicio: descripción completa del servicio facturado.
@@ -231,6 +459,7 @@ Ejemplo de respuesta válida:
   "subtotal": 353693.37,
   "igv": 63664.81,
   "montoTotal": 417358.18,
+  "moneda": "SOLES",
   "detraccion": 50083,
   "formaPago": "CREDITO",
   "categorizacion": "MANTENIMIENTO",

@@ -47,12 +47,13 @@ export async function POST(
     );
 
     const resultado =
-      await PythonShell.run(
-        "python/bank_reconciliation.py",
-        {
-          args: [rutaArchivo]
-        }
-      );
+  await PythonShell.run(
+    "python/bank_reconciliation.py",
+    {
+      pythonPath: process.env.PYTHON_PATH,
+      args: [rutaArchivo]
+    }
+  );
 
     const json =
       JSON.parse(

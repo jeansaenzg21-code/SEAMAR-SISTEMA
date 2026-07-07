@@ -35,8 +35,8 @@ VALORIZACION — estructura si no hay datos:
   "fechaValorizacion": null
 }
 
-Campos: tipoDocumento, proveedor, ruc, negocioOperacion, numeroOrdenServicio, descripcion, monto, moneda, periodo, fechaEjecucion.
-
+Campos principales:
+tipoDocumento, empresaCliente, proveedor, ruc, negocioOperacion, proyecto, numeroOrdenServicio, descripcion, montoValorizado, moneda, periodo, fechaValorizacion.
 Si el origen es Excel: analiza filas/columnas aunque estén desordenadas, usa encabezados para mapear campos, y si hay varias filas válidas toma la primera con monto y descripción. No inventes datos faltantes — usa null.
 
 Mapeo de columnas:
@@ -60,6 +60,36 @@ periodo: si aparece mes y año, devuelve "FEBRERO 2026". Si aparece "2026-02", c
 
 Extrae la información exactamente como aparece en el documento. No inventes datos.
 
+Analiza primero la estructura del documento antes de extraer los datos.
+
+Identifica los encabezados de cada columna y luego asocia cada valor únicamente con su encabezado correspondiente.
+
+Si un mismo valor puede pertenecer a varios campos, utiliza siempre el encabezado explícito del documento para decidir.
+
+Orden de prioridad:
+
+1. Encabezado del campo.
+2. Estructura de la tabla.
+3. Contexto del documento.
+
+Nunca utilices únicamente la cercanía visual entre textos para decidir el valor de un campo.
+
+Nunca asocies un valor a un campo por cercanía visual; utiliza siempre el nombre del encabezado.
+
+Si el documento contiene tablas, primero identifica el encabezado de cada columna y después extrae el valor correspondiente.
+
+En documentos escaneados mediante OCR pueden existir pequeños errores de reconocimiento de caracteres.
+
+Ejemplos:
+
+- "Valorizaci�n" = "Valorización"
+- "Operaci�n" = "Operación"
+- "Descripci�n" = "Descripción"
+
+No descartes un encabezado únicamente porque tenga errores menores de OCR.
+
+Utiliza el contexto del documento para identificar correctamente cada campo.
+
 Campos adicionales obligatorios:
 
 - empresaCliente
@@ -68,55 +98,211 @@ Campos adicionales obligatorios:
 - montoValorizado
 - fechaValorizacion
 
-### Empresa (Cliente)
+## IDENTIFICACIÓN AUTOMÁTICA DEL CLIENTE
 
-La empresa cliente es la que aparece en el encabezado del documento, normalmente junto al logotipo.
+Antes de extraer cualquier dato, identifica el formato del documento.
 
-Si en el encabezado aparece cualquiera de los siguientes textos:
+Si el documento presenta la estructura típica de valorizaciones de TERMINALES DEL PERÚ, aunque el OCR tenga errores, considera que el cliente es:
+
+"empresaCliente": "TERMINALES DEL PERÚ"
+
+Se considera una valorización de TERMINALES DEL PERÚ cuando se observan varios de los siguientes elementos:
+
+- Encabezado "VALORIZACIÓN MENSUAL".
+- Logotipo TDP o fragmentos OCR como:
+  - TDP
+  - TERMINALES
+  - TERMINAL
+  - DEL PERÚ
+  - DEL PERU
+  - REL PERU
+  - OR DE TERMINAL
+- Código de formato similar a:
+  - UE-CA-FR-011
+- Campos:
+  - Negocio / Operación
+  - Proveedor
+  - RUC
+  - N° de Orden de Servicio (OS)
+  - Monto pactado en la OS
+  - Fecha de ejecución
+  - AMORTIZACIONES
+  - Monto valorizado en la fecha
+  - Estado actual de la valorización
+
+Si al menos cuatro de estos elementos están presentes, identifica automáticamente el documento como perteneciente a:
+
+"empresaCliente": "TERMINALES DEL PERÚ"
+
+No es necesario que el nombre completo de la empresa sea legible si la estructura del documento coincide.
+
+
+### Empresa Cliente
+
+La empresa cliente SIEMPRE debe obtenerse del encabezado del documento.
+
+Buscar prioritariamente:
 
 - TERMINALES DEL PERÚ
 - TERMINALES DEL PERU
 - TDP
+- TERMINALES DEL PERÚ S.A.
+- TERMINALES DEL PERU S.A.
+- TERMINALES DEL PERÚ S.A.C.
+- TERMINALES DEL PERU S.A.C.
 
-devolver obligatoriamente:
+Si aparece cualquiera de esos textos o el logotipo de TDP, devolver:
 
 "empresaCliente": "TERMINALES DEL PERÚ"
 
-aunque el proveedor sea otra empresa.
+Nunca utilizar el proveedor como empresa cliente.
 
-NO devolver el proveedor como empresa cliente.
+Si no existe ningún nombre de empresa en el encabezado devolver null.
 
 ### Proveedor
 
 Extraer la empresa que ejecuta el servicio.
 
-### Proyecto
+### Negocio / Operación
 
-Extraer el proyecto exactamente como aparece en el documento.
+Buscar exactamente el campo:
+
+Negocio / Operación
+
+o
+
+Negocio
+
+u
+
+Operación
+
+Extraer únicamente el valor asociado.
 
 Ejemplo:
 
 "MANTENIMIENTO DE AMARRADEROS"
 
-No utilizar el nombre del archivo.
+Nunca utilizar la descripción del servicio como negocio.
 
-No resumir.
+### Proyecto
 
-No utilizar el nombre del archivo.
+El campo "proyecto" corresponde al nombre del proyecto o servicio principal.
 
-Si no existe devolver null.
+Orden de prioridad:
 
-### Descripción
+1. Si existe un campo llamado:
+   - Proyecto
+   - Nombre del proyecto
+   - Proyecto / Servicio
+   utilizar ese valor.
 
-Extraer la descripción exactamente como aparece debajo del proyecto.
+2. Si el documento pertenece a TERMINALES DEL PERÚ (TDP) y NO existe una columna "Proyecto", utilizar EXCLUSIVAMENTE el valor del campo "Negocio / Operación" como proyecto.
 
 Ejemplo:
 
-"MANTENIMIENTO SEMESTRAL DE AMARRADERO SALAVERRY 2025 (SERVICIO CULMINADO)"
+Negocio / Operación:
+MANTENIMIENTO DE AMARRADEROS
+
+↓
+
+"proyecto": "MANTENIMIENTO DE AMARRADEROS"
+
+Nunca utilizar la columna "Descripción" como proyecto.
+
+3. Nunca utilizar:
+   - Negocio
+   - Operación
+   - Número de Orden de Servicio
+   - Fechas
+   - Nombre del archivo
+
+Conservar el texto completo sin resumir.
+
+Nunca utilizar:
+
+- el nombre del archivo
+- las fechas de ejecución
+- el negocio u operación
 
 No resumir.
 
-No modificar mayúsculas.
+### Descripción
+
+El campo "descripcion" corresponde únicamente a la descripción del servicio ejecutado.
+
+En documentos de TERMINALES DEL PERÚ (TDP), la descripción SIEMPRE debe obtenerse de la columna "Descripción".
+
+Si la descripción ocupa varias líneas, unir todas las líneas en un solo texto respetando el orden.
+
+Ejemplo:
+
+MANTENIMIENTO SEMESTRAL DE AMARRADERO
+SALAVERRY 2026 (SERVICIO CULMINADO)
+
+↓
+
+"MANTENIMIENTO SEMESTRAL DE AMARRADERO SALAVERRY 2026 (SERVICIO CULMINADO)"
+
+Nunca utilizar el campo "Negocio / Operación" como descripción.
+
+Orden de prioridad:
+
+1. Si existe una columna llamada:
+   - Descripción
+   - Servicio
+   - Concepto
+   - Detalle
+   - Actividad
+
+   devolver exactamente ese texto.
+
+2. Si el documento no posee una descripción independiente y únicamente existe el nombre del proyecto, utilizar el mismo texto del proyecto.
+
+Nunca utilizar:
+
+- Fechas
+- Periodos
+- Negocio
+- Operación
+- Orden de Servicio
+
+como descripción.
+
+
+## REGLAS ESPECIALES PARA DOCUMENTOS TDP
+
+Cuando el documento pertenezca a TERMINALES DEL PERÚ:
+
+Antes de extraer cualquier dato:
+
+1. Identificar completamente la tabla.
+2. Identificar todos los encabezados.
+3. Asociar cada valor únicamente con su encabezado.
+
+Está prohibido utilizar la cercanía visual entre textos.
+
+La extracción debe seguir exactamente esta correspondencia:
+
+empresaCliente -> encabezado del documento (TERMINALES DEL PERÚ)
+
+proyecto -> columna Proyecto. Si no existe, columna Descripción.
+
+descripcion -> columna Descripción.
+
+numeroOrdenServicio -> columna Orden de Servicio u OC.
+
+montoValorizado -> campo "Monto valorizado en la fecha".
+
+fechaValorizacion -> fecha de emisión o firma.
+
+Nunca intercambiar Proyecto y Descripción.
+
+Nunca utilizar el Negocio como Proyecto.
+
+Nunca utilizar la Fecha como Descripción.
+
+Nunca utilizar el nombre del archivo como Proyecto.
 
 ### Número de Orden de Servicio
 
@@ -154,6 +340,18 @@ Si existen ambos campos:
 
 SIEMPRE devolver el valor de "Monto valorizado en la fecha", aunque sean diferentes.
 
+En valorizaciones de TDP normalmente existen tres montos:
+
+- Monto pactado de la OS
+- Monto valorizado en la fecha
+- Monto total valorizado
+
+El campo "montoValorizado" SIEMPRE corresponde a:
+
+Monto valorizado en la fecha.
+
+Nunca devolver el monto pactado ni el monto total valorizado.
+
 ### Fecha
 
 Extraer la fecha principal indicada en la valorización y convertirla al formato YYYY-MM-DD.
@@ -166,4 +364,53 @@ Ejemplo:
 
 2026-05-29
 
+Si existen varias fechas en el documento, utilizar la fecha de firma o emisión de la valorización.
+
+Nunca utilizar la fecha de ejecución del servicio como fechaValorizacion.
+
+### Calidad del documento
+
+Si el documento proviene de OCR y algunos caracteres no son perfectamente legibles, utiliza el contexto del documento para reconstruir el texto cuando sea razonablemente evidente.
+
+Si un campo no puede determinarse con suficiente confianza, devuelve null.
+
+Nunca inventes información que no esté presente en el documento.
+
+### Valores nulos
+
+Si un campo no existe realmente en el documento o no puede identificarse con suficiente certeza, devolver null.
+
+No reutilices información de otro campo para completar un campo faltante.
+
+Cada campo debe corresponder únicamente a la información indicada por su propio encabezado.
+
+## IDENTIFICADOR DE LA VALORIZACIÓN
+
+El documento puede contener códigos internos, números de formato, correlativos o identificadores de otras empresas.
+
+Está PROHIBIDO utilizar cualquier código encontrado en el documento como identificador de la valorización.
+
+Ejemplos que NO deben utilizarse:
+
+- REP-...
+- REPSOL-...
+- UE-CA-FR-011
+- Códigos de formato
+- Números de control
+- Cualquier identificador interno del documento
+
+Para TERMINALES DEL PERÚ (TDP):
+
+El identificador de la valorización será generado posteriormente por el sistema con el formato:
+
+VAL-AAAA-XX
+
+Ejemplos:
+
+VAL-2026-01
+VAL-2026-02
+
+Por lo tanto, el modelo NO debe extraer ningún ID del documento ni inferir uno.
+
+Si el documento contiene un código perteneciente a otra empresa (por ejemplo REPSOL), ignóralo completamente.
 `;

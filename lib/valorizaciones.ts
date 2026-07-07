@@ -21,6 +21,25 @@ const os =
         data.numeroOrdenServicio
       );
 
+console.log("HASH:", data.hashArchivo);
+
+      const [duplicado]: any = await pool.query(
+  `
+  SELECT id
+  FROM valorizaciones
+  WHERE hash_archivo = ?
+  LIMIT 1
+  `,
+  [data.hashArchivo]
+);
+
+console.log("DUPLICADO:", duplicado);
+
+if (duplicado.length > 0) {
+  console.log("La valorización ya existe. Se omite el registro.");
+  return;
+}
+
   const fechaBase =
   data.fechaValorizacion ||
   data.fechaEjecucion ||
@@ -33,29 +52,37 @@ let codigo = data.codigo;
 
 if (!codigo) {
 
+  const cliente =
+    data.empresaCliente ??
+    data.proveedor ??
+    "SIN PROVEEDOR";
+
   const [rows]: any = await pool.query(
     `
     SELECT codigo
     FROM valorizaciones
     WHERE codigo LIKE ?
+      AND proveedor = ?
     ORDER BY id DESC
     LIMIT 1
     `,
-    [`VAL-${anio}-%`]
+    [
+      `VAL-${anio}-%`,
+      cliente
+    ]
   );
 
   let correlativo = 1;
 
   if (rows.length > 0) {
 
-    const ultimo =
-      rows[0].codigo;
+    const ultimo = rows[0].codigo;
 
-    const partes =
-      ultimo.split("-");
+    const partes = ultimo.split("-");
 
-    correlativo =
-      Number(partes[2]) + 1;
+    if (partes.length >= 3) {
+      correlativo = Number(partes[2]) + 1;
+    }
 
   }
 
@@ -100,10 +127,12 @@ respaldo_nombre,
       respaldo_onedrive_id,
       respaldo_url,
 
-      observaciones
+      
+observaciones,
+hash_archivo
 
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
 
@@ -155,7 +184,9 @@ os?.webUrl ?? null,
 
 os
   ? null
-  : "Documentos incompletos"
+  : "Documentos incompletos",
+
+data.hashArchivo
 
     ]
   );
@@ -163,7 +194,7 @@ os
   const valorizacionId =
   result.insertId;
 
-if (!os) {
+if (esRepsol && !os) {
 
   await pool.query(
     `
@@ -185,7 +216,7 @@ if (!os) {
 
       "SISTEMA",
 
-      "Documentos incompletos",
+      "Documentos incompletos para REPSOL",
 
       "Sistema"
     ]

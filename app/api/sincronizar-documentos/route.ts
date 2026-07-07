@@ -736,6 +736,7 @@ correlativoCxp++;
   descripcion,
 
   monto,
+  moneda,
   saldo,
 
   fecha_emision,
@@ -750,7 +751,7 @@ correlativoCxp++;
   archivo_url
 
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
   [
   codigo,
@@ -764,9 +765,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   json.descripcionServicio,
 
   json.montoTotal,
-  json.montoTotal,
 
-  json.fechaEmision,
+json.moneda ?? "SOLES",
+
+json.montoTotal,
+
+json.fechaEmision,
 
   json.fechaVencimiento,
 

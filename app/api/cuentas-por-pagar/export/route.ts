@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
 
     const year = searchParams.get("year")
     const month = searchParams.get("month")
+    const moneda =
+  searchParams.get("moneda") ?? "SOLES"
 
     if (!year || !month) {
       return NextResponse.json(
@@ -23,26 +25,24 @@ export async function GET(request: NextRequest) {
   pr.razon_social AS proveedor,
   cxp.numero_documento,
 
-  CASE
-    WHEN cxp.detraccion = 1 THEN 'Sí'
-    ELSE 'No'
-  END AS detraccion,
+  cxp.detraccion,
 
   cxp.forma_pago,
         cxp.categorizacion,
         cxp.monto,
-        cxp.saldo,
-        cxp.estado,
+cxp.moneda,
+cxp.saldo,
         cxp.fecha_emision,
         cxp.fecha_vencimiento
       FROM cuentas_por_pagar cxp
       LEFT JOIN proveedores pr
         ON cxp.proveedor_id = pr.id
       WHERE YEAR(cxp.fecha_emision) = ?
-      AND MONTH(cxp.fecha_emision) = ?
-      ORDER BY cxp.fecha_emision ASC
+AND MONTH(cxp.fecha_emision) = ?
+AND cxp.moneda = ?
+ORDER BY cxp.fecha_emision ASC
       `,
-      [year, month]
+      [year, month, moneda]
     )
 
     const workbook = new ExcelJS.Workbook()
@@ -188,11 +188,13 @@ rows.forEach((row: any) => {
 excelRow.getCell(8).value =
   Number(row.saldo || 0)
 
-excelRow.getCell(7).numFmt =
-  '"S/ " #,##0.00'
+const formatoMoneda =
+  row.moneda === "DOLARES"
+    ? '"US$ " #,##0.00'
+    : '"S/ " #,##0.00'
 
-excelRow.getCell(8).numFmt =
-  '"S/ " #,##0.00'
+excelRow.getCell(7).numFmt = formatoMoneda
+excelRow.getCell(8).numFmt = formatoMoneda
 
   excelRow.eachCell((cell) => {
   cell.border = {
@@ -241,8 +243,13 @@ const totalSaldo = rows.reduce(
     acc + Number(row.saldo || 0),
   0
 )
-worksheet.getColumn(7).numFmt = '"S/ " #,##0.00'
-worksheet.getColumn(8).numFmt = '"S/ " #,##0.00'
+const formatoGeneral =
+  moneda === "DOLARES"
+    ? '"US$ " #,##0.00'
+    : '"S/ " #,##0.00'
+
+worksheet.getColumn(7).numFmt = formatoGeneral
+worksheet.getColumn(8).numFmt = formatoGeneral
 
 worksheet.getColumn(10).numFmt = "dd/mm/yyyy"
 worksheet.getColumn(11).numFmt = "dd/mm/yyyy"
@@ -315,7 +322,7 @@ worksheet.views = [
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition":
-          `attachment; filename=SEAMAR_CXP_${nombreMes}_${year}.xlsx`
+          `attachment; filename=SEAMAR_CXP_${moneda}_${nombreMes}_${year}.xlsx`
       }
     })
   } catch (error) {

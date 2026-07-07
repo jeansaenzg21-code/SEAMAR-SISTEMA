@@ -97,6 +97,13 @@ const json = await procesarDocumento(
 
 console.log(json);
 
+console.log("==================================");
+console.log("ARCHIVO:", archivoCompleto.nombre);
+console.log("TIPO:", json.tipoDocumento);
+console.log("CLIENTE:", json.cliente);
+console.log("PROYECTO:", json.proyecto);
+console.log("==================================");
+
 const esValorizacion =
   json.tipoDocumento?.toLowerCase() ===
   "valorizacion" ||

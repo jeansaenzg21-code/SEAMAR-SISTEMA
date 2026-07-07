@@ -499,21 +499,21 @@ const abrirDetalle = async (item: Approval) => {
     </div>
 
     <div className="space-y-3">
-      <p className="text-xs font-se mibold tracking-widest text-muted-foreground">
-        <DocumentosPreview documentos={selectedApproval?.documentos} />
-      </p>
+  <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+    DOCUMENTOS
+  </p>
 
-      {selectedApproval?.documentos &&
-selectedApproval.documentos.length > 0 ? (
-  <div className="space-y-2">
+  {selectedApproval?.documentos &&
+  selectedApproval.documentos.length > 0 ? (
     <DocumentosPreview documentos={selectedApproval.documentos} />
-  </div>
-) : (
-  <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-    Sin documentos adjuntos
-  </div>
-)}
+  ) : (
+    <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+      Sin documentos adjuntos
     </div>
+  )}
+</div>
+
+    
 
     <div className="space-y-4 pt-4">
       <p className="text-xs font-semibold tracking-widest text-muted-foreground">

@@ -4,7 +4,8 @@ import * as XLSX from "xlsx";
 import { FACTURA_PROMPT } from "./ai/factura-prompt";
 import { VALORIZACION_PROMPT } from "./ai/valorizacion-prompt";
 import { CONTRATO_PROMPT } from "./ai/contrato-prompt";
-
+import { leerPdfConOCR } from "./pdf-ocr";
+import crypto from "crypto";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
@@ -85,9 +86,15 @@ export async function procesarDocumento(
   buffer: Buffer,
   nombreArchivo: string,
   tipo: "factura" | "valorizacion" | "contrato"
+  
 ) {
 
   const nombre = nombreArchivo.toLowerCase();
+
+  const hashArchivo = crypto
+  .createHash("sha256")
+  .update(buffer)
+  .digest("hex");
 
 const esExcel =
   nombre.endsWith(".xlsx") ||
@@ -110,11 +117,30 @@ const esPdf =
 console.log("ES ESCANEADO:", esEscaneado);
 console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
-  if (esEscaneado) {
+  if (esPdf && esEscaneado) {
+
+  console.log(
+    `PDF escaneado detectado: ${nombreArchivo}`
+  );
+
+  try {
+
+    textoDocumento = await leerPdfConOCR(buffer);
+
     console.log(
-      `PDF escaneado detectado: ${nombreArchivo}`
+      `OCR terminó correctamente. Caracteres: ${textoDocumento.length}`
     );
+
+  } catch (error) {
+
+    console.error(
+      "Error ejecutando OCR:",
+      error
+    );
+
   }
+
+}
 
   let ultimoError: any;
 
@@ -129,8 +155,13 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
       const prompt = obtenerPrompt(tipo);
 
       console.log("================================");
-console.log(textoDocumento);
+console.log("LONGITUD DEL TEXTO:", textoDocumento.length);
+console.log(textoDocumento.substring(0, 1000));
 console.log("================================");
+
+console.log("========== TEXTO EXTRAÍDO ==========");
+console.log(textoDocumento);
+console.log("====================================");
 
 const response = await openai.responses.create({
   model: "gpt-5-mini",
@@ -146,11 +177,18 @@ ${textoDocumento}
 });
 
 
-      return parsearJson(
+      const resultado = parsearJson(
   response.output_text ?? "{}"
-
-
 );
+
+console.log("==================================");
+console.log("JSON DEVUELTO POR OPENAI");
+console.log(JSON.stringify(resultado, null, 2));
+console.log("==================================");
+
+resultado.hashArchivo = hashArchivo;
+
+return resultado;
 
     } catch (error: any) {
 

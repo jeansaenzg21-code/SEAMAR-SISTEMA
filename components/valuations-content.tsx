@@ -105,6 +105,7 @@ interface ApiValorizacionItem {
   archivo_nombre?: string
   archivo_url?: string
   observacion_sistema?: string
+  fecha_fin?: string | null
   [key: string]: unknown
 }
 
@@ -186,7 +187,7 @@ const EMPRESA_DOCUMENTOS_REQUERIDOS: Array<{
 /** Etiqueta de la columna "orden de servicio" según la vista de cliente activa. */
 const ORDEN_SERVICIO_LABEL: Record<Extract<VistaCliente, "repsol" | "tdp">, string> = {
   repsol: "N° O/T",
-  tdp: "N° OC",
+  tdp: "N° OS",
 }
 
 /* ============================================================================
@@ -214,7 +215,7 @@ function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
   return {
     id: item.id,
     codigo: item.codigo || "",
-    projectName: item.proyecto_nombre || "",
+    projectName: item.proyecto_nombre || item.negocio_operacion || "",
     client: item.proveedor || "",
     orden_servicio: item.numero_orden_servicio || "",
     type: item.negocio_operacion || "",
@@ -229,6 +230,7 @@ function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
     archivo_nombre: item.archivo_nombre || "",
     archivo_url: item.archivo_url || "",
     observacion_sistema: item.observacion_sistema || "",
+    fecha_fin: item.fecha_fin || null,
   }
 }
 
@@ -856,8 +858,14 @@ function ValorizacionesTableComponent({
                   <td className="px-5 py-4 whitespace-nowrap align-top">{item.date || "-"}</td>
 
                   <td className="px-5 py-4 whitespace-nowrap align-top">
-                    {item.fecha_fin ? new Date(item.fecha_fin).toLocaleDateString("es-PE") : "-"}
-                  </td>
+  {item.status === "approved" && item.fecha_fin
+    ? new Date(item.fecha_fin).toLocaleDateString("es-PE", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+})
+    : "-"}
+</td>
 
                   <td className="px-5 py-4 min-w-[120px] whitespace-nowrap align-top">
                     <StatusBadge status={item.status} />
