@@ -62,6 +62,7 @@ function StatusBadge({ status }: { status: Status }) {
 export function ApprovalsContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [approvals, setApprovals] = useState<Approval[]>([])
+  const [approvalFiles, setApprovalFiles] = useState<File[]>([])
   useEffect(() => {
 
   async function cargarAprobaciones() {
@@ -274,6 +275,7 @@ const abrirDetalle = async (item: Approval) => {
               <p><span className="text-muted-foreground">Fecha:</span> {item.submittedDate}</p>
             </div>
           </div>
+
 
           <div className="flex gap-2">
             <Button
@@ -644,6 +646,40 @@ const abrirDetalle = async (item: Approval) => {
         </div>
       </div>
     </div>
+
+    {/* DOCUMENTOS DE APROBACIÓN */}
+<div className="mt-4 rounded-lg border p-3 space-y-3">
+  <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+    DOCUMENTOS DE APROBACIÓN
+  </p>
+
+  <Input
+    type="file"
+    multiple
+    onChange={(e) => {
+  setApprovalFiles(
+    e.target.files
+      ? Array.from(e.target.files)
+      : []
+  )
+}}
+  />
+
+  <Button
+  size="sm"
+  className="w-full"
+  onClick={() => {
+    console.log(approvalFiles)
+    alert(`${approvalFiles.length} archivo(s) seleccionado(s)`)
+  }}
+>
+  Adjuntar documento
+</Button>
+
+  <div className="space-y-2">
+    {/* aquí aparecerán los documentos guardados */}
+  </div>
+</div> 
 
     <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
       <Button

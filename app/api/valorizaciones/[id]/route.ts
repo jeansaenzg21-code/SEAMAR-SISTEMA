@@ -58,12 +58,12 @@ for (const documento of documentos as any[]) {
   const bytes = await documento.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const archivoSubido = await subirArchivoAOneDrive(
-    documento.name,
-    buffer,
-    ONEDRIVE_FOLDERS.VALORIZACIONES,
-    token
-  );
+const archivoSubido = await subirArchivoAOneDrive(
+  documento.name,
+  buffer,
+  ONEDRIVE_FOLDERS.DOCUMENTOS_RESPALDO,
+  token
+);
 
   await pool.query(
     `
