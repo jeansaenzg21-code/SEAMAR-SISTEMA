@@ -3,6 +3,7 @@ import pool from "@/lib/mysql";
 import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive";
 import { Buffer } from "buffer";
 import { getAccessToken } from "@/lib/msal";
+import { obtenerSesion } from "@/lib/session";
 
 
 
@@ -22,6 +23,10 @@ export async function GET() {
         v.*,
         p.nombre AS proyecto_nombre,
         p.tipo AS proyecto_tipo,
+        v.creado_por,
+v.enviado_revision_por,
+v.aprobado_por,
+v.observado_por,
         (
           SELECT COUNT(*)
           FROM valorizacion_documentos vd
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
   try {
 
     const token = await getAccessToken();
+    const sesion = await obtenerSesion();
     const formData = await request.formData()
 
     const documentos =
@@ -137,10 +143,11 @@ export async function POST(request: Request) {
         fecha_ejecucion,
         encargado,
         estado,
+        creado_por,
         archivo_nombre,
         respaldo_nombre
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         proveedor,
@@ -155,6 +162,7 @@ export async function POST(request: Request) {
         fecha_ejecucion || null,
         encargado,
         "BORRADOR",
+        sesion?.nombre || sesion?.correo || "Sistema",
         documentos.map((doc) => doc.name).join(", "),
         documentos.map((doc) => doc.name).join(", "),
       ]

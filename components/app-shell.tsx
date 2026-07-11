@@ -85,6 +85,8 @@ export function Sidebar() {
   clients: true,
   providers: true,
 })
+
+
 const toggleSection = (section: keyof typeof expandedSections) => {
   setExpandedSections((prev) => ({
     ...prev,
@@ -95,6 +97,9 @@ const toggleSection = (section: keyof typeof expandedSections) => {
 
 
   return (
+    <>
+
+
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
@@ -322,7 +327,8 @@ const toggleSection = (section: keyof typeof expandedSections) => {
         </DropdownMenu>
       </div>
     </aside>
-  )
+  </>
+)
 }
 
 export function Header() {
@@ -357,8 +363,115 @@ export function Header() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+
+const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
+const [valorizacionesPendientes, setValorizacionesPendientes] = useState(0)
+
+useEffect(() => {
+  async function verificarPendientes() {
+    const sesionResponse = await fetch("/api/auth/session");
+
+    if (!sesionResponse.ok) return;
+
+    const sesion = await sesionResponse.json();
+
+    if (sesion.rol !== "SUPERVISOR") return;
+
+    const pendientesResponse = await fetch(
+      "/api/valorizaciones/pendientes"
+    );
+
+    if (!pendientesResponse.ok) return;
+
+    const data = await pendientesResponse.json();
+
+    if (
+  data.pendientes > 0 &&
+  !sessionStorage.getItem("recordatorio_supervisor_mostrado")
+) {
+  setValorizacionesPendientes(data.pendientes);
+  setMostrarRecordatorio(true);
+
+  sessionStorage.setItem(
+    "recordatorio_supervisor_mostrado",
+    "true"
+  );
+}
+  }
+
+  verificarPendientes();
+}, []);
+
+
+ 
+
   return (
-    <div className="flex min-h-screen overflow-x-hidden">
+  <>
+  {mostrarRecordatorio && (
+<div
+  className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+  style={{
+    zIndex: 999999999,
+    pointerEvents: "auto",
+  }}
+>
+   <div
+  className="w-[520px] rounded-2xl border border-blue-500/20 bg-zinc-900/95 backdrop-blur-xl shadow-2xl p-8"
+  style={{
+    position: "relative",
+    zIndex: 1000000000,
+  }}
+>
+      <div className="flex flex-col items-center text-center">
+
+        <div className="mb-4 text-3xl">
+          🔔
+        </div>
+
+        <h2 className="text-2xl font-semibold text-white">
+          Recordatorio de aprobación
+        </h2>
+
+        <p className="mt-5 text-lg text-zinc-300">
+          Tiene{" "}
+          <span className="text-2xl font-bold text-blue-400">
+            {valorizacionesPendientes}
+          </span>{" "}
+          valorizaciones pendientes de aprobación.
+        </p>
+
+        <p className="mt-3 text-sm text-zinc-500">
+          Revise las valorizaciones pendientes para continuar el flujo operativo.
+        </p>
+
+        <div className="mt-8 flex gap-4">
+          <button
+  type="button"
+  className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 transition-all"
+  onClick={() => {
+    setMostrarRecordatorio(false);
+    window.location.href = "/approvals";
+  }}
+>
+  Revisar ahora
+</button>
+
+          <button
+  type="button"
+  className="rounded-lg border border-zinc-700 px-6 py-2 text-zinc-300 hover:bg-zinc-800 transition-all"
+  onClick={() => {
+    setMostrarRecordatorio(false);
+  }}
+>
+  Más tarde
+</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
+     <div className="flex min-h-screen overflow-x-hidden">
   <Sidebar />
   <div className="flex flex-1 min-w-0 flex-col pl-64 overflow-x-hidden">
     <Header />
@@ -366,6 +479,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {children}
     </main>
       </div>
-    </div>
-  )
+        </div>
+  </>
+)
 }

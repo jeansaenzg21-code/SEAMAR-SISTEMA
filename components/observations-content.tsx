@@ -411,10 +411,7 @@ documentos_respuesta:
                   <Button onClick={async () => {
   if (!selectedObservation) return
 
-  const data = localStorage.getItem("fincontrol_valuations")
-  if (!data) return
 
-  const valuations = JSON.parse(data)
 
   let documentoUrl = ""
 
@@ -466,22 +463,7 @@ documentosSubidos.push({
 
 }
 
-  const updatedValuations = valuations.map((item: any) =>
-    String(item.id) === String(selectedObservation.valuation)
-      ? {
-    ...item,
-    status: "resolved",
-    respuesta_observacion: response,
-    documentos_respuesta:
- documentosSubidos
-  }
-      : item
-  )
 
-  localStorage.setItem(
-    "fincontrol_valuations",
-    JSON.stringify(updatedValuations)
-  )
 
 
 
@@ -493,8 +475,9 @@ documentosSubidos.push({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      observation_status: "resolved",
-    }),
+  observation_status: "resolved",
+  response: response,
+}),
   }
 )
 

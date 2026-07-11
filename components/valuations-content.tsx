@@ -70,6 +70,10 @@ interface Valuation {
   documentos_completos: number
   documentos_adjuntos?: number
   documentos?: DocumentoValorizacion[]
+  creado_por?: string
+enviado_revision_por?: string
+aprobado_por?: string
+observado_por?: string
 }
 
 interface Cliente {
@@ -106,7 +110,12 @@ interface ApiValorizacionItem {
   archivo_url?: string
   observacion_sistema?: string
   fecha_fin?: string | null
+  creado_por?: string
+  enviado_revision_por?: string
+  aprobado_por?: string
+  observado_por?: string
   [key: string]: unknown
+  
 }
 
 /** Campos editables del formulario de creación/edición. */
@@ -231,6 +240,10 @@ function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
     archivo_url: item.archivo_url || "",
     observacion_sistema: item.observacion_sistema || "",
     fecha_fin: item.fecha_fin || null,
+    creado_por: item.creado_por,
+enviado_revision_por: item.enviado_revision_por,
+aprobado_por: item.aprobado_por,
+observado_por: item.observado_por,
   }
 }
 
@@ -1290,6 +1303,8 @@ interface ValorizacionDetailDialogProps {
   onOpenChange: (open: boolean) => void
   valuation: Valuation | null
   enviarAObservado: (item: Valuation, comentario?: string) => Promise<boolean>
+  nombreUsuario: string
+rolUsuario: string
 }
 
 function ValorizacionDetailDialog({
@@ -1297,6 +1312,8 @@ function ValorizacionDetailDialog({
   onOpenChange,
   valuation,
   enviarAObservado,
+  nombreUsuario,
+  rolUsuario,
 }: ValorizacionDetailDialogProps) {
   const [comentarioObservacion, setComentarioObservacion] = useState("")
 
@@ -1355,22 +1372,48 @@ function ValorizacionDetailDialog({
 
           <div className="border-l pl-4 space-y-5">
             <div>
-              <p className="font-semibold">A. Rivas · SEAMAR</p>
-              <p className="text-sm text-muted-foreground">Creación de borrador</p>
-              <p className="text-xs text-muted-foreground">{valuation.date}</p>
-            </div>
+  <p className="font-semibold">
+    {valuation.creado_por || "Sistema"}
+  </p>
+  <p className="text-sm text-muted-foreground">
+    Creación de borrador
+  </p>
+  <p className="text-xs text-muted-foreground">
+    {valuation.date}
+  </p>
+</div>
 
-            <div>
-              <p className="font-semibold">{valuation.encargado || "Responsable"} · SEAMAR</p>
-              <p className="text-sm text-muted-foreground">Envió a cliente para revisión</p>
-              <p className="text-xs text-muted-foreground">En revisión</p>
-            </div>
+{valuation.status !== "draft" && (
+  <div>
+    <p className="font-semibold">
+      {valuation.enviado_revision_por || "Pendiente"}
+    </p>
 
-            <div>
-              <p className="font-semibold">Cliente · {valuation.client}</p>
-              <p className="text-sm text-muted-foreground">Pendiente de aprobación</p>
-              <p className="text-xs text-muted-foreground">—</p>
-            </div>
+    <p className="text-sm text-muted-foreground">
+      Envió a cliente para revisión
+    </p>
+
+    <p className="text-xs text-muted-foreground">
+      En revisión
+    </p>
+  </div>
+)}
+
+{valuation.status === "approved" && (
+  <div>
+    <p className="font-semibold">
+      {valuation.aprobado_por || "Pendiente"}
+    </p>
+
+    <p className="text-sm text-muted-foreground">
+      Valorización aprobada
+    </p>
+
+    <p className="text-xs text-muted-foreground">
+      {valuation.fecha_fin || "—"}
+    </p>
+  </div>
+)}
           </div>
         </div>
 
@@ -1434,6 +1477,8 @@ export function ValuationsContent() {
   } = useValorizaciones()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [rolUsuario, setRolUsuario] = useState("")
+const [nombreUsuario, setNombreUsuario] = useState("")
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
 
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -1448,7 +1493,24 @@ const pasosCompilacion = [
   "Analizando documentos con IA...",
   "Guardando valorizaciones..."
 ]
+useEffect(() => {
+  async function cargarSesion() {
+    const response = await fetch("/api/auth/session")
 
+    if (!response.ok) return
+
+    const data = await response.json()
+
+    setRolUsuario(data.rol)
+    setNombreUsuario(
+      data.nombre ||
+      data.user?.name ||
+      "Usuario"
+    )
+  }
+
+  cargarSesion()
+}, [])
   const abrirCreacion = useCallback(() => {
     setEditingValuation(null)
     setIsFormOpen(true)
@@ -1581,11 +1643,13 @@ const pasosCompilacion = [
       />
 
       <ValorizacionDetailDialog
-        open={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        valuation={selectedValuation}
-        enviarAObservado={enviarAObservado}
-      />
+  open={isDetailOpen}
+  onOpenChange={setIsDetailOpen}
+  valuation={selectedValuation}
+  enviarAObservado={enviarAObservado}
+  nombreUsuario={nombreUsuario}
+  rolUsuario={rolUsuario}
+/>
 {mostrarCompilacion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80">
           <div className="w-[480px] rounded-xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">

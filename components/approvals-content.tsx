@@ -34,7 +34,10 @@ type Approval = {
 archivo_respuesta_nombre?: string
 historial_observaciones?: any[]
 documentos?: any[]
-
+creado_por?: string
+enviado_revision_por?: string
+aprobado_por?: string
+observado_por?: string
 }
 
 const initialApprovals: Approval[] = []
@@ -63,7 +66,21 @@ export function ApprovalsContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [approvalFiles, setApprovalFiles] = useState<File[]>([])
+  const [rolUsuario, setRolUsuario] = useState("")
+  const [nombreUsuario, setNombreUsuario] = useState("")
   useEffect(() => {
+
+async function cargarSesion() {
+  const response = await fetch("/api/auth/session");
+
+  if (!response.ok) return;
+
+  const data = await response.json();
+
+  setRolUsuario(data.rol);
+  setNombreUsuario(data.nombre || data.user?.name || "Usuario");
+  console.log("ROL DEL USUARIO:", data.rol);
+}
 
   async function cargarAprobaciones() {
 
@@ -124,6 +141,10 @@ historial_observaciones:
   typeof v.historial_observaciones === "string"
     ? JSON.parse(v.historial_observaciones)
     : v.historial_observaciones || [],
+    creado_por: v.creado_por,
+enviado_revision_por: v.enviado_revision_por,
+aprobado_por: v.aprobado_por,
+observado_por: v.observado_por,
 
 documentos:
   typeof v.documentos === "string"
@@ -133,12 +154,13 @@ documentos:
         }));
 
     setApprovals(
-      approvalsData
-    );
+  approvalsData
+);
 
-  }
+}
 
-  cargarAprobaciones();
+cargarSesion();
+cargarAprobaciones();
 
 }, []);
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null)
@@ -515,47 +537,67 @@ const abrirDetalle = async (item: Approval) => {
   )}
 </div>
 
+    <div className="space-y-4 pt-4">
+  <p className="text-xs font-semibold tracking-widest text-muted-foreground">
+    LÍNEA DE APROBACIÓN
+  </p>
+
+  <div className="border-l pl-4 space-y-5"></div>
+
     
 
-    <div className="space-y-4 pt-4">
-      <p className="text-xs font-semibold tracking-widest text-muted-foreground">
-        LÍNEA DE APROBACIÓN
+  <div>
+    <p className="font-semibold">
+  {selectedApproval?.enviado_revision_por || "Pendiente"}
+</p>
+
+<p className="text-sm text-muted-foreground">
+  Valorización enviada a revisión
+</p>
+
+    <p className="text-xs text-muted-foreground">
+      {selectedApproval?.submittedDate || "—"}
+    </p>
+  </div>
+
+  <div>
+    <p className="font-semibold">
+  {selectedApproval?.observado_por ||
+   selectedApproval?.aprobado_por ||
+   selectedApproval?.enviado_revision_por ||
+   "Pendiente"}
+</p>
+
+<p className="text-sm text-muted-foreground">
+  Estado actual de la valorización
+</p>
+
+    <p className="text-xs text-muted-foreground">
+      {selectedApproval?.status === "under_review"
+        ? "En revisión"
+        : selectedApproval?.status === "observed"
+        ? "Observada"
+        : "Aprobada"}
+    </p>
+  </div>
+
+  {selectedApproval?.status === "approved" && (
+    <div>
+      <p className="font-semibold">
+  {selectedApproval?.aprobado_por || "Pendiente"}
+</p>
+
+<p className="text-sm text-green-500">
+  Valorización aprobada
+</p>
+
+      <p className="text-xs text-muted-foreground">
+        {selectedApproval?.submittedDate || "—"}
       </p>
-
-      <div className="border-l pl-4 space-y-5">
-        <div>
-          <p className="font-semibold">Sistema · SEAMAR</p>
-          <p className="text-sm text-muted-foreground">
-            Valorización enviada a aprobación
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {selectedApproval?.submittedDate || "—"}
-          </p>
-        </div>
-
-        <div>
-          <p className="font-semibold">
-            {selectedApproval?.submittedBy || "Responsable"} · SEAMAR
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Revisión pendiente
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Estado: {selectedApproval?.status || "—"}
-          </p>
-        </div>
-
-        <div>
-          <p className="font-semibold">
-            Aprobador · {selectedApproval?.client || "Cliente"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Pendiente de decisión final
-          </p>
-          <p className="text-xs text-muted-foreground">—</p>
-        </div>
-      </div>
     </div>
+  )}
+
+</div>
 
     <div className="space-y-3 pt-4">
       <p className="text-xs font-semibold tracking-widest text-muted-foreground">
@@ -682,14 +724,16 @@ const abrirDetalle = async (item: Approval) => {
 </div> 
 
     <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
-      <Button
-  className="flex-1 bg-green-600 hover:bg-green-700"
-  onClick={() => {
-    setIsApproveOpen(true)
-  }}
->
-  Aprobar
-</Button>
+      {rolUsuario === "SUPERVISOR" || rolUsuario === "ADMINISTRADOR" ? (
+  <Button
+    className="flex-1 bg-green-600 hover:bg-green-700"
+    onClick={() => {
+      setIsApproveOpen(true)
+    }}
+  >
+    Aprobar
+  </Button>
+) : null}
 
       <Button
   variant="outline"

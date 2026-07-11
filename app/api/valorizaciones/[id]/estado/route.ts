@@ -1,45 +1,83 @@
   import { NextResponse } from "next/server";
   import pool from "@/lib/mysql";
+  import { obtenerSesion } from "@/lib/session";
 
-  export async function PATCH(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
-  ) {
+ export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-      const { id } = await params;
 
-      const body = await req.json();
+     const { id } = await params;
 
-      const { estado, observacion } = body;
+const body = await req.json();
+console.log(body);
 
-      if (body.observation_status === "resolved") {
-    await pool.query(
-      `
-      UPDATE valorizacion_observaciones
-      SET
-        estado = 'RESUELTA',
-        fecha_resolucion = NOW()
-      WHERE valorizacion_id = ?
-        AND estado = 'EN_PROGRESO'
-      `,
-      [id]
-    );
+const { estado, observacion } = body;
 
-    await pool.query(
-      `
-      UPDATE valorizaciones
-      SET
-        estado = 'EN_REVISION',
-        fecha_revision = NOW()
-      WHERE id = ?
-      `,
-      [id]
-    );
+const esAprobacion = estado === "APROBADO";
 
-    return NextResponse.json({
-      success: true,
-    });
-  }
+const sesion = await obtenerSesion();
+
+if (
+  esAprobacion &&
+  (
+    !sesion ||
+    (
+      sesion.rol !== "ADMINISTRADOR" &&
+      sesion.rol !== "SUPERVISOR"
+    )
+  )
+) {
+  return NextResponse.json(
+    {
+      error: "No tiene permisos para aprobar valorizaciones."
+    },
+    {
+      status: 403
+    }
+  );
+}
+
+     if (body.observation_status === "resolved") {
+
+  console.log("ENTRO A RESOLVED", id, body);
+
+  
+
+  await pool.query(
+  `
+  UPDATE valorizacion_observaciones
+  SET
+    estado = 'RESUELTA',
+    fecha_resolucion = NOW()
+  WHERE valorizacion_id = ?
+  AND estado <> 'RESUELTA'
+  `,
+  [id]
+);
+
+
+
+
+  await pool.query(
+    `
+    UPDATE valorizaciones
+    SET
+      estado = 'EN_REVISION',
+      fecha_revision = NOW()
+    WHERE id = ?
+    `,
+    [id]
+  );
+
+  return NextResponse.json({
+    success: true,
+  });
+
+}
+
+
 
   if (body.observation_status === "in_progress") {
     await pool.query(
@@ -57,6 +95,8 @@
     return NextResponse.json({
       success: true,
     });
+
+    
   }
       if (!estado) {
     await pool.query(
@@ -86,6 +126,8 @@
         body.encargado,
         id,
       ]
+
+      
     );
 
     return NextResponse.json({
@@ -96,6 +138,12 @@
       let estadoFinal = estado;
 
       const observacionesSistema: string[] = [];
+
+      let enviadoRevisionPor = null;
+let aprobadoPor = null;
+let observadoPor = null;
+
+
 
       if (estado === "EN_REVISION") {
         const [rows]: any = await pool.query(
@@ -112,10 +160,6 @@
           `,
           [id]
         );
-
-      
-
-      
 
         const valorizacion = rows[0];
 
@@ -137,15 +181,37 @@
   const documentosRequeridos = esRepsol ? 4 : 3;
 
   if (Number(valorizacion?.documentos_adjuntos || 0) < documentosRequeridos) {
-    observacionesSistema.push(
-      `Documentos incompletos para ${esRepsol ? "REPSOL" : "TDP"}`
-    );
-  }
+  observacionesSistema.push(
+    `Documentos incompletos para ${esRepsol ? "REPSOL" : "TDP"}`
+  );
+}
 
-        if (observacionesSistema.length > 0) {
-          estadoFinal = "OBSERVADO";
-        }
+if (observacionesSistema.length > 0) {
+  estadoFinal = "OBSERVADO";
+}
+
       }
+
+if (estadoFinal === "EN_REVISION") {
+  enviadoRevisionPor =
+    sesion?.nombre || sesion?.correo || "Sistema";
+}
+
+if (estadoFinal === "APROBADO") {
+  aprobadoPor =
+    sesion?.nombre || sesion?.correo || "Sistema";
+}
+
+if (estadoFinal === "OBSERVADO") {
+  observadoPor =
+    sesion?.nombre || sesion?.correo || "Sistema";
+}
+
+
+
+
+
+
 
       const observacionFinal =
         observacionesSistema.length > 0
@@ -202,6 +268,29 @@ dias_para_aprobar =
       ELSE dias_para_aprobar
     END
 
+    ,
+
+enviado_revision_por =
+  CASE
+    WHEN ? = 'EN_REVISION'
+    THEN ?
+    ELSE enviado_revision_por
+  END,
+
+aprobado_por =
+  CASE
+    WHEN ? = 'APROBADO'
+    THEN ?
+    ELSE aprobado_por
+  END,
+
+observado_por =
+  CASE
+    WHEN ? = 'OBSERVADO'
+    THEN ?
+    ELSE observado_por
+  END
+
         WHERE id = ?
         `,
         [
@@ -213,6 +302,16 @@ dias_para_aprobar =
   estadoFinal,
   estadoFinal,
   estadoFinal,
+
+  estadoFinal,
+  enviadoRevisionPor,
+
+  estadoFinal,
+  aprobadoPor,
+
+  estadoFinal,
+  observadoPor,
+
   id,
 ]
       );
