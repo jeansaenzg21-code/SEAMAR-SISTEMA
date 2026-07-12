@@ -11,6 +11,8 @@ import {
 } from "@/lib/openai-documentos";
 import { enviarCorreo } from "@/lib/outlook";
 
+import { registrarActividad } from "@/lib/actividad";
+
 const TAMANO_LOTE = 10;
 
 export async function POST(
@@ -850,6 +852,38 @@ WHERE id = ?
   sincronizacionId
 ]
 );
+// ======================================================
+// ACTIVIDADES DEL SISTEMA
+// ======================================================
+
+if (nuevasCxc > 0) {
+  await registrarActividad({
+    tipo: "cxc",
+    accion: "importacion",
+    titulo: `Se registraron ${nuevasCxc} cuentas por cobrar`,
+    subtitulo: "Sincronización con OneDrive",
+  });
+}
+
+if (nuevasCxp > 0) {
+  await registrarActividad({
+    tipo: "cxp",
+    accion: "importacion",
+    titulo: `Se registraron ${nuevasCxp} cuentas por pagar`,
+    subtitulo: "Sincronización con OneDrive",
+  });
+}
+
+// ======================================================
+// LIMPIAR ACTIVIDADES ANTIGUAS
+// ======================================================
+
+await pool.query(`
+  DELETE
+  FROM actividad_sistema
+  WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+`);
+
 
 const asunto =
   "SEAMAR - Sincronización completada";

@@ -42,6 +42,18 @@ observado_por?: string
 
 const initialApprovals: Approval[] = []
 
+const formatearFecha = (fecha?: string) => {
+  if (!fecha) return "-"
+
+  return new Date(fecha).toLocaleString("es-PE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 function StatusBadge({ status }: { status: Status }) {
   const labels = {
     under_review: "En revisión",
@@ -294,7 +306,10 @@ const abrirDetalle = async (item: Approval) => {
               <p><span className="text-muted-foreground">Cliente:</span> {item.client}</p>
               <p><span className="text-muted-foreground">Monto:</span> {item.amount}</p>
               <p><span className="text-muted-foreground">Enviado por:</span> {item.submittedBy}</p>
-              <p><span className="text-muted-foreground">Fecha:</span> {item.submittedDate}</p>
+              <p>
+  <span className="text-muted-foreground">Fecha:</span>{" "}
+  {formatearFecha(item.submittedDate)}
+</p>
             </div>
           </div>
 
@@ -492,7 +507,7 @@ const abrirDetalle = async (item: Approval) => {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{selectedApproval?.client}</span>
           <span>·</span>
-          <span>{selectedApproval?.submittedDate}</span>
+          <span>{formatearFecha(selectedApproval?.submittedDate)}</span>
         </div>
       </div>
     </DialogHeader>
@@ -556,8 +571,8 @@ const abrirDetalle = async (item: Approval) => {
 </p>
 
     <p className="text-xs text-muted-foreground">
-      {selectedApproval?.submittedDate || "—"}
-    </p>
+  {formatearFecha(selectedApproval?.submittedDate)}
+</p>
   </div>
 
   <div>
@@ -592,8 +607,8 @@ const abrirDetalle = async (item: Approval) => {
 </p>
 
       <p className="text-xs text-muted-foreground">
-        {selectedApproval?.submittedDate || "—"}
-      </p>
+  {formatearFecha(selectedApproval?.submittedDate)}
+</p>
     </div>
   )}
 

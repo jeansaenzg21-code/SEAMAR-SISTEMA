@@ -16,7 +16,7 @@ export async function leerPdfConOCR(
   try {
     const texto = await new Promise<string>((resolve, reject) => {
       execFile(
-        "python",
+        process.env.PYTHON_EXECUTABLE || "py",
         ["python/pdf_ocr.py", archivoTemporal],
         {
           maxBuffer: 1024 * 1024 * 100,

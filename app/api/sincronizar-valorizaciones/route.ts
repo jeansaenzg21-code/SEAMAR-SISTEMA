@@ -5,7 +5,7 @@ import {
   descargarArchivo
 } from "@/lib/onedrive";
 import { guardarValorizacion } from "@/lib/valorizaciones";
-
+import { registrarActividad } from "@/lib/actividad";
 import { procesarDocumento } from "@/lib/openai-documentos";
 import { leerValorizacionesExcel } from "@/lib/excel-reader";
 
@@ -193,6 +193,25 @@ if (esValorizacion) {
 
 }
     }
+    if (nuevos > 0) {
+  await registrarActividad({
+    tipo: "valorizacion",
+    accion: "importacion",
+    titulo: `Se registraron ${nuevos} valorizaciones`,
+    subtitulo: "Sincronización con OneDrive",
+  });
+}
+
+// ======================================================
+// LIMPIAR ACTIVIDADES ANTIGUAS
+// ======================================================
+
+await pool.query(`
+  DELETE
+  FROM actividad_sistema
+  WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+`);
+
     return NextResponse.json({
       success: true,
       encontrados: lista.length,

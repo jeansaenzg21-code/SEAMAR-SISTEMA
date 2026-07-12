@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useEffect } from "react"
 import {
   LayoutDashboard,
 
@@ -26,8 +25,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import {
   CheckCircle,
@@ -42,9 +47,7 @@ const navigation = [
   { name: "Conciliación Bancaria", href: "/bank-reconciliation", icon: Landmark },
 ] 
 
-const aiSection = [
-  { name: "Subir Documento", href: "/upload", icon: Sparkles },
-]
+
 
 const analytics = [
   { name: "Centro de Costos", href: "/analytics/cost-centers", icon: BarChart3 },
@@ -70,10 +73,7 @@ const providersSection = [
     name: "Cuentas por Pagar",
     href: "/accounts-payable",
   },
-  {
-    name: "Conciliación Facturas",
-    href: "/invoice-reconciliation",
-  },
+
 ]
 
 export function Sidebar() {
@@ -138,35 +138,7 @@ const toggleSection = (section: keyof typeof expandedSections) => {
           })}
         </div>
 
-        {/* AI Section */}
-        <div className="pt-4">
-          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Inteligencia Artificial
-          </div>
-          <div className="space-y-1">
-            {aiSection.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                  <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
-                    IA
-                  </Badge>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
+        
 
         <div className="pt-4">
   <button
@@ -332,6 +304,42 @@ const toggleSection = (section: keyof typeof expandedSections) => {
 }
 
 export function Header() {
+  const [actividades, setActividades] = useState<any[]>([]);
+const [cargandoActividad, setCargandoActividad] = useState(true);
+
+useEffect(() => {
+
+  async function cargarActividad() {
+
+    try {
+
+      const response =
+        await fetch("/api/actividad?limit=20");
+
+      const data =
+        await response.json();
+
+      setActividades(
+        data.actividades || []
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+    } finally {
+
+      setCargandoActividad(false);
+
+    }
+
+  }
+
+  cargarActividad();
+
+}, []);
+
+console.log("ACTIVIDADES:", actividades); 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center gap-4">
@@ -341,10 +349,97 @@ export function Header() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" />
-        </Button>
+        <Popover
+  onOpenChange={async (open) => {
+
+    if (!open) return;
+
+    try {
+
+      await fetch("/api/actividad", {
+        method: "PATCH",
+      });
+
+      setActividades((prev) =>
+        prev.map((a) => ({
+          ...a,
+          leido: true,
+        }))
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+  }}
+>
+  <PopoverTrigger asChild>
+    <Button variant="ghost" size="icon" className="relative">
+      <Bell className="h-5 w-5" />
+
+      {actividades.some((a) => !a.leido) && (
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" />
+      )}
+    </Button>
+  </PopoverTrigger>
+
+  <PopoverContent align="end" className="w-96 p-0">
+
+    <div className="border-b px-4 py-3">
+      <h3 className="font-semibold">
+        Actividad reciente
+      </h3>
+
+      <p className="text-xs text-muted-foreground">
+        Últimos eventos del sistema
+      </p>
+    </div>
+
+    <div className="max-h-96 overflow-y-auto">
+
+      {actividades.length === 0 ? (
+
+        <div className="p-6 text-center text-sm text-muted-foreground">
+          No hay actividades recientes.
+        </div>
+
+      ) : (
+
+        actividades.map((actividad) => (
+
+          <div
+            key={actividad.id}
+            className="border-b px-4 py-3 hover:bg-muted/50"
+          >
+
+            <div className="font-medium text-sm">
+              {actividad.titulo}
+            </div>
+
+            {actividad.subtitulo && (
+
+              <div className="text-xs text-muted-foreground mt-1">
+                {actividad.subtitulo}
+              </div>
+
+            )}
+
+            <div className="text-[11px] text-muted-foreground mt-2">
+              {new Date(actividad.created_at).toLocaleString("es-PE")}
+            </div>
+
+          </div>
+
+        ))
+
+      )}
+
+    </div>
+
+  </PopoverContent>
+</Popover>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2">

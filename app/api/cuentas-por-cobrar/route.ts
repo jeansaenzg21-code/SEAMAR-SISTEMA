@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
-
 export async function GET() {
 
   try {
@@ -139,6 +138,7 @@ if (existente.length > 0) {
 
         ]
       );
+
 
     return NextResponse.json({
       success: true,
