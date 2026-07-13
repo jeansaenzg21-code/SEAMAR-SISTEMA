@@ -287,10 +287,10 @@ const toggleSection = (section: keyof typeof expandedSections) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Configuración
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/configuration")}>
+  <Settings className="mr-2 h-4 w-4" />
+  Configuración
+</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive">
               Cerrar sesión

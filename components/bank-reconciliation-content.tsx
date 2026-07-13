@@ -1282,6 +1282,70 @@ export default function BankReconciliationContent() {
     setActiveFilter(null);
   }, []);
 
+  const handleExport = async () => {
+
+  try {
+
+    const response = await fetch(
+      "/api/bank-reconciliation/export",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+
+          banco: extracto?.banco,
+
+          periodo: extracto?.periodo,
+
+          moneda: currency,
+
+          movimientos,
+
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error("No se pudo exportar.")
+    }
+
+    const blob = await response.blob()
+
+    const url =
+      window.URL.createObjectURL(blob)
+
+    const link =
+      document.createElement("a")
+
+    link.href = url
+
+    link.download =
+      `SEAMAR_CONCILIACION_${new Date()
+        .toISOString()
+        .slice(0,10)}.xlsx`
+
+    document.body.appendChild(link)
+
+    link.click()
+
+    link.remove()
+
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+
+    console.error(error)
+
+    alert(
+      "Error al exportar la conciliación."
+    )
+
+  }
+
+}
+
   const abrirHistorial = async (
   conciliacionId: string
 ) => {
@@ -1540,12 +1604,13 @@ const seleccionarCoincidencia = async (
               Ejecutar
             </button>
             <button
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm text-slate-400 hover:text-slate-200 hover:border-white/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={movimientos.length === 0}
-            >
-              <Download size={13} />
-              Exportar
-            </button>
+  onClick={handleExport}
+  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm text-slate-400 hover:text-slate-200 hover:border-white/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+  disabled={movimientos.length === 0}
+>
+  <Download size={13} />
+  Exportar
+</button>
           </div>
         </div>
       </div>

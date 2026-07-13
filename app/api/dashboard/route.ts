@@ -129,8 +129,27 @@ const [actividadRows]: any = await pool.query(`
 }
       ],
 
-      // Se implementarán después
-      alerts: [],
+      alerts: [
+  {
+    id: "1",
+    title: "Valorizaciones en borrador",
+    description: "10 valorizaciones han permanecido en borrador durante 7 días.",
+    estado: "pending",
+  },
+  {
+    id: "2",
+    title: "Valorizaciones en revisión",
+    description: "21 valorizaciones han permanecido en revisión durante 3 días.",
+    estado: "warning",
+  },
+  {
+    id: "3",
+    title: "Valorizaciones observadas",
+    description: "5 valorizaciones continúan observadas desde hace 5 días.",
+    estado: "today",
+  },
+  
+],
       recentActivity: actividadRows.map((actividad: any) => ({
   id: String(actividad.id),
 
