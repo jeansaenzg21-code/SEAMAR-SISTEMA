@@ -1477,6 +1477,15 @@ export function ValuationsContent() {
   } = useValorizaciones()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [mostrarImportador, setMostrarImportador] = useState(false)
+  const [empresaImportacion, setEmpresaImportacion] = useState("")
+  const [modoImportacion, setModoImportacion] = useState("individual")
+  const [archivoImportacion, setArchivoImportacion] = useState<File | null>(null)
+  const [anioImportacion, setAnioImportacion] = useState("2026")  
+  const [valorizacionesDetectadas, setValorizacionesDetectadas] = useState<string[]>([])
+const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<string[]>([])
+  const [hojasExcel, setHojasExcel] = useState<string[]>([])
+const [hojaSeleccionada, setHojaSeleccionada] = useState("")
   const [rolUsuario, setRolUsuario] = useState("")
 const [nombreUsuario, setNombreUsuario] = useState("")
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
@@ -1619,6 +1628,13 @@ useEffect(() => {
               <Plus className="h-4 w-4 mr-2" />
               Nueva Valorización
             </Button>
+           <Button
+  variant="outline"
+  onClick={() => setMostrarImportador(true)}
+>
+  <FileText className="h-4 w-4 mr-2" />
+  Importar Valorización
+</Button>
           </div>
         </div>
 
@@ -1708,7 +1724,278 @@ useEffect(() => {
           </div>
         </div>
       )}
+<Dialog
+  open={mostrarImportador}
+  onOpenChange={setMostrarImportador}
+>
+  <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>
+        Importar valorización
+      </DialogTitle>
+
+      <DialogDescription>
+        Seleccione la empresa y el archivo a importar.
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-4 py-4">
+
+      <div className="grid gap-2">
+        <Label>Empresa</Label>
+
+        <Select
+          value={empresaImportacion}
+          onValueChange={setEmpresaImportacion}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccionar empresa" />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="REPSOL">
+              REPSOL
+            </SelectItem>
+
+            <SelectItem value="TDP">
+              TERMINALES DEL PERÚ
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="grid gap-2">
+  <Label>Modo</Label>
+
+  <Select
+    value={modoImportacion}
+    onValueChange={setModoImportacion}
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="individual">
+        Individual
+      </SelectItem>
+
+      <SelectItem value="masivo">
+        Masivo
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+        <div className="grid gap-2">
+  <Label>Archivo</Label>
+
+  <Input
+  type="file"
+  accept={
+    empresaImportacion === "REPSOL"
+      ? ".xlsx,.xls"
+      : ".pdf"
+  }
+  onChange={(e) => {
+    const archivo = e.target.files?.[0]
+
+    if (archivo) {
+      setArchivoImportacion(archivo)
+    }
+    
+  }}
+/>
+{archivoImportacion && (
+  <p className="text-sm text-muted-foreground">
+    Archivo seleccionado: {archivoImportacion.name}
+  </p>
+)}
+{
+  valorizacionesDetectadas.length > 0 && (
+    <div className="space-y-3">
+
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">
+          {valorizacionesSeleccionadas.length} valorizaciones seleccionadas
+        </span>
+
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setValorizacionesSeleccionadas(
+                valorizacionesDetectadas
+              )
+            }
+          >
+            Todas
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setValorizacionesSeleccionadas([])
+            }
+          >
+            Limpiar
+          </Button>
+        </div>
+      </div>
+
+      <div className="
+        max-h-48
+        overflow-y-auto
+        border
+        border-border
+        rounded-lg
+        p-3
+        bg-muted/20
+        space-y-2
+      ">
+        {valorizacionesDetectadas.map((valor) => (
+          <label
+            key={valor}
+            className="
+              flex items-center
+              gap-2
+              px-2
+              py-2
+              rounded-md
+              hover:bg-muted/50
+              cursor-pointer
+            "
+          >
+            <input
+              type="checkbox"
+              checked={valorizacionesSeleccionadas.includes(valor)}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setValorizacionesSeleccionadas(prev => [...prev, valor])
+                } else {
+                  setValorizacionesSeleccionadas(
+                    prev => prev.filter(v => v !== valor)
+                  )
+                }
+              }}
+            />
+
+            <span className="text-sm">
+              {valor}
+            </span>
+          </label>
+        ))}
+      </div>
 
     </div>
   )
+}
+
+{
+  empresaImportacion === "REPSOL" &&
+  modoImportacion === "individual" &&
+  hojasExcel.length > 0 && (
+    <div className="grid gap-2">
+      <Label>Hoja</Label>
+
+      <Select
+        value={hojaSeleccionada}
+        onValueChange={setHojaSeleccionada}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+
+        <SelectContent>
+          {hojasExcel.map((hoja) => (
+            <SelectItem
+              key={hoja}
+              value={hoja}
+            >
+              {hoja}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+</div>
+      </div>
+
+    </div>
+
+    <DialogFooter>
+  <Button
+    variant="outline"
+    onClick={() => setMostrarImportador(false)}
+  >
+    Cancelar
+  </Button>
+
+  <Button
+    disabled={
+      !empresaImportacion ||
+      !archivoImportacion
+    }
+    onClick={async () => {
+
+  const formData = new FormData();
+
+  formData.append(
+    "empresa",
+    empresaImportacion
+  );
+
+  formData.append(
+  "modo",
+  modoImportacion
+);
+
+  formData.append(
+    "archivo",
+    archivoImportacion!
+  );
+
+  const response = await fetch(
+    "/api/importar-valorizacion",
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+const data = await response.json();
+
+console.log(data);
+
+if (data.hojas) {
+  setValorizacionesDetectadas(data.hojas)
+setValorizacionesSeleccionadas(data.hojas)
+
+  if (data.hojas.length > 0) {
+    setHojaSeleccionada(data.hojas[0])
+  }
+
+  return
+}
+formData.append(
+  "valorizaciones",
+  JSON.stringify(valorizacionesSeleccionadas)
+)
+
+alert(data.message)
+
+}}
+  >
+    Importar
+  </Button>
+  
+
+</DialogFooter>
+
+  </DialogContent>
+</Dialog>
+    </div>
+  )
+  
 }

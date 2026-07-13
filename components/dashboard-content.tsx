@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   DollarSign,
   Wallet,
   BarChart3,
@@ -181,13 +188,71 @@ const CLIENT_STATUS_CONFIG: Record<ClienteEstado, { label: string; dotColor: str
 }
 
 // =============================================================================
+// FILTROS EJECUTIVOS
+// =============================================================================
+
+// Moneda soportada por el selector de filtros. El backend recibirá este
+// valor tal cual vía query param `moneda`.
+export type Moneda = "SOLES" | "DOLARES"
+
+const MONEDA_OPTIONS: { value: Moneda; label: string }[] = [
+  { value: "SOLES", label: "Soles" },
+  { value: "DOLARES", label: "Dólares" },
+]
+
+// Los meses se listan en español, en orden calendario. El valor enviado al
+// backend es el número de mes en string ("1".."12") para evitar ambigüedad
+// de idioma/localización en la API.
+const MESES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+] as const
+
+const MES_OPTIONS = MESES.map((label, index) => ({
+  value: String(index + 1),
+  label,
+}))
+
+const anioActual =
+new Date().getFullYear()
+
+const ANIOS =
+Array.from(
+  { length: 5 },
+  (_, i) =>
+    String(anioActual - 2 + i)
+) 
+
+// =============================================================================
 // FORMATEO
 // =============================================================================
 
-function formatCurrency(value: number): string {
-  return `S/ ${value.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-}
+function formatCurrency(
+  value: number,
+  moneda: Moneda
+): string {
 
+  const simbolo =
+    moneda === "DOLARES"
+      ? "US$"
+      : "S/"
+
+  return `${simbolo} ${value.toLocaleString("es-PE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`
+
+}
 function formatRelativeTime(iso: string): string {
 
   const fecha = new Date(iso);
@@ -220,18 +285,39 @@ function formatRelativeTime(iso: string): string {
 }
 
 
-function KPICard({ kpi }: { kpi: DashboardKPI }) {
+function KPICard({
+  kpi,
+  moneda,
+}: {
+  kpi: DashboardKPI
+  moneda: Moneda
+}) {
   const config = getKpiConfig(kpi.id)
   const Icon = config.icon
+
   return (
     <Card className="bg-card border-border">
       <CardContent className="p-5">
-        <div className={cn("mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl", config.iconBg)}>
+        <div
+          className={cn(
+            "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl",
+            config.iconBg
+          )}
+        >
           <Icon className={cn("h-5 w-5", config.iconColor)} />
         </div>
-        <div className="text-2xl font-bold tracking-tight">{formatCurrency(kpi.value)}</div>
-        <p className="mt-1 text-sm text-muted-foreground">{kpi.description}</p>
-        <p className="mt-2 text-xs font-medium text-muted-foreground/80">{config.title}</p>
+
+        <div className="text-2xl font-bold tracking-tight">
+          {formatCurrency(kpi.value, moneda)}
+        </div>
+
+        <p className="mt-1 text-sm text-muted-foreground">
+          {kpi.description}
+        </p>
+
+        <p className="mt-2 text-xs font-medium text-muted-foreground/80">
+          {config.title}
+        </p>
       </CardContent>
     </Card>
   )
@@ -286,13 +372,19 @@ function ActivityItem({
   )
 }
 
-function ClientRow({ client }: { client: DashboardClient }) {
+function ClientRow({
+  client,
+  moneda,
+}: {
+  client: DashboardClient
+  moneda: Moneda
+}) {
   const statusConfig = CLIENT_STATUS_CONFIG[client.estado]
   return (
     <tr className="border-b border-border/60 last:border-0 hover:bg-secondary/30">
       <td className="py-3 pr-4 font-medium">{client.nombre}</td>
-      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.cxc)}</td>
-      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.valorizaciones)}</td>
+      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.cxc, moneda)}</td>
+      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.valorizaciones, moneda)}</td>
       <td className="py-3 pr-4 text-muted-foreground">{client.diasMora} días</td>
       <td className="py-3">
         <span className="inline-flex items-center gap-2">
@@ -310,11 +402,19 @@ export function DashboardContent() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Filtros ejecutivos: moneda, mes y año. Se inicializan con la moneda por
+  // defecto (SOLES) y con el mes/año actuales del sistema.
+  const [moneda, setMoneda] = useState<Moneda>("SOLES")
+  const [mes, setMes] = useState<string>(String(new Date().getMonth() + 1))
+  const [anio, setAnio] = useState<string>(String(new Date().getFullYear()))
+
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch("/api/dashboard")
+      const response = await fetch(
+        `/api/dashboard?moneda=${moneda}&mes=${mes}&anio=${anio}`
+      )
       if (!response.ok) {
         throw new Error(`Error ${response.status} al obtener el dashboard`)
       }
@@ -325,7 +425,7 @@ export function DashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [moneda, mes, anio])
 
   useEffect(() => {
     loadDashboard()
@@ -355,6 +455,51 @@ export function DashboardContent() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Barra de Filtros Ejecutivos */}
+      {/* Filtros de moneda, mes y año. Cada cambio dispara automáticamente
+          una nueva consulta a GET /api/dashboard con los query params
+          correspondientes (ver loadDashboard). No requiere botón "Buscar". */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Select value={moneda} onValueChange={(value) => setMoneda(value as Moneda)}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Moneda" />
+          </SelectTrigger>
+          <SelectContent>
+            {MONEDA_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            {MES_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={anio} onValueChange={setAnio}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Año" />
+          </SelectTrigger>
+          <SelectContent>
+            {ANIOS.map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {error && (
@@ -391,8 +536,14 @@ export function DashboardContent() {
         ) : dashboardData && dashboardData.kpis.length > 0 ? (
           [...dashboardData.kpis]
             .sort((a, b) => getKpiConfig(a.id).order - getKpiConfig(b.id).order)
-            .map((kpi) => <KPICard key={kpi.id} kpi={kpi} />)
-        ) : (
+            .map((kpi) => (
+      <KPICard
+        key={kpi.id}
+        kpi={kpi}
+        moneda={moneda}
+      />
+    ))
+) : (
           <div className="col-span-full py-8 text-center text-sm text-muted-foreground">
             No hay información disponible
           </div>
@@ -497,7 +648,11 @@ export function DashboardContent() {
                 </thead>
                 <tbody>
                   {dashboardData.topClients.map((client) => (
-                    <ClientRow key={client.id} client={client} />
+                    <ClientRow
+  key={client.id}
+  client={client}
+  moneda={moneda}
+/>
                   ))}
                 </tbody>
               </table>

@@ -23,22 +23,35 @@ export async function leerPdfConOCR(
         },
         (error, stdout, stderr) => {
           if (error) {
-            reject(stderr || error.message);
-            return;
-          }
+    console.log("ERROR PYTHON:", error);
+    console.log("STDERR:", stderr);
+    console.log("STDOUT:", stdout);
+
+    reject(stderr || stdout || error.message || String(error));
+    return;
+}
 
           try {
-            const resultado = JSON.parse(stdout);
+  const inicio = stdout.indexOf('{"ok"');
 
-            if (!resultado.ok) {
-              reject(resultado.error);
-              return;
-            }
+  if (inicio === -1) {
+    reject(stdout);
+    return;
+  }
 
-            resolve(resultado.texto ?? "");
-          } catch {
-            reject(stdout);
-          }
+  const json = stdout.substring(inicio);
+
+  const resultado = JSON.parse(json);
+
+  if (!resultado.ok) {
+    reject(resultado.error);
+    return;
+  }
+
+  resolve(resultado.texto ?? "");
+} catch {
+  reject(stdout);
+}
         }
       );
     });

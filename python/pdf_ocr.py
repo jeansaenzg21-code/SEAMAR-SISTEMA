@@ -8,10 +8,8 @@ from paddleocr import PaddleOCR
 
 ocr = PaddleOCR(
     use_angle_cls=True,
-    lang="es",
-    show_log=False
+    lang="es"
 )
-
 
 def extraer_texto(pdf_path):
     documento = fitz.open(pdf_path)
@@ -31,7 +29,9 @@ def extraer_texto(pdf_path):
             pix.n
         )
 
-        resultado = ocr.ocr(imagen, cls=True)
+        resultado = ocr.ocr(imagen)
+
+    
 
         pagina_texto = []
 
