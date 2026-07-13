@@ -439,59 +439,66 @@ await pool.query(
     `
     INSERT INTO cuentas_por_cobrar (
 
-      codigo,
+  codigo,
 
-      cliente_id,
+  cliente_id,
+  proyecto_id,
 
-      proyecto_id,
+  numero_factura,
 
-      numero_factura,
+  descripcion,
 
-      descripcion,
+  monto,
+  moneda,
+  detraccion,
+  forma_pago,
+  saldo,
 
-      monto,
-      saldo,
+  fecha_emision,
+  fecha_vencimiento,
 
-      fecha_emision,
-      fecha_vencimiento,
+  estado,
 
-      estado,
+  archivo_onedrive_id,
+  archivo_nombre,
+  archivo_url
 
-      archivo_onedrive_id,
-      archivo_nombre,
-      archivo_url
-
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
+  codigo,
 
-      codigo,
+  clienteId,
 
-      clienteId,
+  proyectoId,
 
-      proyectoId,
+  json.numeroFactura,
 
-      json.numeroFactura,
+  json.descripcionServicio,
 
-      json.descripcionServicio,
+  json.montoTotal,
 
-      json.montoTotal,
-      json.montoTotal,
+  json.moneda ?? "SOLES",
 
-      json.fechaEmision,
+  json.detraccion ?? 0,
 
-      json.fechaVencimiento,
+  json.formaPago ?? null,
 
-      "PENDIENTE",
+  json.montoTotal,
 
-      archivoCompleto.itemId,
+  json.fechaEmision,
 
-      archivoCompleto.nombre,
+  json.fechaVencimiento,
 
-      archivoCompleto.webUrl
+  "PENDIENTE",
 
-    ]
+  archivoCompleto.itemId,
+
+  archivoCompleto.nombre,
+
+  archivoCompleto.webUrl
+]
   );
 
   console.log(
