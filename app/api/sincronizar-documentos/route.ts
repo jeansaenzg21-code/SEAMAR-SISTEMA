@@ -165,7 +165,7 @@ const procesarArchivo = async (archivo: any) => {
   );
 
   const RUC_SEAMAR =
-  "20611842458";
+  process.env.SEAMAR_RUC || "20611842458";
 
 const rucEmisor =
   String(

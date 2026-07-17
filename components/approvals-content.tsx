@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { useRol } from "@/lib/role-context"
 import { Search, Check, X, Eye, Clock, AlertTriangle, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -40,8 +41,6 @@ aprobado_por?: string
 observado_por?: string
 }
 
-const initialApprovals: Approval[] = []
-
 const formatearFecha = (fecha?: string) => {
   if (!fecha) return "-"
 
@@ -74,107 +73,62 @@ function StatusBadge({ status }: { status: Status }) {
   )
 }
 
+function mapApiToApproval(v: any): Approval {
+  return {
+    id: v.id,
+    codigo: v.codigo,
+    client: v.proveedor,
+    description: v.descripcion,
+    amount: `S/ ${v.monto}`,
+    status:
+      v.estado === "BORRADOR"
+        ? "draft"
+        : v.estado === "EN_REVISION"
+        ? "under_review"
+        : v.estado === "OBSERVADO"
+        ? "observed"
+        : v.estado === "APROBADO"
+        ? "approved"
+        : "draft",
+    submittedBy: v.encargado ?? "-",
+    submittedDate: v.fecha_revision,
+    priority: "medium",
+    respuesta_observacion: v.respuesta_observacion,
+    archivo_respuesta_nombre: v.archivo_respuesta_nombre,
+    historial_observaciones:
+      typeof v.historial_observaciones === "string"
+        ? JSON.parse(v.historial_observaciones)
+        : v.historial_observaciones || [],
+    creado_por: v.creado_por,
+    enviado_revision_por: v.enviado_revision_por,
+    aprobado_por: v.aprobado_por,
+    observado_por: v.observado_por,
+    documentos:
+      typeof v.documentos === "string"
+        ? JSON.parse(v.documentos)
+        : v.documentos || [],
+  }
+}
+
 export function ApprovalsContent() {
+  const { rol: rolUsuario } = useRol()
   const [searchQuery, setSearchQuery] = useState("")
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [approvalFiles, setApprovalFiles] = useState<File[]>([])
-  const [rolUsuario, setRolUsuario] = useState("")
-  const [nombreUsuario, setNombreUsuario] = useState("")
+
+  const cargarAprobaciones = useCallback(async () => {
+    const response = await fetch("/api/valorizaciones")
+    if (!response.ok) return
+    const data = await response.json()
+    if (!Array.isArray(data)) return
+    setApprovals(data.map(mapApiToApproval))
+  }, [])
+
   useEffect(() => {
-
-async function cargarSesion() {
-  const response = await fetch("/api/auth/session");
-
-  if (!response.ok) return;
-
-  const data = await response.json();
-
-  setRolUsuario(data.rol);
-  setNombreUsuario(data.nombre || data.user?.name || "Usuario");
-  console.log("ROL DEL USUARIO:", data.rol);
-}
-
-  async function cargarAprobaciones() {
-
-    const response =
-      await fetch(
-        "/api/valorizaciones"
-      );
-
-    const data =
-      await response.json();
-
-    const approvalsData = data
-        .map((v: any) => ({
-
-          id: v.id,
-          
-          codigo: v.codigo,
-
-          client:
-            v.proveedor,
-
-          description:
-            v.descripcion,
-
-          amount:
-            `S/ ${v.monto}`,
-
-          status:
-  v.estado === "BORRADOR"
-    ? "draft"
-    : v.estado === "EN_REVISION"
-    ? "under_review"
-    : v.estado === "OBSERVADO"
-    ? "observed"
-    : v.estado === "APROBADO"
-    ? "approved"
-    : "draft",  
-
-          submittedBy:
-            v.encargado ??
-            "-",
-
-          submittedDate:
-            v.fecha_revision,
-
-          priority:
-            "medium",
-
-          respuesta_observacion:
-            v.respuesta_observacion,
-
-          archivo_respuesta_nombre:
-            v.archivo_respuesta_nombre
-
-            ,
-
-historial_observaciones:
-  typeof v.historial_observaciones === "string"
-    ? JSON.parse(v.historial_observaciones)
-    : v.historial_observaciones || [],
-    creado_por: v.creado_por,
-enviado_revision_por: v.enviado_revision_por,
-aprobado_por: v.aprobado_por,
-observado_por: v.observado_por,
-
-documentos:
-  typeof v.documentos === "string"
-    ? JSON.parse(v.documentos)
-    : v.documentos || []
-
-        }));
-
-    setApprovals(
-  approvalsData
-);
-
-}
-
-cargarSesion();
-cargarAprobaciones();
-
-}, []);
+    let cancelled = false
+    cargarAprobaciones().then(() => { if (cancelled) return })
+    return () => { cancelled = true }
+  }, [cargarAprobaciones])
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null)
   const [isApproveOpen, setIsApproveOpen] = useState(false)
   const [isObserveOpen, setIsObserveOpen] = useState(false)
@@ -194,82 +148,42 @@ const [isViewOpen, setIsViewOpen] =
   const approved = approvals.filter((item) => item.status === "approved")
 
   const approveItem = async () => {
+    if (!selectedApproval) return
 
-  if (!selectedApproval) return
-
-  try {
-
-    const response =
-      await fetch(
+    try {
+      const response = await fetch(
         `/api/valorizaciones/${selectedApproval.id}/estado`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            estado: "APROBADO",
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ estado: "APROBADO" }),
         }
       )
 
-    const data =
-      await response.json()
+      const data = await response.json()
 
-    if (!data.success) {
+      if (!data.success) {
+        alert("No se pudo aprobar.")
+        return
+      }
 
-      alert("No se pudo aprobar.")
+      setApprovals((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(selectedApproval.id)
+            ? { ...item, status: "approved" }
+            : item
+        )
+      )
 
-      return
-
+      setIsApproveOpen(false)
+      setSelectedApproval(null)
+      alert("Valorización aprobada.")
+    } catch (error) {
+      console.error(error)
+      alert("Error al aprobar")
     }
-
-    alert("Valorización aprobada.")
-
-    location.reload()
-
-  } catch (error) {
-
-    console.error(error)
-
-    alert("Error al aprobar")
-
   }
 
-}
-
-  const observeItem = () => {
-  if (!selectedApproval) return
-
-  const data = localStorage.getItem("fincontrol_valuations")
-  if (!data) return
-
-  const valuations = JSON.parse(data)
-
-    const updatedValuations = valuations.map((item: any) =>
-      String(item.id) === String(selectedApproval.id)
-        ? {
-            ...item,
-            status: "observed",
-            observation_status: "pending",
-            observacion: observation,
-          }
-        : item
-    )
-
-    localStorage.setItem(
-      "fincontrol_valuations",
-      JSON.stringify(updatedValuations)
-    )
-
-  setApprovals((prev) =>
-    prev.filter((item) => String(item.id) !== String(selectedApproval.id))
-  )
-
-  setObservation("")
-  setIsObserveOpen(false)
-  setSelectedApproval(null)
-}
 const abrirDetalle = async (item: Approval) => {
   setSelectedApproval(item)
   setIsViewOpen(true)
@@ -431,7 +345,7 @@ const abrirDetalle = async (item: Approval) => {
         </Tabs>
 
         <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
-          <DialogContent>
+          <DialogContent className="w-[95vw] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Aprobar valorización</DialogTitle>
               <DialogDescription>
@@ -468,7 +382,7 @@ const abrirDetalle = async (item: Approval) => {
         </Dialog>
 
         <Dialog open={isObserveOpen} onOpenChange={setIsObserveOpen}>
-          <DialogContent>
+          <DialogContent className="w-[95vw] sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Observar valorización</DialogTitle>
               <DialogDescription>
@@ -486,12 +400,42 @@ const abrirDetalle = async (item: Approval) => {
               <Button variant="outline" onClick={() => setIsObserveOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={observeItem}>Guardar observación</Button>
+              <Button onClick={async () => {
+                if (!selectedApproval) return
+                try {
+                  const response = await fetch(
+                    `/api/valorizaciones/${selectedApproval.id}/estado`,
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ estado: "OBSERVADO", observacion: observation }),
+                    }
+                  )
+                  const data = await response.json()
+                  if (!data.success) {
+                    alert("No se pudo observar.")
+                    return
+                  }
+                  setApprovals((prev) =>
+                    prev.map((item) =>
+                      String(item.id) === String(selectedApproval.id)
+                        ? { ...item, status: "observed" }
+                        : item
+                    )
+                  )
+                  setIsObserveOpen(false)
+                  setSelectedApproval(null)
+                  setObservation("")
+                } catch (error) {
+                  console.error(error)
+                  alert("Error al observar")
+                }
+              }}>Guardar observación</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-  <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+  <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
     <DialogHeader>
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
@@ -684,9 +628,7 @@ const abrirDetalle = async (item: Approval) => {
           `/api/valorizaciones/${selectedApproval.id}/estado`,
           {
             method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               estado: "OBSERVADO",
               observacion: observation,
@@ -694,7 +636,16 @@ const abrirDetalle = async (item: Approval) => {
           }
         )
 
-        location.reload()
+        setApprovals((prev) =>
+          prev.map((item) =>
+            String(item.id) === String(selectedApproval.id)
+              ? { ...item, status: "observed" }
+              : item
+          )
+        )
+
+        setIsViewOpen(false)
+        setSelectedApproval(null)
       }}
     >
       Enviar
@@ -760,9 +711,7 @@ const abrirDetalle = async (item: Approval) => {
       `/api/valorizaciones/${selectedApproval.id}/estado`,
       {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           estado: "OBSERVADO",
           observacion:
@@ -771,7 +720,16 @@ const abrirDetalle = async (item: Approval) => {
       }
     )
 
-    location.reload()
+    setApprovals((prev) =>
+      prev.map((item) =>
+        String(item.id) === String(selectedApproval.id)
+          ? { ...item, status: "observed" }
+          : item
+      )
+    )
+
+    setIsViewOpen(false)
+    setSelectedApproval(null)
   }}
 >
   Solicitar corrección

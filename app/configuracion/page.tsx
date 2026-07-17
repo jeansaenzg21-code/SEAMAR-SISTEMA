@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { ConfiguracionContent } from "@/components/configuracion/configuracion-content"
 
 export const metadata: Metadata = {
-  title: "Configuración | SEAMAR",
+  title: "Configuración",
 }
 
 export default function ConfiguracionPage() {

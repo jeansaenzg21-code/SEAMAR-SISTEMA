@@ -11,7 +11,9 @@ export type TipoActividad =
   | "valorizacion"
   | "cliente"
   | "proyecto"
-  | "conciliacion";
+  | "conciliacion"
+  | "configuracion"
+  | "logout";
 
 // =============================================================================
 // ACCIONES
@@ -26,7 +28,10 @@ export type AccionActividad =
   | "eliminar"
   | "pagar"
   | "cobrar"
-  | "importacion";
+  | "importacion"
+  | "activar"
+  | "desactivar"
+  | "cerrar_sesion";
 
 // =============================================================================
 // INPUT

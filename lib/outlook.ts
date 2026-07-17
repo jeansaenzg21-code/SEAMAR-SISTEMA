@@ -1,11 +1,12 @@
 import { getAccessToken } from "./graph";
 
 const USER =
-  "trainee.soporte@paredescano.com";
+  process.env.OUTLOOK_USER || "";
 
 export async function enviarCorreo(
   asunto: string,
-  contenido: string
+  contenido: string,
+  destinatario?: string
 ) {
 
   const token =
@@ -38,7 +39,7 @@ export async function enviarCorreo(
             {
               emailAddress: {
                 address:
-                  "traine.nomina@paredescano.com"
+                  destinatario || process.env.OUTLOOK_DEFAULT_RECIPIENT || ""
               }
             }
           ]

@@ -1,7 +1,7 @@
 import { getAccessToken } from "./graph";
 import { ONEDRIVE_FOLDERS } from "./onedrive-config";
 
-const USER = "trainee.soporte@paredescano.com";
+const USER = process.env.ONEDRIVE_USER || "";
 
 
   

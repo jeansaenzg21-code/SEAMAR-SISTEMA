@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import bcrypt from "bcryptjs";
 import { crearSesion } from "@/lib/session";
-
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       `
       SELECT *
       FROM usuarios
-      WHERE correo = ?
+      WHERE usuario = ?
         AND estado = 'ACTIVO'
       LIMIT 1
       `,
@@ -34,8 +34,15 @@ export async function POST(req: Request) {
 
     const user = rows[0];
 
-    // Temporal (luego usaremos bcrypt)
-    if (user.password !== password) {
+    console.log("[LOGIN] Usuario encontrado:", user.usuario);
+    console.log("[LOGIN] Hash almacenado longitud:", user.password?.length || 0);
+    console.log("[LOGIN] Hash almacenado prefijo:", user.password?.substring(0, 7) || "vacio");
+
+    const passwordValida = await bcrypt.compare(password, user.password);
+
+    console.log("[LOGIN] Resultado bcrypt.compare:", passwordValida);
+
+    if (!passwordValida) {
       return NextResponse.json(
         { error: "Contraseña incorrecta." },
         { status: 401 }
@@ -56,6 +63,9 @@ export async function POST(req: Request) {
   nombre: user.nombre,
   usuario: user.usuario,
   rol: user.rol,
+  tema: user.tema,
+  cargo: user.cargo ?? null,
+  avatar: user.avatar ?? null,
 });
 
     return NextResponse.json({
@@ -66,6 +76,7 @@ export async function POST(req: Request) {
         usuario: user.usuario,
         rol: user.rol,
       },
+      tema: user.tema,
     });
 
   } catch (error) {

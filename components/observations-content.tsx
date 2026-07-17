@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Search, MessageSquare, Check, AlertTriangle, Clock } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -43,90 +43,46 @@ const statusStyles = {
 
 export function ObservationsContent() {
   const [observations, setObservations] = useState<any[]>([])
-useEffect(() => {
 
-  cargarObservaciones()
-
-}, [])
-
-const cargarObservaciones =
-  async () => {
-
+  const cargarObservaciones = useCallback(async () => {
     try {
+      const response = await fetch("/api/valorizaciones")
+      const data = await response.json()
 
-      const response =
-        await fetch(
-          "/api/valorizaciones"
-        )
+      const observedData = data
+        .filter((v: any) => v.estado === "OBSERVADO")
+        .map((v: any) => ({
+          id: v.codigo,
+          valuationId: v.id,
+          client: v.proveedor,
+          observation:
+            v.observacion_sistema && v.observacion_sistema.trim() !== ""
+              ? v.observacion_sistema
+              : "Orden de servicio no encontrada",
+          createdBy: "Sistema",
+          createdDate: v.fecha_observacion?.split("T")[0] || "",
+          status:
+            v.estado_observacion === "EN_PROGRESO"
+              ? "in_progress"
+              : v.estado_observacion === "RESUELTA"
+              ? "resolved"
+              : "pending",
+          assignedTo: v.encargado || "-",
+          response: v.respuesta_observacion,
+          documentos_respuesta: v.documentos_respuesta || [],
+        }))
 
-      const data =
-        await response.json()
-
-      const observedData =
-        data
-          .filter(
-            (v: any) =>
-              v.estado ===
-              "OBSERVADO"
-          )
-          .map(
-            (v: any) => ({
-
-              id:
-                `OBS-${v.id}`,
-
-              valuation:
-v.id,
-
-valuationId:
-  v.id,
-
-              client:
-                v.proveedor,
-
-              observation:
-  v.observacion_sistema && v.observacion_sistema.trim() !== ""
-    ? v.observacion_sistema
-    : "Orden de servicio no encontrada",
-
-              createdBy:
-                "Sistema",
-
-              createdDate:
-                v.fecha_observacion
-                  ?.split("T")[0]
-                || "",
-
-              status:
-  v.estado_observacion === "EN_PROGRESO"
-    ? "in_progress"
-    : v.estado_observacion === "RESUELTA"
-      ? "resolved"
-      : "pending",
-
-              assignedTo:
-                v.encargado || "-",
-
-              response:
-  v.respuesta_observacion,
-
-documentos_respuesta:
-  v.documentos_respuesta || []
-
-            })
-          )
-
-      setObservations(
-        observedData
-      )
-
+      setObservations(observedData)
     } catch (error) {
-
       console.error(error)
-
     }
+  }, [])
 
-}
+  useEffect(() => {
+    let cancelled = false
+    cargarObservaciones().then(() => { if (cancelled) return })
+    return () => { cancelled = true }
+  }, [cargarObservaciones])
 
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
@@ -141,7 +97,6 @@ documentos_respuesta:
     if (
       searchQuery &&
       !o.observation.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !o.valuation.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !o.client.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false
@@ -213,7 +168,7 @@ documentos_respuesta:
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="bg-secondary">
+          <TabsList className="bg-secondary flex-wrap">
             <TabsTrigger value="all">Todas ({observations.length})</TabsTrigger>
             <TabsTrigger value="pending">Pendientes ({pendingCount})</TabsTrigger>
             <TabsTrigger value="in_progress">En progreso ({inProgressCount})</TabsTrigger>
@@ -233,8 +188,6 @@ documentos_respuesta:
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold">{observation.id}</h3>
-                            <span className="text-muted-foreground">•</span>
-                            <span className="text-primary">{observation.valuation}</span>
 
                             <span
                               className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusConfig.className}`}
@@ -334,7 +287,7 @@ documentos_respuesta:
         </Tabs>
 
         <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="w-[95vw] sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>
                 {selectedObservation?.status === "resolved"
@@ -342,7 +295,7 @@ documentos_respuesta:
                   : "Responder observación"}
               </DialogTitle>
               <DialogDescription>
-                {selectedObservation?.id} • {selectedObservation?.valuation}
+                {selectedObservation?.id}
               </DialogDescription>
             </DialogHeader>
 
@@ -434,7 +387,7 @@ form.append(
 
 form.append(
  "valorizacionId",
- String(selectedObservation.valuation)
+  String(selectedObservation.valuationId)
 )
 
 
@@ -468,7 +421,7 @@ documentosSubidos.push({
 
 
   await fetch(
-  `/api/valorizaciones/${selectedObservation.valuation}/estado`,
+  `/api/valorizaciones/${selectedObservation.valuationId}/estado`,
   {
     method: "PATCH",
     headers: {

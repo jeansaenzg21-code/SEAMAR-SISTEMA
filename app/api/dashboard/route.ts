@@ -105,6 +105,50 @@ const [actividadRows]: any = await pool.query(`
   LIMIT 5
 `);
 
+// =========================
+// ALERTAS CRÍTICAS
+// =========================
+const [alertasRows]: any = await pool.query(`
+  SELECT
+    SUM(CASE WHEN estado = 'BORRADOR' AND TIMESTAMPDIFF(DAY, created_at, NOW()) >= 7 THEN 1 ELSE 0 END) AS borrador_7d,
+    SUM(CASE WHEN estado = 'EN_REVISION' AND TIMESTAMPDIFF(DAY, COALESCE(updated_at, created_at), NOW()) >= 3 THEN 1 ELSE 0 END) AS revision_3d,
+    SUM(CASE WHEN estado = 'OBSERVADO' AND TIMESTAMPDIFF(DAY, COALESCE(updated_at, created_at), NOW()) >= 5 THEN 1 ELSE 0 END) AS observado_5d
+  FROM valorizaciones
+`);
+
+const alertasData = alertasRows[0];
+const alerts: any[] = [];
+
+if (alertasData.borrador_7d > 0) {
+  alerts.push({
+    id: "borrador",
+    title: "Valorizaciones en borrador",
+    description: `${alertasData.borrador_7d} valorizaciones han permanecido en borrador durante 7 días.`,
+    estado: "pending",
+    cantidad: alertasData.borrador_7d,
+  });
+}
+
+if (alertasData.revision_3d > 0) {
+  alerts.push({
+    id: "revision",
+    title: "Valorizaciones en revisión",
+    description: `${alertasData.revision_3d} valorizaciones han permanecido en revisión durante 3 días.`,
+    estado: "warning",
+    cantidad: alertasData.revision_3d,
+  });
+}
+
+if (alertasData.observado_5d > 0) {
+  alerts.push({
+    id: "observado",
+    title: "Valorizaciones observadas",
+    description: `${alertasData.observado_5d} valorizaciones continúan observadas desde hace 5 días.`,
+    estado: "today",
+    cantidad: alertasData.observado_5d,
+  });
+}
+
     return NextResponse.json({
       kpis: [
         {
@@ -129,27 +173,7 @@ const [actividadRows]: any = await pool.query(`
 }
       ],
 
-      alerts: [
-  {
-    id: "1",
-    title: "Valorizaciones en borrador",
-    description: "10 valorizaciones han permanecido en borrador durante 7 días.",
-    estado: "pending",
-  },
-  {
-    id: "2",
-    title: "Valorizaciones en revisión",
-    description: "21 valorizaciones han permanecido en revisión durante 3 días.",
-    estado: "warning",
-  },
-  {
-    id: "3",
-    title: "Valorizaciones observadas",
-    description: "5 valorizaciones continúan observadas desde hace 5 días.",
-    estado: "today",
-  },
-  
-],
+      alerts,
       recentActivity: actividadRows.map((actividad: any) => ({
   id: String(actividad.id),
 

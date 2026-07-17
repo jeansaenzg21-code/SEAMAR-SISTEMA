@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
-import { procesarDocumento } from "@/lib/openai-documentos";
 type ClientFormProps = {
   onClose: () => void
 }

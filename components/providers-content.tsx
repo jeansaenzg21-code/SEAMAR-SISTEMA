@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { cacheGet, cacheSet } from "@/lib/simple-cache"
 import ProviderForm from "@/components/provider-form"
 import {
   DropdownMenu,
@@ -50,16 +51,22 @@ export function ProvidersContent() {
   const [open, setOpen] = useState(false)
   const [providers, setProviders] = useState<any[]>([])
   const [search, setSearch] = useState("")
-  const cargarProveedores = async () => {
-  try {
-    const response = await fetch("/api/proveedores")
-    const data = await response.json()
-
-    setProviders(Array.isArray(data) ? data : [])
-  } catch (error) {
-    console.error(error)
-  }
-}
+  const cargarProveedores = useCallback(async () => {
+    try {
+      const cached = cacheGet<any[]>("proveedores")
+      if (cached) {
+        setProviders(cached)
+        return
+      }
+      const response = await fetch("/api/proveedores")
+      const data = await response.json()
+      const proveedores = Array.isArray(data) ? data : []
+      cacheSet("proveedores", proveedores)
+      setProviders(proveedores)
+    } catch (error) {
+      console.error(error)
+    }
+  }, [])
 
 const cambiarEstado = async (
   id: number,
@@ -90,8 +97,10 @@ const cambiarEstado = async (
 }
 
 useEffect(() => {
-  cargarProveedores()
-}, [])
+  let cancelled = false
+  cargarProveedores().then(() => { if (cancelled) return })
+  return () => { cancelled = true }
+}, [cargarProveedores])
 
 const filteredProviders = providers.filter((provider) =>
   provider.razon_social
@@ -113,7 +122,7 @@ const filteredProviders = providers.filter((provider) =>
           </p>
         </div>
         
-  <Button onClick={() => setOpen(true)}>
+  <Button onClick={() => setOpen(true)} className="min-h-[44px]">
   <Plus className="mr-2 h-4 w-4" />
   Agregar Proveedor
 </Button>
@@ -121,7 +130,7 @@ const filteredProviders = providers.filter((provider) =>
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
+      <div className="relative w-full lg:max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
   value={search}

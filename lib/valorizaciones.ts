@@ -1,7 +1,5 @@
 import pool from "./mysql";
 import { buscarOSPorNumero } from "./onedrive";
-import { procesarDocumento } from "@/lib/openai-documentos";
-
 export async function guardarValorizacion(
   data: any
 ) {

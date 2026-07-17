@@ -24,7 +24,6 @@ import {
   Building2,
   AlertTriangle,
   CheckCircle2,
-  Upload,
   MessageSquareText,
   Activity,
   Eye,
@@ -54,6 +53,7 @@ export interface DashboardAlert {
   title: string
   description: string
   estado: AlertaEstado
+  cantidad?: number
 }
 
 // ActivityType se deriva automáticamente de ACTIVITY_CONFIG, definido más
@@ -148,7 +148,15 @@ const ACTIVITY_CONFIG = {
     icon: BarChart3,
   },
 
+  configuracion: {
+    icon: Sparkles,
+  },
+
 } as const
+
+const DEFAULT_ACTIVITY_CONFIG = {
+  icon: Activity,
+}
 
 const ALERT_STATUS_CONFIG = {
   today: {
@@ -351,7 +359,8 @@ function ActivityItem({
   activity: DashboardActivity
   isLast: boolean
 }) {
-  const Icon = ACTIVITY_CONFIG[activity.type].icon
+  const config = ACTIVITY_CONFIG[activity.type as keyof typeof ACTIVITY_CONFIG] ?? DEFAULT_ACTIVITY_CONFIG
+  const Icon = config.icon
   return (
     <div className="relative flex gap-4">
       <div className="relative flex flex-col items-center">
@@ -428,7 +437,9 @@ export function DashboardContent() {
   }, [moneda, mes, anio])
 
   useEffect(() => {
-    loadDashboard()
+    let cancelled = false
+    loadDashboard().then(() => { if (cancelled) return })
+    return () => { cancelled = true }
   }, [loadDashboard])
 
   return (
@@ -442,18 +453,7 @@ export function DashboardContent() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/analytics/profitability">
-            <Button variant="outline">
-              <Eye className="mr-2 h-4 w-4" />
-              Ver Reportes
-            </Button>
-          </Link>
-          <Link href="/upload">
-            <Button>
-              <Sparkles className="mr-2 h-4 w-4" />
-              IA de Facturas
-            </Button>
-          </Link>
+         
         </div>
       </div>
 
@@ -461,7 +461,7 @@ export function DashboardContent() {
       {/* Filtros de moneda, mes y año. Cada cambio dispara automáticamente
           una nueva consulta a GET /api/dashboard con los query params
           correspondientes (ver loadDashboard). No requiere botón "Buscar". */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <Select value={moneda} onValueChange={(value) => setMoneda(value as Moneda)}>
           <SelectTrigger className="w-full sm:w-[160px]">
             <SelectValue placeholder="Moneda" />
@@ -521,7 +521,7 @@ export function DashboardContent() {
       {/* Este bloque será alimentado por GET /api/dashboard -> kpis
           Backend: CxC, CxP, Valorizaciones, Proyectos (y cualquier KPI futuro
           agregado a KPI_CONFIG, sin cambios de lógica) */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="bg-card border-border">
@@ -631,9 +631,9 @@ export function DashboardContent() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : !dashboardData || dashboardData.topClients.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No hay información disponible
-            </div>
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No existen alertas críticas.
+              </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

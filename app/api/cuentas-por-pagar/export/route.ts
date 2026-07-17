@@ -4,6 +4,9 @@ import pool from "@/lib/mysql"
 
 export async function GET(request: NextRequest) {
   try {
+    const [empresaRows]: any = await pool.query("SELECT nombre_comercial FROM empresa LIMIT 1")
+    const empresaNombre = empresaRows[0]?.nombre_comercial || ""
+
     const { searchParams } = new URL(request.url)
 
     const year = searchParams.get("year")
@@ -68,7 +71,7 @@ ORDER BY cxp.fecha_emision ASC
 const nombreMes = meses[Number(month) - 1]
 
 worksheet.mergeCells("A1:K1")
-worksheet.getCell("A1").value = "SEAMAR"
+worksheet.getCell("A1").value = empresaNombre
 
 worksheet.mergeCells("A2:K2")
 worksheet.getCell("A2").value =
@@ -322,7 +325,7 @@ worksheet.views = [
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition":
-          `attachment; filename=SEAMAR_CXP_${moneda}_${nombreMes}_${year}.xlsx`
+          `attachment; filename=${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXP_${moneda}_${nombreMes}_${year}.xlsx`
       }
     })
   } catch (error) {

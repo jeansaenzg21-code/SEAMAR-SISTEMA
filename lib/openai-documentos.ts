@@ -164,7 +164,7 @@ console.log(textoDocumento);
 console.log("====================================");
 
 const response = await openai.responses.create({
-  model: "gpt-5-mini",
+  model: process.env.OPENAI_MODEL || "gpt-5-mini",
   input: `
 ${prompt}
 

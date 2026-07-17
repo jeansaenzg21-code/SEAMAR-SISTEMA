@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { cacheGet, cacheSet } from "@/lib/simple-cache"
 import ClientForm from "@/components/client-form"
 import {
   DropdownMenu,
@@ -50,16 +51,22 @@ export function ClientsContent() {
   const [open, setOpen] = useState(false)
   const [clients, setClients] = useState<any[]>([])
   const [search, setSearch] = useState("")
-  const cargarClientes = async () => {
-  try {
-    const response = await fetch("/api/clientes")
-    const data = await response.json()
-
-    setClients(Array.isArray(data) ? data : [])
-  } catch (error) {
-    console.error(error)
-  }
-}
+  const cargarClientes = useCallback(async () => {
+    try {
+      const cached = cacheGet<any[]>("clientes")
+      if (cached) {
+        setClients(cached)
+        return
+      }
+      const response = await fetch("/api/clientes")
+      const data = await response.json()
+      const clientes = Array.isArray(data) ? data : []
+      cacheSet("clientes", clientes)
+      setClients(clientes)
+    } catch (error) {
+      console.error(error)
+    }
+  }, [])
 
 const cambiarEstado = async (
   id: number,
@@ -90,8 +97,10 @@ const cambiarEstado = async (
 }
 
 useEffect(() => {
-  cargarClientes()
-}, [])
+  let cancelled = false
+  cargarClientes().then(() => { if (cancelled) return })
+  return () => { cancelled = true }
+}, [cargarClientes])
 
 const filteredClients = clients.filter((client) =>
   client.razon_social
@@ -113,7 +122,7 @@ const filteredClients = clients.filter((client) =>
           </p>
         </div>
         
-  <Button onClick={() => setOpen(true)}>
+  <Button onClick={() => setOpen(true)} className="min-h-[44px]">
   <Plus className="mr-2 h-4 w-4" />
   Agregar Cliente
 </Button>
@@ -121,7 +130,7 @@ const filteredClients = clients.filter((client) =>
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
+      <div className="relative w-full lg:max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
   value={search}

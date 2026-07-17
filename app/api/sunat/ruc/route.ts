@@ -7,7 +7,7 @@ export async function POST(
     const { ruc } = await request.json()
 
     const response = await fetch(
-      `https://peruapi.com/api/ruc/${ruc}`,
+      `${process.env.PERUAPI_BASE_URL || "https://peruapi.com/api/ruc"}/${ruc}`,
       {
         headers: {
           "X-API-KEY":

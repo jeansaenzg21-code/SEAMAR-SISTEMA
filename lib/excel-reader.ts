@@ -379,21 +379,21 @@ const codigoValorizacion =
       codigo: codigoValorizacion,
       tipoDocumento: "valorizacion",
 
-      proveedor: "REPSOL COMERCIAL SAC",
-cliente: "REPSOL COMERCIAL SAC",
-ruc: "20503840121",
+      proveedor: process.env.EXCEL_DEFAULT_PROVEEDOR || "REPSOL COMERCIAL SAC",
+      cliente: process.env.EXCEL_DEFAULT_PROVEEDOR || "REPSOL COMERCIAL SAC",
+      ruc: process.env.EXCEL_DEFAULT_RUC || "20503840121",
 
       descripcion,
       pu,
       monto: total,
       total,
 
-      moneda: "PEN",
+      moneda: process.env.EXCEL_DEFAULT_MONEDA || "PEN",
 
       fechaEjecucion: fechaInicio,
       fechaInicio,
 
-      negocioOperacion: "REPSOL COMERCIAL SAC",
+      negocioOperacion: process.env.EXCEL_DEFAULT_NEGOCIO || "REPSOL COMERCIAL SAC",
       numeroOrdenServicio: numeroOT,
 
       archivoNombre: archivo.nombre,

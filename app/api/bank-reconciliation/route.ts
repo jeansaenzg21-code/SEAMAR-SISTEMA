@@ -51,7 +51,13 @@ export async function POST(
     "python/bank_reconciliation.py",
     {
       pythonPath: process.env.PYTHON_PATH,
-      args: [rutaArchivo]
+      args: [
+        rutaArchivo,
+        process.env.DB_HOST || "localhost",
+        process.env.DB_USER || "root",
+        process.env.DB_PASSWORD || "",
+        process.env.DB_NAME || "seamar",
+      ]
     }
   );
 

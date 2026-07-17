@@ -1,12 +1,15 @@
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "seamar_session";
+const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || "app_session";
 
 export async function crearSesion(usuario: {
   id: number;
   nombre: string;
   usuario: string;
   rol: string;
+  tema?: string;
+  cargo?: string | null;
+  avatar?: string | null;
 }) {
   const cookieStore = await cookies();
 
@@ -18,7 +21,7 @@ export async function crearSesion(usuario: {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 8, // 8 horas
+      maxAge: Number(process.env.SESSION_MAX_AGE_SECONDS) || 28800,
     }
   );
 }

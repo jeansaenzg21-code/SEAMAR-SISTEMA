@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const textoLimitado = texto.slice(0, 60000)
 
     const response = await openai.responses.create({
-      model: "gpt-5-mini",
+      model: process.env.OPENAI_MODEL || "gpt-5-mini",
       input: `
 Analiza este contrato.
 

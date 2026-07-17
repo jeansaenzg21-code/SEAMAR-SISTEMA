@@ -1,7 +1,9 @@
 "use client"
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
-import { Download, FileText, Filter, MoreVertical, Plus, RefreshCw } from "lucide-react"
+import { FileText, Filter, MoreVertical, Plus, RefreshCw } from "lucide-react"
+import { useRol, useUser } from "@/lib/role-context"
+import { cacheGet, cacheSet } from "@/lib/simple-cache"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DocumentosPreview } from "@/components/DocumentosPreview"
+import { ExportDialog } from "@/components/export-dialog"
 
 /* ============================================================================
  * 1) TYPES
@@ -346,10 +349,16 @@ async function fetchValorizacionesApi(): Promise<ApiValorizacionItem[] | ApiResu
   return res.json()
 }
 
+const CACHE_KEY_CLIENTES = "clientes"
+
 async function fetchClientesApi(): Promise<Cliente[]> {
+  const cached = cacheGet<Cliente[]>(CACHE_KEY_CLIENTES)
+  if (cached) return cached
   const res = await fetch("/api/clientes")
   const data = await res.json()
-  return Array.isArray(data) ? data : []
+  const clientes = Array.isArray(data) ? data : []
+  cacheSet(CACHE_KEY_CLIENTES, clientes)
+  return clientes
 }
 
 async function fetchProyectosClienteApi(clienteId: string | number): Promise<ProyectoCliente[]> {
@@ -787,7 +796,7 @@ function ValorizacionesTableComponent({
   return (
     <Card className="bg-card border-border">
       <CardContent className="p-0">
-        <div className="overflow-x-auto rounded-md">
+        <div className="overflow-x-auto rounded-md hidden lg:block">
           <table className="w-full table-auto text-sm">
             <thead className="border-b bg-secondary">
               <tr>
@@ -929,6 +938,40 @@ function ValorizacionesTableComponent({
               ))}
             </tbody>
           </table>
+
+          <div className="block lg:hidden space-y-3 mt-4">
+            {valuations.map((item) => (
+              <Card key={item.id} className="bg-card border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm">{item.codigo || item.id}</span>
+                    <StatusBadge status={item.status} />
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex justify-between"><span>Cliente:</span><span className="text-right font-medium text-foreground">{item.client}</span></div>
+                    {item.orden_servicio && <div className="flex justify-between"><span>OS:</span><span className="text-right font-medium text-foreground">{item.orden_servicio}</span></div>}
+                    <div className="flex justify-between"><span>Monto:</span><span className="text-right font-medium text-foreground">S/ {Number(item.amount).toLocaleString("es-PE")}</span></div>
+                    <div className="flex justify-between"><span>Periodo:</span><span className="text-right font-medium text-foreground">{item.date}</span></div>
+                    {item.projectName && <div className="flex justify-between"><span>Proyecto:</span><span className="text-right font-medium text-foreground">{item.projectName}</span></div>}
+                    <div className="flex justify-between"><span>Encargado:</span><span className="text-right font-medium text-foreground">{item.encargado}</span></div>
+                  </div>
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                    <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" onClick={() => onVer(item)}>Ver</Button>
+                    <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" onClick={() => onEditar(item)}>Editar</Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="min-h-[44px]"><MoreVertical className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEnviarRevision(item)}>Enviar a revisión</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDescargar(item)}>Descargar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -1078,7 +1121,7 @@ function ValorizacionFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isSaving && onOpenChange(next)}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingValuation ? "Editar Valorización" : "Nueva Valorización"}</DialogTitle>
           <DialogDescription>Complete los datos principales de la valorización.</DialogDescription>
@@ -1329,7 +1372,7 @@ function ValorizacionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">{valuation.codigo}</p>
@@ -1457,6 +1500,7 @@ function ValorizacionDetailDialog({
 
 export function ValuationsContent() {
   const {
+    valuations,
     filteredValuations,
     clientes,
     vistaCliente,
@@ -1478,16 +1522,15 @@ export function ValuationsContent() {
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [mostrarImportador, setMostrarImportador] = useState(false)
+  const [mostrarExportador, setMostrarExportador] = useState(false)
   const [empresaImportacion, setEmpresaImportacion] = useState("")
   const [modoImportacion, setModoImportacion] = useState("individual")
   const [archivoImportacion, setArchivoImportacion] = useState<File | null>(null)
-  const [anioImportacion, setAnioImportacion] = useState("2026")  
+
   const [valorizacionesDetectadas, setValorizacionesDetectadas] = useState<string[]>([])
 const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<string[]>([])
   const [hojasExcel, setHojasExcel] = useState<string[]>([])
 const [hojaSeleccionada, setHojaSeleccionada] = useState("")
-  const [rolUsuario, setRolUsuario] = useState("")
-const [nombreUsuario, setNombreUsuario] = useState("")
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
 
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -1495,31 +1538,16 @@ const [nombreUsuario, setNombreUsuario] = useState("")
   const [mostrarCompilacion, setMostrarCompilacion] = useState(false)
   const [pasoCompilacion, setPasoCompilacion] = useState(0)
 
+  const { rol: rolUsuario } = useRol()
+  const sesionUsuario = useUser()
+  const nombreUsuario = sesionUsuario?.nombre || "Usuario"
+
 const pasosCompilacion = [
   "Conectando con OneDrive...",
   "Buscando valorizaciones...",
-  "Descargando documentos...",
   "Analizando documentos con IA...",
   "Guardando valorizaciones..."
 ]
-useEffect(() => {
-  async function cargarSesion() {
-    const response = await fetch("/api/auth/session")
-
-    if (!response.ok) return
-
-    const data = await response.json()
-
-    setRolUsuario(data.rol)
-    setNombreUsuario(
-      data.nombre ||
-      data.user?.name ||
-      "Usuario"
-    )
-  }
-
-  cargarSesion()
-}, [])
   const abrirCreacion = useCallback(() => {
     setEditingValuation(null)
     setIsFormOpen(true)
@@ -1552,7 +1580,7 @@ useEffect(() => {
         <div className="flex flex-col md:flex-row gap-4 justify-between">
           <div className="flex flex-1 gap-3">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-44 bg-secondary border-border">
+              <SelectTrigger className="w-full lg:w-44 bg-secondary border-border">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
@@ -1567,7 +1595,7 @@ useEffect(() => {
             </Select>
 
             <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-44 bg-secondary border-border">
+              <SelectTrigger className="w-full lg:w-44 bg-secondary border-border">
                 <SelectValue placeholder="Clientes" />
               </SelectTrigger>
               <SelectContent>
@@ -1584,13 +1612,14 @@ useEffect(() => {
               type="month"
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="h-10 w-[180px] rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none [color-scheme:dark]"
+              className="h-10 w-full lg:w-[180px] rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none [color-scheme:dark]"
             />
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
   variant="ghost"
+  className="w-full lg:w-auto"
   onClick={async () => {
   setMostrarCompilacion(true)
   setPasoCompilacion(0)
@@ -1619,18 +1648,19 @@ useEffect(() => {
   )}
 </Button>
 
-            <Button variant="outline" className="border-border">
-              <Download />
+            <Button variant="outline" className="border-border w-full lg:w-auto" onClick={() => setMostrarExportador(true)}>
+              <FileText />
               Exportar
             </Button>
 
-            <Button onClick={abrirCreacion}>
+            <Button onClick={abrirCreacion} className="w-full lg:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Nueva Valorización
             </Button>
            <Button
   variant="outline"
   onClick={() => setMostrarImportador(true)}
+  className="w-full lg:w-auto"
 >
   <FileText className="h-4 w-4 mr-2" />
   Importar Valorización
@@ -1728,7 +1758,7 @@ useEffect(() => {
   open={mostrarImportador}
   onOpenChange={setMostrarImportador}
 >
-  <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+  <DialogContent className="w-full sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
     <DialogHeader>
       <DialogTitle>
         Importar valorización
@@ -1995,6 +2025,13 @@ alert(data.message)
 
   </DialogContent>
 </Dialog>
+<ExportDialog
+  open={mostrarExportador}
+  onOpenChange={setMostrarExportador}
+  clientes={clientes}
+  valuations={valuations}
+  nombreUsuario={nombreUsuario}
+/>
     </div>
   )
   

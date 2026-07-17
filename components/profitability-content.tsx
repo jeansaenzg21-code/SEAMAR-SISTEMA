@@ -1,7 +1,6 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -41,14 +40,6 @@ import {
   AreaChart,
   Area,
 } from "recharts"
-
-const clientProfitability: any[] = []
-
-const monthlyProfitability: any[] = []
-
-const marginTrend: any[] = []
-
-const topProjects: any[] = []
 
 export function ProfitabilityContent() {
   const totalRevenue = 0

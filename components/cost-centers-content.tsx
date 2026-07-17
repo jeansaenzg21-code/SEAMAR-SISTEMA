@@ -31,13 +31,9 @@ import {
   Download,
   Calendar,
   TrendingUp,
-  TrendingDown,
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Building2,
-  FolderKanban,
-  FileText,
   Activity,
   Globe,
   Target,
@@ -68,8 +64,6 @@ import {
 
 const clientsData: any[] = []
 const projectsData: any[] = []
-const monthlyTrend: any[] = []
-const recentActivity: any[] = []
 
 const statusConfig = {
   "en-curso": { label: "En Curso", variant: "default" as const },
@@ -87,8 +81,6 @@ export function CostCentersContent() {
   const filteredProjects = selectedClient === "all" 
     ? projectsData 
     : projectsData.filter(p => p.client === selectedClient)
-
-  const selectedClientData = clientsData.find(c => c.id === selectedClient)
 
   // Calculate totals
   const totalPresupuesto = 0

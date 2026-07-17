@@ -10,16 +10,20 @@ import mysql.connector
 sys.stdout.reconfigure(encoding="utf-8")
 
 archivo = sys.argv[1]
+db_host = sys.argv[2] if len(sys.argv) > 2 else "localhost"
+db_user = sys.argv[3] if len(sys.argv) > 3 else "root"
+db_password = sys.argv[4] if len(sys.argv) > 4 else ""
+db_name = sys.argv[5] if len(sys.argv) > 5 else "seamar"
 
 # =========================
 # MYSQL
 # =========================
 
 conexion = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="MYSQL",
-    database="seamar"
+    host=db_host,
+    user=db_user,
+    password=db_password,
+    database=db_name
 )
 
 cursor = conexion.cursor(dictionary=True)

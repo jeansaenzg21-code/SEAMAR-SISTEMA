@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useEmpresa } from "@/hooks/use-empresa";
 import {
   Upload,
   ChevronRight,
@@ -14,13 +17,11 @@ import {
   Calendar,
   Hash,
   X,
-  Check,
   Filter,
   RefreshCw,
   Download,
   Inbox,
   Loader2,
-  Landmark,
   History as HistoryIcon,
   ArrowDownCircle,
   ArrowUpCircle,
@@ -192,8 +193,8 @@ const statusMeta: Record<
   },
   pendiente: {
     label: "Pendiente",
-    color: "text-slate-400",
-    bg: "bg-slate-400/10",
+    color: "text-muted-foreground",
+    bg: "bg-muted/50",
     ring: "border-l-slate-500/60",
     icon: <Clock size={12} />,
   },
@@ -439,8 +440,8 @@ function CoincidenciaCard({
     <div
       className={cn(
         "rounded-xl border p-4 space-y-3",
-        borderColor ?? "border-white/[0.06]",
-        bgColor ?? "bg-white/[0.02]"
+        borderColor ?? "border-border",
+        bgColor ?? "bg-muted/30"
       )}
     >
       {/* Badge de origen */}
@@ -449,10 +450,10 @@ function CoincidenciaCard({
       {/* Nombre principal + monto */}
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 min-w-0">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {labelPrincipal}
           </div>
-          <div className="text-sm font-medium text-slate-200 truncate">
+          <div className="text-sm font-medium text-foreground/90 truncate">
             {nombrePrincipal ?? "-"}
           </div>
         </div>
@@ -464,18 +465,18 @@ function CoincidenciaCard({
       {/* Proyecto + documento + fecha */}
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-0.5">
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider">Proyecto</div>
-          <div className="text-xs text-slate-400 truncate">{match.proyecto}</div>
+          <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Proyecto</div>
+          <div className="text-xs text-muted-foreground truncate">{match.proyecto}</div>
         </div>
         <div className="space-y-0.5">
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider">
+          <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
             {esCobrar ? "Factura" : "Documento"}
           </div>
-          <div className="text-xs text-slate-400 font-mono">{match.documento}</div>
+          <div className="text-xs text-muted-foreground font-mono">{match.documento}</div>
         </div>
       </div>
 
-      <div className="text-[11px] text-slate-600">
+      <div className="text-[11px] text-muted-foreground/70">
   {match.fecha
     ? new Date(match.fecha).toLocaleDateString(
         "es-PE",
@@ -491,8 +492,8 @@ function CoincidenciaCard({
       {/* Glosa (descripción) — solo si el backend la envía */}
       {match.descripcion && (
         <div className="space-y-0.5">
-          <div className="text-[10px] text-slate-600 uppercase tracking-wider">Glosa</div>
-          <div className="text-xs text-slate-400">{match.descripcion}</div>
+          <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Glosa</div>
+          <div className="text-xs text-muted-foreground">{match.descripcion}</div>
         </div>
       )}
 
@@ -503,7 +504,7 @@ function CoincidenciaCard({
           className={cn(
             "w-full mt-1 py-1.5 rounded-lg text-xs font-medium border transition-all",
             accionColor ??
-              "border-white/[0.08] text-slate-400 hover:text-slate-200 hover:border-white/15"
+              "border-border text-muted-foreground hover:text-foreground hover:border-border"
           )}
         >
           {accionLabel}
@@ -528,13 +529,13 @@ function EmptyState({
 }) {
   return (
     <div className="py-16 flex flex-col items-center justify-center gap-3 text-center px-6">
-      <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-slate-500">
+      <div className="p-3 rounded-2xl bg-muted/40 border border-border text-muted-foreground">
         {icon}
       </div>
       <div className="space-y-1">
-        <div className="text-sm font-medium text-slate-300">{title}</div>
+        <div className="text-sm font-medium text-foreground/80">{title}</div>
         {description && (
-          <div className="text-xs text-slate-600 max-w-xs">{description}</div>
+          <div className="text-xs text-muted-foreground/70 max-w-xs">{description}</div>
         )}
       </div>
     </div>
@@ -553,18 +554,18 @@ function CurrencyToggle({
   onChange: (c: Moneda) => void;
 }) {
   return (
-    <div className="flex items-center gap-1 p-1 rounded-xl bg-[#0d1117] border border-white/[0.06]">
+    <div className="flex items-center gap-1 p-1 rounded-xl bg-card border border-border">
       {(["PEN", "USD"] as Moneda[]).map((c) => (
         <button
           key={c}
           onClick={() => onChange(c)}
           className={cn(
             "relative px-5 py-2 rounded-lg text-sm font-semibold tracking-widest transition-all duration-300",
-            value === c ? "text-white" : "text-slate-500 hover:text-slate-300"
+            value === c ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
           )}
         >
           {value === c && (
-            <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-white/[0.08] shadow-lg" />
+            <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-border shadow-lg" />
           )}
           <span className="relative flex items-center gap-2">
             <span className="text-xs opacity-60">{c === "PEN" ? "S/" : "$"}</span>
@@ -596,10 +597,10 @@ function SummaryCard({
     <button
       onClick={onClick}
       className={cn(
-        "group flex-1 min-w-0 rounded-2xl border p-5 text-left transition-all duration-200",
+        "group flex-1 min-w-0 rounded-2xl border p-5 text-left transition-all duration-200 min-h-[44px]",
         active
-          ? "border-white/15 bg-white/[0.04] shadow-lg shadow-black/20"
-          : "border-white/[0.05] bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.03]"
+          ? "border-border bg-muted/50 shadow-sm"
+          : "border-border/50 bg-muted/30 hover:border-border/70 hover:bg-muted/40"
       )}
     >
       <div className="flex items-center justify-between mb-3">
@@ -613,11 +614,11 @@ function SummaryCard({
           {meta.icon}
           {meta.label}
         </span>
-        {active && <span className="w-1.5 h-1.5 rounded-full bg-white/40" />}
+        {active && <span className="w-1.5 h-1.5 rounded-full bg-foreground/40" />}
       </div>
-      <div className="text-2xl font-light text-white tabular-nums">
+      <div className="text-2xl font-light text-foreground tabular-nums">
         {count}
-        <span className="text-sm text-slate-500 ml-1 font-normal">mov.</span>
+        <span className="text-sm text-muted-foreground ml-1 font-normal">mov.</span>
       </div>
       <div className={cn("text-sm mt-1 font-medium tabular-nums", meta.color)}>
         {fmt(total, currency)}
@@ -637,23 +638,23 @@ function ProgressBar({ movimientos }: { movimientos: MovimientoBancario[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>Avance de conciliación</span>
-        <span className="text-white font-medium tabular-nums">
+        <span className="text-foreground font-medium tabular-nums">
           {total ? Math.round(pct(conciliados)) : 0}% conciliado
         </span>
       </div>
-      <div className="h-1.5 rounded-full bg-white/[0.06] flex overflow-hidden gap-px">
+      <div className="h-1.5 rounded-full bg-border/50 flex overflow-hidden gap-px">
         <div className={cn("h-full bg-emerald-500 rounded-l-full transition-all duration-700", progressWidthClass(pct(conciliados)))} />
         <div className={cn("h-full bg-amber-500 transition-all duration-700",              progressWidthClass(pct(observaciones)))} />
         <div className={cn("h-full bg-rose-500 transition-all duration-700",               progressWidthClass(pct(diferencias)))} />
-        <div className={cn("h-full bg-slate-600 rounded-r-full transition-all duration-700", progressWidthClass(pct(pendientes)))} />
+        <div className={cn("h-full bg-muted-foreground/30 rounded-r-full transition-all duration-700", progressWidthClass(pct(pendientes)))} />
       </div>
-      <div className="flex items-center gap-4 text-xs text-slate-500">
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />{conciliados} conc.</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" />{observaciones} obs.</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />{diferencias} dif.</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-600" />{pendientes} pend.</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30" />{pendientes} pend.</span>
       </div>
     </div>
   );
@@ -675,14 +676,14 @@ function MovementRow({
     <button
       onClick={onClick}
       className={cn(
-        "w-full grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-5 py-4 text-left transition-all duration-150 border-b border-l-2 border-white/[0.04] last:border-b-0",
+        "w-full grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-5 py-4 text-left transition-all duration-150 border-b border-l-2 border-border/40 last:border-b-0",
         meta.ring,
-        selected ? "bg-white/[0.05]" : "hover:bg-white/[0.025]"
+        selected ? "bg-border/30" : "hover:bg-muted/20"
       )}
     >
       <div className="flex flex-col items-start gap-0.5 min-w-[90px]">
-        <span className="text-xs text-slate-400 tabular-nums">{movimiento.fecha}</span>
-        <span className="text-[11px] text-slate-600 font-mono">{movimiento.referencia}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{movimiento.fecha}</span>
+        <span className="text-[11px] text-muted-foreground/70 font-mono">{movimiento.referencia}</span>
       </div>
       <div className="flex items-center gap-2 min-w-0">
 
@@ -699,10 +700,10 @@ function MovementRow({
     />
   )}
 
-        <span className="text-sm text-slate-200 truncate">{movimiento.descripcion}</span>
+        <span className="text-sm text-foreground/90 truncate">{movimiento.descripcion}</span>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <span className={cn("text-sm font-medium tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-slate-200")}>
+        <span className={cn("text-sm font-medium tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-foreground/90")}>
           {movimiento.tipo === "credito" ? "+" : "−"} {fmt(movimiento.monto, movimiento.moneda)}
         </span>
       </div>
@@ -711,7 +712,7 @@ function MovementRow({
           {meta.icon}
           {meta.label}
         </span>
-        <ChevronRight size={14} className={cn("text-slate-600 transition-transform", selected && "text-slate-400 rotate-90")} />
+        <ChevronRight size={14} className={cn("text-muted-foreground/70 transition-transform", selected && "text-muted-foreground rotate-90")} />
       </div>
     </button>
   );
@@ -737,26 +738,26 @@ function DifferencePanel({ movimiento }: { movimiento: MovimientoBancario }) {
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Monto Sistema</div>
-            <div className="text-sm font-medium text-slate-200 tabular-nums">
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Monto Sistema</div>
+            <div className="text-sm font-medium text-foreground/90 tabular-nums">
               {fmt(match.monto, movimiento.moneda)}
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Monto Banco</div>
-            <div className="text-sm font-medium text-white tabular-nums">
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Monto Banco</div>
+            <div className="text-sm font-medium text-foreground tabular-nums">
               {fmt(movimiento.monto, movimiento.moneda)}
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Diferencia</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Diferencia</div>
             <div className="text-sm font-semibold text-rose-400 tabular-nums">
               {fmt(movimiento.diferencia ?? 0, movimiento.moneda)}
             </div>
           </div>
         </div>
         <div className="space-y-2">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider">Posible causa</div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Posible causa</div>
           <div className="flex flex-wrap gap-1.5">
             {causeOptions.map((c) => (
               <button
@@ -765,7 +766,7 @@ function DifferencePanel({ movimiento }: { movimiento: MovimientoBancario }) {
                   "text-xs px-2.5 py-1 rounded-lg border transition-all",
                   movimiento.causaDiferencia === c
                     ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
-                    : "border-white/[0.06] bg-white/[0.02] text-slate-500 hover:text-slate-300 hover:border-white/10"
+                    : "border-border bg-muted/30 text-muted-foreground hover:text-foreground/80 hover:border-border/70"
                 )}
               >
                 {c}
@@ -825,7 +826,7 @@ function ObservationPanel({
         <div className="text-sm text-amber-300 font-medium">
           {coincidencias.length} coincidencia{coincidencias.length !== 1 ? "s" : ""} encontrada{coincidencias.length !== 1 ? "s" : ""}
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-muted-foreground">
           El sistema no puede resolver automáticamente. Selecciona la coincidencia correcta.
         </div>
       </div>
@@ -874,14 +875,14 @@ function MovementDetail({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-border">
         <div className="space-y-0.5">
-          <div className="text-xs text-slate-500 uppercase tracking-widest">Movimiento bancario</div>
-          <div className="text-sm font-mono text-slate-300">{movimiento.referencia}</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-widest">Movimiento bancario</div>
+          <div className="text-sm font-mono text-foreground/80">{movimiento.referencia}</div>
         </div>
         <button
           onClick={onClose}
-          className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] transition-all"
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground/80 hover:bg-muted/50 transition-all"
         >
           <X size={16} />
         </button>
@@ -920,21 +921,21 @@ function MovementDetail({
 
 ].map(({ label, value }) => (
               <div key={label} className="space-y-1">
-                <div className="text-[10px] text-slate-600 uppercase tracking-wider">{label}</div>
-                <div className="text-sm text-slate-200">{value}</div>
+                <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">{label}</div>
+                <div className="text-sm text-foreground/90">{value}</div>
               </div>
             ))}
           </div>
           
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <span className="text-xs text-slate-500">Importe</span>
-            <span className={cn("text-xl font-light tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-white")}>
+          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 border border-border/50">
+            <span className="text-xs text-muted-foreground">Importe</span>
+            <span className={cn("text-xl font-light tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-foreground")}>
               {movimiento.tipo === "credito" ? "+" : "−"} {fmt(movimiento.monto, movimiento.moneda)}
             </span>
           </div>
         </div>
 
-        <div className="border-t border-white/[0.05]" />
+        <div className="border-t border-border/50" />
 
         {/* ── Panel OBSERVACIÓN ── */}
         {movimiento.estado === "observacion" && (
@@ -975,14 +976,14 @@ function MovementDetail({
             Si no hay ninguna, mostramos el panel original de acción manual. */}
         {movimiento.estado === "pendiente" && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-400 text-xs font-medium uppercase tracking-widest">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-widest">
               <Clock size={12} />
               Sin conciliar
             </div>
 
             {coincidencias.length > 0 ? (
               <>
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-xs text-slate-500">
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
                   Se encontraron posibles coincidencias. Revisa y confirma manualmente.
                 </div>
                 <div className="space-y-2">
@@ -992,7 +993,7 @@ function MovementDetail({
                       match={match}
                       moneda={movimiento.moneda}
                       accionLabel="Confirmar como coincidencia"
-                      accionColor="border-slate-500/30 text-slate-300 hover:bg-white/[0.04]"
+                      accionColor="border-border/50 text-foreground/80 hover:bg-muted/50"
                       onAccion={() => {/* TODO: confirmar manualmente */}}
                     />
                   ))}
@@ -1000,15 +1001,15 @@ function MovementDetail({
               </>
             ) : (
               <>
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-slate-500">
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
                   No se encontraron coincidencias en el sistema. Asigna manualmente o marca como excepción.
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   
-                  <button className="py-2.5 rounded-xl border border-white/[0.08] text-slate-400 text-sm hover:border-white/15 hover:text-slate-200 transition-all">
+                  <button className="py-2.5 rounded-xl border border-border text-muted-foreground text-sm hover:border-border hover:text-foreground transition-all">
                     Asignar manual
                   </button>
-                  <button className="py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-300 text-sm hover:bg-white/[0.06] transition-all">
+                  <button className="py-2.5 rounded-xl bg-muted/50 border border-border text-foreground/80 text-sm hover:bg-border/50 transition-all">
                     Marcar excepción
                   </button>
                 </div>
@@ -1032,16 +1033,16 @@ function ExtractoSummaryCard({
   const isProcessing = extracto.estado === "procesando";
 
   return (
-    <div className={cn("rounded-2xl border overflow-hidden", isError ? "border-rose-500/20 bg-rose-500/[0.04]" : "border-white/[0.06] bg-white/[0.02]")}>
-      <div className="flex items-center gap-4 px-5 py-4 border-b border-white/[0.05]">
+    <div className={cn("rounded-2xl border overflow-hidden", isError ? "border-rose-500/20 bg-rose-500/[0.04]" : "border-border bg-muted/30")}>
+      <div className="flex items-center gap-4 px-5 py-4 border-b border-border/50">
         <div className={cn("p-2.5 rounded-xl border", isError ? "bg-rose-500/10 border-rose-500/20" : "bg-emerald-500/10 border-emerald-500/20")}>
           {isProcessing
             ? <Loader2 size={18} className="text-amber-400 animate-spin" />
             : <FileText size={18} className={isError ? "text-rose-400" : "text-emerald-400"} />}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-slate-200 truncate">{extracto.nombreArchivo}</div>
-          <div className="text-xs text-slate-500 mt-0.5">
+          <div className="text-sm font-medium text-foreground/90 truncate">{extracto.nombreArchivo}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
             {isProcessing && "Procesando extracto…"}
             {isError && (extracto.mensajeError ?? "Error al procesar el extracto")}
             {extracto.estado === "cargado" && "Extracto bancario"}
@@ -1053,7 +1054,7 @@ function ExtractoSummaryCard({
             Cargado
           </span>
         )}
-        <button onClick={onClear} className="p-1.5 rounded-lg text-slate-600 hover:text-slate-400 transition-colors">
+        <button onClick={onClear} className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-muted-foreground transition-colors">
           <X size={14} />
         </button>
       </div>
@@ -1065,10 +1066,10 @@ function ExtractoSummaryCard({
           { label: "Movimientos", value: typeof extracto.totalMovimientos === "number" ? String(extracto.totalMovimientos) : undefined, icon: <Hash size={11} /> },
         ].map(({ label, value, icon }) => (
           <div key={label} className="space-y-1">
-            <div className="flex items-center gap-1 text-[10px] text-slate-600 uppercase tracking-wider">
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 uppercase tracking-wider">
               {icon}{label}
             </div>
-            <div className="text-sm text-slate-200 tabular-nums">{value ?? "—"}</div>
+            <div className="text-sm text-foreground/90 tabular-nums">{value ?? "—"}</div>
           </div>
         ))}
       </div>
@@ -1098,19 +1099,19 @@ function UploadZone({ onFileSelected }: { onFileSelected: (file: File) => void }
       className={cn(
         "rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-200",
         dragging
-          ? "border-slate-400 bg-white/[0.04]"
-          : "border-white/[0.08] bg-white/[0.01] hover:border-white/20 hover:bg-white/[0.025]"
+          ? "border-border bg-muted/50"
+          : "border-border bg-muted/10 hover:border-border hover:bg-muted/20"
       )}
     >
       <input ref={inputRef} type="file" accept=".xlsx,.csv,.ofx,.qfx" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-      <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
-        <Upload size={22} className="text-slate-400" />
+      <div className="p-3 rounded-2xl bg-muted/50 border border-border">
+        <Upload size={22} className="text-muted-foreground" />
       </div>
       <div className="text-center space-y-1">
-        <div className="text-sm text-slate-300 font-medium">Arrastra el extracto bancario aquí</div>
-        <div className="text-xs text-slate-600">.xlsx, .csv, .ofx, .qfx — máx. 50 MB</div>
+        <div className="text-sm text-foreground/80 font-medium">Arrastra el extracto bancario aquí</div>
+        <div className="text-xs text-muted-foreground/70">.xlsx, .csv, .ofx, .qfx — máx. 50 MB</div>
       </div>
-      <div className="text-xs text-slate-600 border border-white/[0.06] px-3 py-1.5 rounded-lg hover:border-white/10 transition-colors">
+      <div className="text-xs text-muted-foreground/70 border border-border px-3 py-1.5 rounded-lg hover:border-border/70 transition-colors">
         Seleccionar archivo
       </div>
     </div>
@@ -1129,21 +1130,21 @@ function HistorySection({
   ) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.05]">
+    <div className="rounded-2xl border border-border bg-muted/30 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-slate-400">
+          <div className="p-1.5 rounded-lg bg-muted/50 border border-border text-muted-foreground">
             <HistoryIcon size={13} />
           </div>
-          <h2 className="text-xs text-slate-500 uppercase tracking-widest">
+          <h2 className="text-xs text-muted-foreground uppercase tracking-widest">
             Historial de conciliaciones
           </h2>
         </div>
-        <span className="text-xs text-slate-600 tabular-nums">{historial.length} registros</span>
+        <span className="text-xs text-muted-foreground/70 tabular-nums">{historial.length} registros</span>
       </div>
 
       {isLoading ? (
-        <div className="py-16 flex items-center justify-center text-slate-500">
+        <div className="py-16 flex items-center justify-center text-muted-foreground">
           <Loader2 size={18} className="animate-spin" />
         </div>
       ) : historial.length === 0 ? (
@@ -1163,16 +1164,16 @@ function HistorySection({
     onOpenHistorial(h.id)
   }
   className={cn(
-                  "flex items-center gap-4 px-5 py-4 border-b border-l-2 border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition-all cursor-pointer",
+                  "flex items-center gap-4 px-5 py-4 border-b border-l-2 border-border/40 last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer",
                   meta.ring
                 )}
               >
-                <div className="p-2 rounded-lg bg-white/[0.04]">
-                  <Building2 size={14} className="text-slate-500" />
+                <div className="p-2 rounded-lg bg-muted/50">
+                  <Building2 size={14} className="text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-slate-200 truncate">{h.banco}</div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-600">
+                  <div className="text-sm text-foreground/90 truncate">{h.banco}</div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground/70">
                     <span>{h.fecha}</span>
                     <span>·</span>
                     <span className={cn("font-mono text-[10px] px-1.5 py-0.5 rounded", h.moneda === "PEN" ? "text-blue-400 bg-blue-400/10" : "text-green-400 bg-green-400/10")}>
@@ -1184,9 +1185,9 @@ function HistorySection({
                   <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full", meta.color, meta.bg)}>
                     {meta.label}
                   </span>
-                  <span className="text-xs text-slate-600 tabular-nums">{h.totalMovimientos} mov.</span>
+                  <span className="text-xs text-muted-foreground/70 tabular-nums">{h.totalMovimientos} mov.</span>
                 </div>
-                <ChevronRight size={14} className="text-slate-700 flex-shrink-0" />
+                <ChevronRight size={14} className="text-muted-foreground/50 flex-shrink-0" />
               </div>
             );
           })}
@@ -1201,6 +1202,7 @@ function HistorySection({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function BankReconciliationContent() {
+  const { data: empresa } = useEmpresa()
   const [currency, setCurrency]               = useState<Moneda>("PEN");
   const [activeFilter, setActiveFilter]       = useState<EstadoMovimiento | null>(null);
   const [selectedMovimiento, setSelectedMovimiento] = useState<MovimientoBancario | null>(null);
@@ -1322,7 +1324,7 @@ export default function BankReconciliationContent() {
     link.href = url
 
     link.download =
-      `SEAMAR_CONCILIACION_${new Date()
+      `${(empresa?.nombreComercial || "Conciliacion").replace(/\s+/g, "_")}_${new Date()
         .toISOString()
         .slice(0,10)}.xlsx`
 
@@ -1577,168 +1579,152 @@ const seleccionarCoincidencia = async (
   const totalFor = (list: MovimientoBancario[]) => list.reduce((s, m) => s + m.monto, 0);
 
   return (
-    <div className="min-h-screen bg-[#080c12] text-white font-sans">
-      {/* Top Bar */}
-      <div className="border-b border-white/[0.06] bg-[#080c12]/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-[1600px] mx-auto px-8 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-slate-400">
-              <Landmark size={14} />
-            </div>
-            <div className="text-base font-semibold text-white tracking-tight">
-              Conciliación Bancaria
-            </div>
-            <span className="text-white/20">·</span>
-            <span className="text-sm text-slate-500 capitalize">
-              {new Date().toLocaleDateString("es-PE", { month: "long", year: "numeric" })}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <CurrencyToggle value={currency} onChange={handleCurrencyChange} />
-            <button
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm text-slate-400 hover:text-slate-200 hover:border-white/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={movimientos.length === 0}
-            >
-              <RefreshCw size={13} />
-              Ejecutar
-            </button>
-            <button
-  onClick={handleExport}
-  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-sm text-slate-400 hover:text-slate-200 hover:border-white/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-  disabled={movimientos.length === 0}
->
-  <Download size={13} />
-  Exportar
-</button>
-          </div>
+    <div className="space-y-8">
+      {/* Encabezado */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Conciliación Bancaria</h1>
+          <p className="text-muted-foreground">
+            Concilia los extractos bancarios con las cuentas del sistema.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <CurrencyToggle value={currency} onChange={handleCurrencyChange} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-h-[44px]"
+            disabled={movimientos.length === 0}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Ejecutar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-h-[44px]"
+            onClick={handleExport}
+            disabled={movimientos.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
         </div>
       </div>
 
-      {/* Main layout */}
-      <div className="max-w-[1600px] mx-auto px-8 py-8 flex gap-8">
-        {/* Left column */}
-        <div className="flex-1 min-w-0 space-y-6">
-          {/* Upload */}
-          <div className="space-y-3">
-            <h2 className="text-xs text-slate-500 uppercase tracking-widest">Extracto bancario</h2>
-            {extracto ? (
-              <ExtractoSummaryCard extracto={extracto} onClear={handleClearExtracto} />
-            ) : (
-              <>
-                <UploadZone onFileSelected={handleFileSelected} />
-                <p className="text-xs text-slate-600 px-1">
-                  No hay extractos cargados. Sube un archivo para iniciar la conciliación.
-                </p>
-              </>
-            )}
-          </div>
+      {/* Upload */}
+      <div className="space-y-3">
+        {extracto ? (
+          <ExtractoSummaryCard extracto={extracto} onClear={handleClearExtracto} />
+        ) : (
+          <>
+            <UploadZone onFileSelected={handleFileSelected} />
+            <p className="text-xs text-muted-foreground px-1">
+              No hay extractos cargados. Sube un archivo para iniciar la conciliación.
+            </p>
+          </>
+        )}
+      </div>
 
-          {/* Progress */}
-          {movimientos.length > 0 && (
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-              <ProgressBar movimientos={movimientos} />
-            </div>
-          )}
+      {/* Progress */}
+      {movimientos.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-5">
+            <ProgressBar movimientos={movimientos} />
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Summary cards */}
-          <div className="flex gap-3">
-            {(["observacion", "diferencia", "pendiente", "conciliado"] as EstadoMovimiento[]).map((s) => (
-              <SummaryCard
-                key={s}
-                status={s}
-                count={summary[s].length}
-                total={totalFor(summary[s])}
-                currency={currency}
-                active={activeFilter === s}
-                onClick={() => setActiveFilter((prev) => (prev === s ? null : s))}
-              />
-            ))}
-          </div>
+      {/* Summary cards */}
+      <div className="flex flex-col lg:flex-row gap-3">
+        {(["observacion", "diferencia", "pendiente", "conciliado"] as EstadoMovimiento[]).map((s) => (
+          <SummaryCard
+            key={s}
+            status={s}
+            count={summary[s].length}
+            total={totalFor(summary[s])}
+            currency={currency}
+            active={activeFilter === s}
+            onClick={() => setActiveFilter((prev) => (prev === s ? null : s))}
+          />
+        ))}
+      </div>
 
-          {/* Movements */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xs text-slate-500 uppercase tracking-widest">Movimientos</h2>
-                <span className="text-xs text-slate-600 tabular-nums">
-                  {filtered.length} de {movimientos.length}
-                </span>
-                {activeFilter && (
-                  <button
-                    onClick={() => setActiveFilter(null)}
-                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    <X size={10} />
-                    Limpiar filtro
-                  </button>
-                )}
-              </div>
-              <button className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors">
-                <Filter size={11} />
-                Filtrar
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-              {isLoadingMovimientos ? (
-                <div className="py-16 flex items-center justify-center text-slate-500">
-                  <Loader2 size={18} className="animate-spin" />
-                </div>
-              ) : filtered.length === 0 ? (
-                <EmptyState
-                  icon={<Inbox size={18} />}
-                  title={movimientos.length === 0 ? "No se encontraron movimientos" : "Sin resultados para este filtro"}
-                  description={movimientos.length === 0 ? "Carga un extracto bancario para ver los movimientos aquí." : "Intenta limpiar el filtro para ver el resto de movimientos."}
-                />
-              ) : (
-                filtered.map((m) => (
-  <MovementRow
-    key={m.id}
-    movimiento={m}
-    selected={
-      selectedMovimiento?.id === m.id
-    }
-    onClick={() =>
-      setSelectedMovimiento(m)
-    }
-    esReciente={conciliadosRecientes.includes(
-      Number(m.id)
-    )}
-  />
-
-                ))
+      {/* Movements */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-medium">Movimientos</h2>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {filtered.length} de {movimientos.length}
+              </span>
+              {activeFilter && (
+                <button
+                  onClick={() => setActiveFilter(null)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={10} />
+                  Limpiar filtro
+                </button>
               )}
             </div>
+            <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Filter size={11} />
+              Filtrar
+            </button>
           </div>
 
-          {/* Historial */}
-          <div className="space-y-2">
-            <HistorySection
-  historial={historial}
-  isLoading={isLoadingHistorial}
-  onOpenHistorial={abrirHistorial}
-/>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div className={cn("transition-all duration-300 overflow-hidden flex-shrink-0", selectedMovimiento ? "w-[380px]" : "w-0")}>
-          {selectedMovimiento && (
-            <div className="w-[380px] rounded-2xl border border-white/[0.06] bg-[#0d1117] h-fit sticky top-24 overflow-hidden">
-              <MovementDetail
-  movimiento={selectedMovimiento}
-  onClose={() =>
-    setSelectedMovimiento(null)
-  }
-  onSeleccionarCoincidencia={
-    seleccionarCoincidencia
-  }
-/>
+          {isLoadingMovimientos ? (
+            <div className="py-16 flex items-center justify-center text-muted-foreground">
+              <Loader2 size={18} className="animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={<Inbox size={18} />}
+              title={movimientos.length === 0 ? "No se encontraron movimientos" : "Sin resultados para este filtro"}
+              description={movimientos.length === 0 ? "Carga un extracto bancario para ver los movimientos aquí." : "Intenta limpiar el filtro para ver el resto de movimientos."}
+            />
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border/70">
+              <div className="overflow-x-auto">
+                {filtered.map((m) => (
+                  <MovementRow
+                    key={m.id}
+                    movimiento={m}
+                    selected={selectedMovimiento?.id === m.id}
+                    onClick={() => setSelectedMovimiento(m)}
+                    esReciente={conciliadosRecientes.includes(Number(m.id))}
+                  />
+                ))}
+              </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Historial */}
+      <HistorySection
+        historial={historial}
+        isLoading={isLoadingHistorial}
+        onOpenHistorial={abrirHistorial}
+      />
+
+      {/* Right panel */}
+      {selectedMovimiento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedMovimiento(null)} />
+          <div className="relative z-10 w-full max-w-lg mx-4">
+            <Card className="bg-card border-border">
+              <MovementDetail
+                movimiento={selectedMovimiento}
+                onClose={() => setSelectedMovimiento(null)}
+                onSeleccionarCoincidencia={seleccionarCoincidencia}
+              />
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

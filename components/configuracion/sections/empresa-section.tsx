@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,41 +19,118 @@ interface EmpresaData {
   correo: string
 }
 
-// Datos simulados solo para revisar el diseño. Cuando exista el backend,
-// esto se reemplaza por un fetch a GET /api/configuracion/empresa
-// (ver versión anterior del componente / INTEGRACION.md).
-const MOCK_EMPRESA: EmpresaData = {
-  logoUrl: null,
-  razonSocial: "SEAMAR Operaciones Marítimas S.A.C.",
-  nombreComercial: "SEAMAR",
-  ruc: "20601234567",
-  direccion: "Av. La Marina 1250 - Callao",
-  telefono: "(01) 555-1234",
-  correo: "operaciones@seamar.pe",
+function snakeToCamel(row: any): EmpresaData {
+  return {
+    logoUrl: row.logo || null,
+    razonSocial: row.razon_social || "",
+    nombreComercial: row.nombre_comercial || "",
+    ruc: row.ruc || "",
+    direccion: row.direccion || "",
+    telefono: row.telefono || "",
+    correo: row.correo || "",
+  }
 }
 
 export function EmpresaSection() {
-  const [data, setData] = useState<EmpresaData>(MOCK_EMPRESA)
+  const [data, setData] = useState<EmpresaData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const res = await fetch("/api/configuracion/empresa")
+        if (res.ok) {
+          const json = await res.json()
+          if (json) {
+            setData(snakeToCamel(json))
+          } else {
+            setData({
+              logoUrl: null,
+              razonSocial: "",
+              nombreComercial: "",
+              ruc: "",
+              direccion: "",
+              telefono: "",
+              correo: "",
+            })
+          }
+        }
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargar()
+  }, [])
+
   function updateField<K extends keyof EmpresaData>(field: K, value: EmpresaData[K]) {
-    setData((prev) => ({ ...prev, [field]: value }))
+    setData((prev) => (prev ? { ...prev, [field]: value } : prev))
   }
 
   function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (!file) return
-    setData((prev) => ({ ...prev, logoUrl: URL.createObjectURL(file) }))
+    if (!file || !data) return
+    setLogoFile(file)
+    setData((prev) => (prev ? { ...prev, logoUrl: URL.createObjectURL(file) } : prev))
   }
 
-  // Simulado: sin backend todavía, solo confirma visualmente el guardado.
-  function handleSave() {
+  async function handleSave() {
+    if (!data) return
     setSaving(true)
-    setTimeout(() => {
-      setSaving(false)
+    try {
+      const fd = new FormData()
+      fd.append("razon_social", data.razonSocial)
+      fd.append("nombre_comercial", data.nombreComercial)
+      fd.append("ruc", data.ruc)
+      fd.append("direccion", data.direccion)
+      fd.append("telefono", data.telefono)
+      fd.append("correo", data.correo)
+      if (logoFile) {
+        fd.append("logo", logoFile)
+      }
+
+      const res = await fetch("/api/configuracion/empresa", {
+        method: "PUT",
+        body: fd,
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) throw new Error(json.message || "Error al guardar")
+
+      setLogoFile(null)
+
       toast.success("Los datos de la empresa se guardaron correctamente")
-    }, 600)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al guardar")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card className="border-border/80 bg-card shadow-sm">
+        <CardContent className="flex items-center justify-center p-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!data) {
+    return (
+      <Card className="border-border/80 bg-card shadow-sm">
+        <CardContent className="p-10 text-center text-sm text-muted-foreground">
+          No se pudieron cargar los datos de la empresa.
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

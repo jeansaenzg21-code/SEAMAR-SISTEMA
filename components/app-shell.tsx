@@ -5,19 +5,18 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  BarChart3,
-  PieChart,
   Users,
   Settings,
   Bell,
   ChevronDown,
   Anchor,
-  Sparkles,
   Menu,
   Activity,
+  CheckCircle,
+  MessageSquareWarning,
+  Landmark,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,22 +24,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useEffect, useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import {
-  CheckCircle,
-  MessageSquareWarning,
-} from "lucide-react"
-import { Landmark } from "lucide-react"
+import { useEmpresa } from "@/hooks/use-empresa"
+import { useRol, useUser } from "@/lib/role-context"
 
-const navigation = [
+const NAV_ADMIN = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Valorizaciones", href: "/valuations", icon: Activity },
   { name: "Aprobaciones", href: "/approvals", icon: CheckCircle },
@@ -48,10 +43,10 @@ const navigation = [
   { name: "Conciliación Bancaria", href: "/bank-reconciliation", icon: Landmark },
 ]
 
-const analytics = [
-  { name: "Centro de Costos", href: "/analytics/cost-centers", icon: BarChart3 },
-  { name: "Rentabilidad", href: "/analytics/profitability", icon: PieChart },
+const NAV_SUPERVISOR = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 ]
+
 const clientsSection = [
   {
     name: "Clientes",
@@ -75,7 +70,6 @@ const providersSection = [
 ]
 
 export function Sidebar({
-  
   mobileMenuOpen,
   setMobileMenuOpen,
   sidebarCollapsed,
@@ -88,11 +82,18 @@ export function Sidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { data: empresa } = useEmpresa()
+  const sesion = useUser()
+  const { rol } = useRol()
+
+  const esSupervisor = rol === "SUPERVISOR"
+
+  const navItems = esSupervisor ? NAV_SUPERVISOR : NAV_ADMIN
 
   const [expandedSections, setExpandedSections] = useState({
-    analytics: true,
     clients: true,
     providers: true,
+    valorizaciones: true,
   })
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -118,43 +119,49 @@ export function Sidebar({
 
       <aside
   className={cn(
-    "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col bg-sidebar",
+    "fixed left-0 top-0 z-50 flex h-screen flex-col bg-sidebar transition-all duration-300 ease-in-out",
+    mobileMenuOpen ? "w-[80vw] max-w-sm" : sidebarCollapsed ? "w-20" : "w-64",
     mobileMenuOpen
       ? "block"
       : "hidden lg:flex"
   )}
 >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-          {/* Toggle de colapso: funcionalidad exclusiva de escritorio */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden lg:inline-flex"
-            onClick={() => setSidebarCollapsed?.(!sidebarCollapsed)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Anchor className="h-5 w-5 text-primary-foreground" />
-          </div>
-          {!sidebarCollapsed && (
-            <div className="flex flex-col">
-              <span className="text-lg font-semibold text-sidebar-foreground">
-                Seamar
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Operaciones Marítimas
-              </span>
-            </div>
-          )}
+        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+         
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
+                  {empresa?.logo ? (
+                    <img src={empresa.logo} alt="Logo" className="h-10 w-10 rounded-lg object-cover" />
+                  ) : (
+                    <Anchor className="h-5 w-5 text-primary-foreground" />
+                  )}
+                </div>
+                <div className={cn("flex flex-col justify-center min-w-0 transition-all duration-300 overflow-hidden", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>
+                  <span className="truncate text-sm font-semibold text-sidebar-foreground">
+                    {empresa?.nombreComercial || ""}
+                  </span>
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent
+              side="right"
+              align="start"
+              sideOffset={8}
+              className="bg-popover text-foreground border border-border shadow-md"
+            >
+              {empresa?.razonSocial || empresa?.nombreComercial || ""}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           {/* Main Navigation */}
           <div className="space-y-1">
-            {navigation.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
@@ -170,12 +177,58 @@ export function Sidebar({
                   )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
-                  {!sidebarCollapsed && item.name}
+                  <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>{item.name}</span>
                 </Link>
               )
             })}
           </div>
 
+          {esSupervisor && (
+          <div className="pt-4">
+            <button
+              onClick={() => toggleSection("valorizaciones")}
+              className={cn(
+                "flex w-full items-center px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground",
+                sidebarCollapsed ? "justify-center" : "justify-between"
+              )}
+            >
+              <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>Valorizaciones</span>
+              {!sidebarCollapsed && (
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    expandedSections.valorizaciones ? "" : "-rotate-90"
+                  )}
+                />
+              )}
+            </button>
+
+            {!sidebarCollapsed && expandedSections.valorizaciones && (
+              <div className="space-y-1">
+                {(() => {
+                  const isActive = pathname === "/approvals"
+                  return (
+                    <Link
+                      href="/approvals"
+                      onClick={closeMobileMenu}
+                      className={cn(
+                        "ml-4 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-primary"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      )}
+                    >
+                      <CheckCircle className="h-4 w-4 shrink-0" />
+                      Aprobaciones
+                    </Link>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
+          )}
+
+          {!esSupervisor && (
           <div className="pt-4">
             <button
               onClick={() => toggleSection("clients")}
@@ -184,7 +237,7 @@ export function Sidebar({
                 sidebarCollapsed ? "justify-center" : "justify-between"
               )}
             >
-              {!sidebarCollapsed && "Clientes"}
+              <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>Clientes</span>
               <ChevronDown
                 className={cn(
                   "h-4 w-4 transition-transform",
@@ -219,7 +272,9 @@ export function Sidebar({
               </div>
             )}
           </div>
+          )}
 
+          {!esSupervisor && (
           <div className="pt-4">
             <button
               onClick={() => toggleSection("providers")}
@@ -228,7 +283,7 @@ export function Sidebar({
                 sidebarCollapsed ? "justify-center" : "justify-between"
               )}
             >
-              {!sidebarCollapsed && "Proveedores"}
+              <span className={cn("transition-all duration-300 overflow-hidden whitespace-nowrap", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>Proveedores</span>
               {!sidebarCollapsed && (
                 <ChevronDown
                   className={cn(
@@ -264,48 +319,11 @@ export function Sidebar({
               </div>
             )}
           </div>
+          )}
 
-          {/* Analytics Section */}
-          <div className="pt-4">
-            <button
-              onClick={() => toggleSection("analytics")}
-              className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-sidebar-foreground"
-            >
-              Analítica
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 transition-transform",
-                  expandedSections.analytics ? "" : "-rotate-90"
-                )}
-              />
-            </button>
-            {!sidebarCollapsed && expandedSections.analytics && (
-              <div className="space-y-1">
-                {analytics.map((item) => {
-                  const isActive = pathname === item.href
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={closeMobileMenu}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
         </nav>
 
-        {/* User Section */}
+        {/* Sección inferior: menú de usuario con Configuración + Cerrar sesión */}
         <div className="border-t border-sidebar-border p-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -317,31 +335,34 @@ export function Sidebar({
                 )}
               >
                 <Avatar className="h-8 w-8">
+                  {sesion?.avatar ? (
+                    <AvatarImage src={sesion.avatar} alt={sesion.nombre} />
+                  ) : null}
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    SS
+                    {sesion?.nombre ? sesion.nombre.charAt(0).toUpperCase() + (sesion.nombre.split(" ")[1]?.charAt(0) || sesion.nombre.charAt(1) || "").toUpperCase() : "U"}
                   </AvatarFallback>
                 </Avatar>
-                {!sidebarCollapsed && (
-                  <div className="flex flex-1 flex-col items-start text-left">
-                    <span className="text-sm font-medium text-sidebar-foreground">
-                      Sheran Saenz
-                    </span>
-                    <span className="text-xs text-muted-foreground">Administrador</span>
-                  </div>
-                )}
-
-                {!sidebarCollapsed && (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                )}
+                <div className={cn("flex flex-1 flex-col items-start text-left transition-all duration-300 overflow-hidden", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-40 opacity-100")}>
+                  <span className="text-sm font-medium text-sidebar-foreground">
+                    {sesion?.nombre || "Usuario"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{sesion?.cargo || sesion?.rol || ""}</span>
+                </div>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-all duration-300", sidebarCollapsed ? "max-w-0 opacity-0" : "max-w-4 opacity-100")} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/configuracion")}>
                 <Settings className="mr-2 h-4 w-4" />
                 Configuración
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={async () => {
+                try {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                } catch {}
+                router.replace("/login");
+              }}>
                 Cerrar sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -353,7 +374,6 @@ export function Sidebar({
 }
 
 export function Header({
-  
   setMobileMenuOpen,
   sidebarCollapsed,
   setSidebarCollapsed,
@@ -362,24 +382,27 @@ export function Header({
   sidebarCollapsed?: boolean
   setSidebarCollapsed?: (value: boolean) => void
 }) {
-  console.log("HEADER RENDERIZADO")
   const [actividades, setActividades] = useState<any[]>([])
   const [cargandoActividad, setCargandoActividad] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     async function cargarActividad() {
       try {
         const response = await fetch("/api/actividad?limit=20")
+        if (cancelled) return
         const data = await response.json()
-        setActividades(data.actividades || [])
+        if (!cancelled) setActividades(data.actividades || [])
       } catch (error) {
         console.error(error)
       } finally {
-        setCargandoActividad(false)
+        if (!cancelled) setCargandoActividad(false)
       }
     }
 
     cargarActividad()
+    return () => { cancelled = true }
   }, [])
 
   return (
@@ -398,7 +421,11 @@ px-3 md:px-6
           className=""
           onClick={(e) => {
             e.stopPropagation()
-            setMobileMenuOpen?.(true)
+            if (window.innerWidth >= 1024) {
+              setSidebarCollapsed?.(!sidebarCollapsed)
+            } else {
+              setMobileMenuOpen?.(true)
+            }
           }}
         >
           <Menu className="h-5 w-5" />
@@ -483,49 +510,30 @@ px-3 md:px-6
             </div>
           </PopoverContent>
         </Popover>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <span className="hidden md:block text-sm">
-                Vista Ejecutiva
-              </span>
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Vista Ejecutiva</DropdownMenuItem>
-            <DropdownMenuItem>Vista Operativa</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      
       </div>
     </header>
   )
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  
-
-
+  const router = useRouter()
   const [mostrarRecordatorio, setMostrarRecordatorio] = useState(false)
   const [valorizacionesPendientes, setValorizacionesPendientes] = useState(0)
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sidebarCollapsed") === "true"
+    }
+    return false
+  })
+  const { rol } = useRol()
 
   useEffect(() => {
-  console.log("mobileMenuOpen =", mobileMenuOpen)
-}, [mobileMenuOpen])
-  useEffect(() => {
+    if (rol !== "SUPERVISOR") return
+
     async function verificarPendientes() {
-      const sesionResponse = await fetch("/api/auth/session")
-
-      if (!sesionResponse.ok) return
-
-      const sesion = await sesionResponse.json()
-
-      if (sesion.rol !== "SUPERVISOR") return
-
       const pendientesResponse = await fetch(
         "/api/valorizaciones/pendientes"
       )
@@ -549,67 +557,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     verificarPendientes()
-  }, [])
+  }, [rol])
+
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", String(sidebarCollapsed))
+  }, [sidebarCollapsed])
 
   return (
     <>
       {mostrarRecordatorio && (
-        <div
-          className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          style={{
-            zIndex: 999999999,
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            className="w-[520px] rounded-2xl border border-blue-500/20 bg-zinc-900/95 backdrop-blur-xl shadow-2xl p-8"
-            style={{
-              position: "relative",
-              zIndex: 1000000000,
-            }}
-          >
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-[520px] rounded-2xl border border-border bg-card shadow-2xl p-8">
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 text-3xl">
-                🔔
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Bell className="h-6 w-6 text-primary" />
               </div>
 
-              <h2 className="text-2xl font-semibold text-white">
+              <h2 className="text-2xl font-semibold text-card-foreground">
                 Recordatorio de aprobación
               </h2>
 
-              <p className="mt-5 text-lg text-zinc-300">
+              <p className="mt-5 text-lg text-muted-foreground">
                 Tiene{" "}
-                <span className="text-2xl font-bold text-blue-400">
+                <span className="text-2xl font-bold text-primary">
                   {valorizacionesPendientes}
                 </span>{" "}
                 valorizaciones pendientes de aprobación.
               </p>
 
-              <p className="mt-3 text-sm text-zinc-500">
+              <p className="mt-3 text-sm text-muted-foreground">
                 Revise las valorizaciones pendientes para continuar el flujo operativo.
               </p>
 
               <div className="mt-8 flex gap-4">
-                <button
-                  type="button"
-                  className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 transition-all"
+                <Button
                   onClick={() => {
                     setMostrarRecordatorio(false)
-                    window.location.href = "/approvals"
+                    router.push("/approvals")
                   }}
                 >
                   Revisar ahora
-                </button>
+                </Button>
 
-                <button
-                  type="button"
-                  className="rounded-lg border border-zinc-700 px-6 py-2 text-zinc-300 hover:bg-zinc-800 transition-all"
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setMostrarRecordatorio(false)
                   }}
                 >
                   Más tarde
-                </button>
+                </Button>
               </div>
             </div>
           </div>

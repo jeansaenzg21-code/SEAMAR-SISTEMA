@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import ExcelJS from "exceljs"
+import pool from "@/lib/mysql"
 
 interface Coincidencia {
   origen: string
@@ -25,6 +26,8 @@ interface Movimiento {
 
 export async function POST(request: NextRequest) {
   try {
+    const [empresaRows]: any = await pool.query("SELECT nombre_comercial FROM empresa LIMIT 1")
+    const empresaNombre = empresaRows[0]?.nombre_comercial || ""
 
     const {
       banco,
@@ -40,8 +43,8 @@ export async function POST(request: NextRequest) {
 
     const workbook = new ExcelJS.Workbook()
 
-    workbook.creator = "SEAMAR"
-    workbook.company = "SEAMAR"
+    workbook.creator = empresaNombre
+    workbook.company = empresaNombre
     workbook.created = new Date()
 
     // ======================================================
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
     const resumen = workbook.addWorksheet("Resumen")
 
     resumen.mergeCells("A1:B1")
-    resumen.getCell("A1").value = "SEAMAR"
+    resumen.getCell("A1").value = empresaNombre
 
     resumen.mergeCells("A2:B2")
     resumen.getCell("A2").value =

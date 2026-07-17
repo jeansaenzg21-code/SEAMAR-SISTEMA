@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { cacheGet, cacheSet } from "@/lib/simple-cache"
 import {
   Filter,
   Download,
@@ -168,8 +169,9 @@ const [monedaExportar, setMonedaExportar] =
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
 
   useEffect(() => {
-    cargarCuentasPorPagar()
-    cargarProveedores()
+    let cancelled = false
+    Promise.all([cargarCuentasPorPagar(), cargarProveedores()]).then(() => { if (cancelled) return })
+    return () => { cancelled = true }
   }, [])
 
   const cargarCuentasPorPagar = async (
@@ -195,16 +197,22 @@ const [monedaExportar, setMonedaExportar] =
     }
   }
 
-  const cargarProveedores = async () => {
+  const cargarProveedores = useCallback(async () => {
     try {
+      const cached = cacheGet<any[]>("proveedores")
+      if (cached) {
+        setProveedores(cached)
+        return
+      }
       const response = await fetch("/api/proveedores")
       const data = await response.json()
-
-      setProveedores(data)
+      const proveedores = Array.isArray(data) ? data : []
+      cacheSet("proveedores", proveedores)
+      setProveedores(proveedores)
     } catch (error) {
       console.error(error)
     }
-  }
+  }, [])
 
   const sincronizarOneDrive = async () => {
 
@@ -308,7 +316,7 @@ setResultadoSync(sync);
           }
 
         },
-        1000
+        3000
       );
 
   } catch (error) {

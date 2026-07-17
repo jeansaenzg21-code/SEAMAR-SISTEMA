@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { subirDocumentoAOneDrive } from "@/lib/onedrive"
+import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive"
 
 
 export async function POST(req: Request) {
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
 
     const resultado =
-      await subirDocumentoAOneDrive(
+      await subirDocumentoRespaldoAOneDrive(
         `Observacion-${valorizacionId}-${file.name}`,
         buffer
       )

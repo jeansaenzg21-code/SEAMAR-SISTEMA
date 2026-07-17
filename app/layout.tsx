@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/lib/theme-provider"
+import { RoleProvider } from "@/lib/role-context"
+import { obtenerSesion } from "@/lib/session"
 import { Toaster } from "sonner"
 import "./globals.css"
 
@@ -9,16 +11,18 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Seamar - Plataforma de Operaciones Marítimas",
+  title: "Sistema de Gestión Empresarial",
   description:
-    "Automatización inteligente de facturas, centros de costos y gestión documental para operaciones marítimas",
+    "Plataforma de gestión empresarial con automatización de facturas, centros de costos y gestión documental",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const sesion = await obtenerSesion()
+
   return (
     <html lang="es" suppressHydrationWarning>
       <body className="font-sans antialiased">
@@ -27,7 +31,9 @@ export default function RootLayout({
           defaultTheme="dark"
           enableSystem={false}
         >
-          {children}
+          <RoleProvider sesion={sesion}>
+            {children}
+          </RoleProvider>
 
           <Toaster richColors position="top-right" />
 

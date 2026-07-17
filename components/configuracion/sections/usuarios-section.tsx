@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,23 +10,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreVertical, Plus, UserX, Pencil } from "lucide-react"
+import { MoreVertical, Plus, UserX, Pencil, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NuevoUsuarioDialog } from "@/components/configuracion/sections/nuevo-usuario-dialog"
 
-// Los roles y el estado son identificadores que en el futuro vendrán del
-// backend. Esta sección es la única responsable de traducirlos a etiqueta
-// y estilo, igual que ALERT_STATUS_CONFIG / CLIENT_STATUS_CONFIG en el
-// Dashboard.
 export type UsuarioRol = "administrador" | "supervisor" | "operador" | "consulta"
 export type UsuarioEstado = "activo" | "inactivo"
 
 export interface Usuario {
   id: string
+  usuario: string
   nombre: string
   correo: string
+  cargo: string
   rol: UsuarioRol
   estado: UsuarioEstado
+}
+
+const MAP_ROL_DB_TO_FRONT: Record<string, UsuarioRol> = {
+  ADMINISTRADOR: "administrador",
+  SUPERVISOR: "supervisor",
+  OPERADOR: "operador",
+}
+
+const MAP_ESTADO_DB_TO_FRONT: Record<string, UsuarioEstado> = {
+  ACTIVO: "activo",
+  INACTIVO: "inactivo",
 }
 
 const ROL_CONFIG: Record<UsuarioRol, { label: string; className: string }> = {
@@ -58,34 +67,79 @@ const ESTADO_CONFIG: Record<UsuarioEstado, { label: string; className: string; d
   },
 }
 
-// Datos simulados solo para revisar el diseño. Cuando exista el backend,
-// esto se reemplaza por un fetch a GET /api/configuracion/usuarios
-// (ver INTEGRACION.md).
-const MOCK_USUARIOS: Usuario[] = [
-  { id: "1", nombre: "Sheran Saenz", correo: "sheran.saenz@seamar.pe", rol: "administrador", estado: "activo" },
-  { id: "2", nombre: "Carlos Mendoza", correo: "carlos.mendoza@seamar.pe", rol: "supervisor", estado: "activo" },
-  { id: "3", nombre: "María Torres", correo: "maria.torres@seamar.pe", rol: "operador", estado: "activo" },
-  { id: "4", nombre: "Luis Ramos", correo: "luis.ramos@seamar.pe", rol: "consulta", estado: "inactivo" },
-]
+function rowToUsuario(row: any): Usuario {
+  return {
+    id: String(row.id),
+    usuario: row.usuario || "",
+    nombre: row.nombre || "",
+    correo: row.correo || "",
+    cargo: row.cargo || "",
+    rol: MAP_ROL_DB_TO_FRONT[row.rol] || "operador",
+    estado: MAP_ESTADO_DB_TO_FRONT[row.estado] || "inactivo",
+  }
+}
 
 export function UsuariosSection() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>(MOCK_USUARIOS)
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editUsuario, setEditUsuario] = useState<Usuario | null>(null)
 
-  // Simulado: solo actualiza el estado local, sin backend todavía.
-  function handleToggleEstado(usuario: Usuario) {
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const res = await fetch("/api/configuracion/usuarios")
+        if (res.ok) {
+          const json = await res.json()
+          setUsuarios(json.map(rowToUsuario))
+        }
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargar()
+  }, [])
+
+  async function handleToggleEstado(usuario: Usuario) {
     const nuevoEstado: UsuarioEstado = usuario.estado === "activo" ? "inactivo" : "activo"
-    setUsuarios((prev) =>
-      prev.map((u) => (u.id === usuario.id ? { ...u, estado: nuevoEstado } : u))
-    )
-    toast.success(
-      nuevoEstado === "inactivo" ? `${usuario.nombre} fue desactivado` : `${usuario.nombre} fue reactivado`
-    )
+    const dbEstado = nuevoEstado === "activo" ? "ACTIVO" : "INACTIVO"
+
+    try {
+      const res = await fetch(`/api/configuracion/usuarios/${usuario.id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: dbEstado }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) throw new Error(json.message || "Error al cambiar estado")
+
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === usuario.id ? { ...u, estado: nuevoEstado } : u))
+      )
+
+      toast.success(
+        nuevoEstado === "inactivo" ? `${usuario.nombre} fue desactivado` : `${usuario.nombre} fue reactivado`
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al cambiar estado")
+    }
   }
 
   function handleUsuarioCreado(usuario: Usuario) {
-    setUsuarios((prev) => [usuario, ...prev])
-    toast.success("Usuario creado correctamente")
+    setUsuarios((prev) => {
+      const idx = prev.findIndex((u) => u.id === usuario.id)
+      if (idx !== -1) {
+        const copia = [...prev]
+        copia[idx] = usuario
+        return copia
+      }
+      return [usuario, ...prev]
+    })
   }
 
   return (
@@ -101,6 +155,11 @@ export function UsuariosSection() {
           </Button>
         </div>
 
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <div className="overflow-hidden rounded-xl border border-border/70">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -160,7 +219,7 @@ export function UsuariosSection() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => toast.info("Edición de usuario próximamente")}>
+                            <DropdownMenuItem onClick={() => { setEditUsuario(usuario); setDialogOpen(true) }}>
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
                             </DropdownMenuItem>
@@ -178,9 +237,15 @@ export function UsuariosSection() {
             </table>
           </div>
         </div>
+        )}
       </CardContent>
 
-      <NuevoUsuarioDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={handleUsuarioCreado} />
+      <NuevoUsuarioDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditUsuario(null) }}
+        onCreated={handleUsuarioCreado}
+        editUsuario={editUsuario}
+      />
     </Card>
   )
 }
