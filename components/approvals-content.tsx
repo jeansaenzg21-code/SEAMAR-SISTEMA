@@ -92,8 +92,12 @@ function mapApiToApproval(v: any): Approval {
         : v.estado === "APROBADO"
         ? "approved"
         : "draft",
-    submittedBy: v.encargado ?? "-",
-    submittedDate: v.fecha_revision,
+    submittedBy: v.enviado_revision_por ?? "—",
+    submittedDate: v.estado === "OBSERVADO"
+      ? v.fecha_observacion
+      : v.estado === "APROBADO"
+      ? v.fecha_aprobacion
+      : v.fecha_revision,
     priority: "medium",
     respuesta_observacion: v.respuesta_observacion,
     archivo_respuesta_nombre: v.archivo_respuesta_nombre,
@@ -123,6 +127,7 @@ export function ApprovalsContent() {
     if (!response.ok) return
     const data = await response.json()
     if (!Array.isArray(data)) return
+    console.log("APROBACIONES FRONTEND - data[0]:", data[0]?.enviado_revision_por, "proto:", Object.prototype.toString.call(data[0]))
     setApprovals(data.map(mapApiToApproval))
   }, [])
 

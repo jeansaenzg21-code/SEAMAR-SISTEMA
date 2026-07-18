@@ -7,7 +7,7 @@ import numpy as np
 from paddleocr import PaddleOCR
 
 ocr = PaddleOCR(
-    use_angle_cls=True,
+    use_textline_orientation=True,
     lang="es"
 )
 
@@ -29,9 +29,11 @@ def extraer_texto(pdf_path):
             pix.n
         )
 
-        resultado = ocr.ocr(imagen)
-
-    
+        try:
+            resultado = ocr.ocr(imagen)
+        except Exception as e:
+            texto.append(f"[Error OCR página: {e}]")
+            continue
 
         pagina_texto = []
 
@@ -40,17 +42,31 @@ def extraer_texto(pdf_path):
             bloques = []
 
             for linea in resultado[0]:
-                caja = linea[0]
-                texto_detectado = linea[1][0]
+                try:
+                    caja = linea[0]
+                    datos = linea[1]
 
-                x = min(p[0] for p in caja)
-                y = min(p[1] for p in caja)
+                    if isinstance(datos, (list, tuple)):
+                        texto_detectado = datos[0] if datos else ""
+                    else:
+                        texto_detectado = str(datos)
 
-                bloques.append((y, x, texto_detectado))
+                    if not texto_detectado:
+                        continue
 
-            bloques.sort(key=lambda b: (b[0], b[1]))
+                    xs = [p[0] for p in caja if len(p) >= 2]
+                    ys = [p[1] for p in caja if len(p) >= 2]
 
-            pagina_texto = [b[2] for b in bloques]
+                    if not xs or not ys:
+                        continue
+
+                    bloques.append((min(ys), min(xs), texto_detectado))
+                except Exception:
+                    continue
+
+            if bloques:
+                bloques.sort(key=lambda b: (b[0], b[1]))
+                pagina_texto = [b[2] for b in bloques]
 
         texto.append("\n".join(pagina_texto))
 
@@ -60,6 +76,7 @@ def extraer_texto(pdf_path):
 
 
 def main():
+    os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
     if len(sys.argv) < 2:
         print(json.dumps({

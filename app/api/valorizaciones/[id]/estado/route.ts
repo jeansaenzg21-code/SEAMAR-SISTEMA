@@ -65,10 +65,11 @@ if (
     UPDATE valorizaciones
     SET
       estado = 'EN_REVISION',
-      fecha_revision = NOW()
+      fecha_revision = NOW(),
+      enviado_revision_por = ?
     WHERE id = ?
     `,
-    [id]
+    [sesion?.nombre || sesion?.correo || "Sistema", id]
   );
 
   return NextResponse.json({
@@ -192,7 +193,7 @@ if (observacionesSistema.length > 0) {
 
       }
 
-if (estadoFinal === "EN_REVISION") {
+if (estado === "EN_REVISION") {
   enviadoRevisionPor =
     sesion?.nombre || sesion?.correo || "Sistema";
 }
@@ -303,7 +304,7 @@ observado_por =
   estadoFinal,
   estadoFinal,
 
-  estadoFinal,
+  estado,
   enviadoRevisionPor,
 
   estadoFinal,

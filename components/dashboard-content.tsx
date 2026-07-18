@@ -85,6 +85,7 @@ export interface DashboardData {
   alerts: DashboardAlert[]
   recentActivity: DashboardActivity[]
   topClients: DashboardClient[]
+  availableYears: number[]
 }
 
 
@@ -216,15 +217,9 @@ const MES_OPTIONS = MESES.map((label, index) => ({
   label,
 }))
 
-const anioActual =
-new Date().getFullYear()
 
-const ANIOS =
-Array.from(
-  { length: 5 },
-  (_, i) =>
-    String(anioActual - 2 + i)
-) 
+
+
 
 // =============================================================================
 // FORMATEO
@@ -431,6 +426,9 @@ export function DashboardContent() {
       }
       const data: DashboardData = await response.json()
       setDashboardData(data)
+      if (data.availableYears.length > 0 && !data.availableYears.includes(Number(anio))) {
+        setAnio(String(data.availableYears[0]))
+      }
     } catch {
       setError("No se pudo cargar la información del dashboard")
     } finally {
@@ -495,8 +493,8 @@ export function DashboardContent() {
             <SelectValue placeholder="Año" />
           </SelectTrigger>
           <SelectContent>
-            {ANIOS.map((year) => (
-              <SelectItem key={year} value={year}>
+            {(dashboardData?.availableYears ?? []).map((year) => (
+              <SelectItem key={year} value={String(year)}>
                 {year}
               </SelectItem>
             ))}

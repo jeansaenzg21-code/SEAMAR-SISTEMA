@@ -1,7 +1,8 @@
 import pool from "./mysql";
 import { buscarOSPorNumero } from "./onedrive";
 export async function guardarValorizacion(
-  data: any
+  data: any,
+  creadoPor?: string
 ) {
 
   const esRepsol =
@@ -117,6 +118,8 @@ pu,
 
       estado,
 
+      creado_por,
+
 archivo_nombre,
 archivo_onedrive_id,
 archivo_url,
@@ -130,7 +133,7 @@ observaciones,
 hash_archivo
 
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
 
@@ -171,6 +174,8 @@ data.fechaEjecucion ??
 null,
 
       "BORRADOR",
+
+      creadoPor ?? "Sistema",
 
 data.archivoNombre ?? null,
 data.archivoOnedriveId ?? null,

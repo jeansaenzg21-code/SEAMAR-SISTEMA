@@ -150,6 +150,23 @@ if (alertasData.observado_5d > 0) {
 }
 
     // =========================
+    // AÑOS DISPONIBLES
+    // =========================
+    const [yearsRows]: any = await pool.query(`
+      SELECT DISTINCT anio
+      FROM (
+        SELECT YEAR(fecha_emision) AS anio FROM cuentas_por_cobrar
+        UNION
+        SELECT YEAR(fecha_emision) FROM cuentas_por_pagar
+        UNION
+        SELECT YEAR(fecha_ejecucion) FROM valorizaciones
+      ) años
+      WHERE anio IS NOT NULL
+      ORDER BY anio DESC
+    `);
+    const availableYears = yearsRows.map((r: any) => r.anio);
+
+    // =========================
     // TOP CLIENTES POR INDICADOR
     // =========================
     const [topRows]: any = await pool.query(`
@@ -163,7 +180,9 @@ if (alertasData.observado_5d > 0) {
       INNER JOIN cuentas_por_cobrar cxc ON c.id = cxc.cliente_id
         AND cxc.moneda = ?
         AND cxc.estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO')
-      LEFT JOIN valorizaciones v ON c.id = v.cliente_id
+      -- En valorizaciones el campo "proveedor" almacena el nombre del cliente.
+      -- Por ello el JOIN se realiza usando clientes.razon_social.
+      LEFT JOIN valorizaciones v ON c.razon_social = v.proveedor
       GROUP BY c.id, c.razon_social
       ORDER BY cxc DESC
       LIMIT 5
@@ -228,6 +247,7 @@ if (alertasData.observado_5d > 0) {
 
 })),
       topClients: topClients,
+      availableYears,
     });
   } catch (error) {
     console.error(error);

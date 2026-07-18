@@ -23,10 +23,6 @@ export async function GET() {
         v.*,
         p.nombre AS proyecto_nombre,
         p.tipo AS proyecto_tipo,
-        v.creado_por,
-v.enviado_revision_por,
-v.aprobado_por,
-v.observado_por,
         (
           SELECT COUNT(*)
           FROM valorizacion_documentos vd
@@ -65,6 +61,8 @@ ON c.id = p.cliente_id
       ORDER BY v.id DESC
       `
     )
+
+    console.log("VALORIZACIONES API - enviado_revision_por del primer registro:", rows[0]?.enviado_revision_por);
 
     return NextResponse.json(rows)
   } catch (error) {

@@ -8,6 +8,7 @@ import { guardarValorizacion } from "@/lib/valorizaciones";
 import { registrarActividad } from "@/lib/actividad";
 import { procesarDocumento } from "@/lib/openai-documentos";
 import { leerValorizacionesExcel } from "@/lib/excel-reader";
+import { obtenerSesion } from "@/lib/session";
 
 function enviarProgreso(
   controller: ReadableStreamDefaultController,
@@ -23,6 +24,9 @@ function enviarProgreso(
 export async function POST() {
 
   try {
+
+    const sesion = await obtenerSesion();
+    const creadoPor = sesion?.nombre;
 
     const archivos =
       await listarValorizaciones();
@@ -71,7 +75,7 @@ if (esExcel) {
     continue;
   }
 
-  await guardarValorizacion(val);
+  await guardarValorizacion(val, creadoPor);
   nuevos++;
 }
 
@@ -138,6 +142,7 @@ if (esValorizacion) {
   for (const servicio of json.servicios) {
 
     await guardarValorizacion({
+      creadoPor,
 
       proveedor:
   servicio.numeroRequerimiento
@@ -186,7 +191,7 @@ if (esValorizacion) {
 
 } else {
 
-  await guardarValorizacion(json);
+  await guardarValorizacion(json, creadoPor);
   nuevos++;
 
 }
