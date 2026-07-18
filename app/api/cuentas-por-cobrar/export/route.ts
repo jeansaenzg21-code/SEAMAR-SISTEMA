@@ -16,42 +16,48 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const year = searchParams.get("year")
     const month = searchParams.get("month")
-    const moneda = searchParams.get("moneda") ?? "SOLES"
+    const estado = searchParams.get("estado")
 
     if (!year || !month) {
       return NextResponse.json({ error: "Debe indicar año y mes" }, { status: 400 })
     }
 
-    const [rows]: any = await pool.query(
-      `SELECT
-        cxp.codigo,
-        pr.razon_social AS proveedor,
-        cxp.numero_documento,
-        cxp.detraccion,
-        cxp.forma_pago,
-        cxp.categorizacion,
-        cxp.monto,
-        cxp.moneda,
-        cxp.saldo,
-        cxp.estado,
-        cxp.fecha_emision,
-        cxp.fecha_vencimiento
-      FROM cuentas_por_pagar cxp
-      LEFT JOIN proveedores pr ON cxp.proveedor_id = pr.id
-      WHERE YEAR(cxp.fecha_emision) = ? AND MONTH(cxp.fecha_emision) = ? AND cxp.moneda = ?
-      ORDER BY cxp.fecha_emision ASC`,
-      [year, month, moneda]
-    )
+    let query = `
+      SELECT
+        cxc.codigo,
+        c.razon_social AS cliente,
+        p.nombre AS proyecto,
+        cxc.numero_factura,
+        cxc.descripcion,
+        cxc.monto,
+        cxc.saldo,
+        cxc.estado,
+        cxc.fecha_emision,
+        cxc.fecha_vencimiento
+      FROM cuentas_por_cobrar cxc
+      LEFT JOIN clientes c ON cxc.cliente_id = c.id
+      LEFT JOIN proyectos p ON cxc.proyecto_id = p.id
+      WHERE YEAR(cxc.fecha_emision) = ? AND MONTH(cxc.fecha_emision) = ?
+    `
+    const params: any[] = [year, month]
+
+    if (estado && estado !== "TODOS") {
+      query += " AND cxc.estado = ?"
+      params.push(estado)
+    }
+
+    query += " ORDER BY cxc.fecha_emision ASC"
+
+    const [rows]: any = await pool.query(query, params)
 
     const nombreMes = MONTHS[Number(month) - 1]
 
     const columns: ExcelColumn[] = [
       { header: "Código", key: "codigo", width: 18 },
-      { header: "Proveedor", key: "proveedor", width: 40 },
-      { header: "N° Documento", key: "numero_documento", width: 22 },
-      { header: "Detracción", key: "detraccion", width: 15 },
-      { header: "Forma de Pago", key: "forma_pago", width: 20 },
-      { header: "Categorización", key: "categorizacion", width: 25 },
+      { header: "Cliente", key: "cliente", width: 40 },
+      { header: "Proyecto", key: "proyecto", width: 30 },
+      { header: "N° Factura", key: "numero_factura", width: 22 },
+      { header: "Descripción", key: "descripcion", width: 35 },
       { header: "Monto", key: "monto", width: 15 },
       { header: "Saldo", key: "saldo", width: 15 },
       { header: "Estado", key: "estado", width: 15 },
@@ -69,26 +75,26 @@ export async function GET(request: NextRequest) {
     const totalSaldo = rows.reduce((acc: number, r: any) => acc + Number(r.saldo || 0), 0)
 
     const totalRows: ExcelTotalRow[] = [
-      { labelCol: 6, label: "TOTAL MONTO", valueCol: 7, value: totalMonto },
-      { labelCol: 6, label: "TOTAL SALDO", valueCol: 7, value: totalSaldo },
+      { labelCol: 5, label: "TOTAL MONTO", valueCol: 6, value: totalMonto },
+      { labelCol: 5, label: "TOTAL SALDO", valueCol: 6, value: totalSaldo },
     ]
 
     const config: ExcelReportConfig = {
       empresaNombre,
-      titulo: "REPORTE DE CUENTAS POR PAGAR",
+      titulo: "REPORTE DE CUENTAS POR COBRAR",
       periodo: `${nombreMes} ${year}`,
       columns,
-      moneda,
+      moneda: "SOLES",
       data: rows,
-      monedaColumns: [7, 8],
-      dateColumns: [10, 11],
-      statusColumn: 9,
+      monedaColumns: [6, 7],
+      dateColumns: [9, 10],
+      statusColumn: 8,
       statusStyles,
       totalRows,
     }
 
     const buffer = await buildExcelBuffer(config)
-    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXP_${moneda}_${nombreMes}_${year}.xlsx`
+    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXC_${nombreMes}_${year}.xlsx`
     return excelResponse(buffer, filename)
   } catch (error) {
     console.error(error)

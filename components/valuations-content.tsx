@@ -461,6 +461,8 @@ function useValorizaciones() {
   const [clientFilter, setClientFilter] = useState("all")
   const [selectedPeriod, setSelectedPeriod] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
 const [sincronizando, setSincronizando] = useState(false)
   const cargarValorizaciones = useCallback(async () => {
     try {
@@ -523,6 +525,19 @@ const [sincronizando, setSincronizando] = useState(false)
       return true
     })
   }, [valuations, statusFilter, clientFilter, selectedPeriod, searchQuery])
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredValuations.length / ITEMS_PER_PAGE)), [filteredValuations])
+
+  const paginatedValuations = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredValuations.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredValuations, currentPage])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1)
+    }
+  }, [currentPage, totalPages])
 
   const vistaCliente = useMemo(() => getVistaCliente(clientFilter), [clientFilter])
 
@@ -730,6 +745,7 @@ const [sincronizando, setSincronizando] = useState(false)
     // datos
     valuations,
     filteredValuations,
+    paginatedValuations,
     clientes,
     vistaCliente,
 
@@ -742,6 +758,11 @@ const [sincronizando, setSincronizando] = useState(false)
     setSelectedPeriod,
     searchQuery,
     setSearchQuery,
+
+    // paginación
+    currentPage,
+    setCurrentPage,
+    totalPages,
 
     // acciones
     reload: cargarValorizaciones,
@@ -1121,7 +1142,7 @@ function ValorizacionFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isSaving && onOpenChange(next)}>
-      <DialogContent className="w-full sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-[43.75rem] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingValuation ? "Editar Valorización" : "Nueva Valorización"}</DialogTitle>
           <DialogDescription>Complete los datos principales de la valorización.</DialogDescription>
@@ -1502,6 +1523,7 @@ export function ValuationsContent() {
   const {
     valuations,
     filteredValuations,
+    paginatedValuations,
     clientes,
     vistaCliente,
     statusFilter,
@@ -1518,6 +1540,9 @@ export function ValuationsContent() {
     eliminarDocumento,
     guardarValorizacion,
     descargarExcel,
+    currentPage,
+    setCurrentPage,
+    totalPages,
   } = useValorizaciones()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -1669,13 +1694,56 @@ const pasosCompilacion = [
         </div>
 
         <ValorizacionesTable
-          valuations={filteredValuations}
+          valuations={paginatedValuations}
           vistaCliente={vistaCliente}
           onVer={abrirDetalle}
           onEditar={abrirEdicion}
           onEnviarRevision={enviarRevision}
           onDescargar={descargarExcel}
         />
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4">
+            <p className="text-sm text-muted-foreground">
+              Mostrando {(currentPage - 1) * 10 + 1}-{Math.min(currentPage * 10, filteredValuations.length)} de {filteredValuations.length} valorizaciones
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                .map((p, idx, arr) => (
+                  <span key={p} className="flex items-center gap-1">
+                    {idx > 0 && arr[idx - 1] !== p - 1 && (
+                      <span className="px-1 text-muted-foreground">...</span>
+                    )}
+                    <Button
+                      variant={currentPage === p ? "default" : "outline"}
+                      size="sm"
+                      className="min-w-[36px]"
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  </span>
+                ))}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ValorizacionFormModal
@@ -1698,7 +1766,7 @@ const pasosCompilacion = [
 />
 {mostrarCompilacion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80">
-          <div className="w-[480px] rounded-xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
+          <div className="w-[30rem] rounded-xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
               <div>
@@ -1758,7 +1826,7 @@ const pasosCompilacion = [
   open={mostrarImportador}
   onOpenChange={setMostrarImportador}
 >
-  <DialogContent className="w-full sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+  <DialogContent className="w-full sm:max-w-[40.625rem] max-h-[85vh] overflow-y-auto">
     <DialogHeader>
       <DialogTitle>
         Importar valorización

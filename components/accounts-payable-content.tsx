@@ -348,7 +348,7 @@ const modalProgreso = (
 
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 
-      <div className="bg-card border rounded-xl p-6 w-[550px]">
+      <div className="bg-card border rounded-xl p-6 w-[34.375rem]">
 
         <div className="flex items-center gap-3 mb-4">
 
@@ -410,7 +410,7 @@ const modalResumen = (
 
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 
-      <div className="bg-card border rounded-xl p-6 w-[500px]">
+      <div className="bg-card border rounded-xl p-6 w-[31.25rem]">
 
         <h2 className="text-xl font-bold mb-4">
           Sincronización completada
@@ -470,7 +470,7 @@ const modalExportar = (
   mostrarExportar && (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 
-      <div className="bg-card border rounded-xl p-6 w-[420px]">
+      <div className="bg-card border rounded-xl p-6 w-[26.25rem]">
 
         <h2 className="text-xl font-bold mb-2">
           Exportar Excel

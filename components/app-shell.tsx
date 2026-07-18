@@ -567,7 +567,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {mostrarRecordatorio && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-[520px] rounded-2xl border border-border bg-card shadow-2xl p-8">
+          <div className="w-[32.5rem] rounded-2xl border border-border bg-card shadow-2xl p-8">
             <div className="flex flex-col items-center text-center">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <Bell className="h-6 w-6 text-primary" />

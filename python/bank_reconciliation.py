@@ -14,6 +14,13 @@ db_host = sys.argv[2] if len(sys.argv) > 2 else "localhost"
 db_user = sys.argv[3] if len(sys.argv) > 3 else "root"
 db_password = sys.argv[4] if len(sys.argv) > 4 else ""
 db_name = sys.argv[5] if len(sys.argv) > 5 else "seamar"
+moneda = sys.argv[6] if len(sys.argv) > 6 else "PEN"
+
+MAPEO_MONEDA = {
+    "PEN": "SOLES",
+    "USD": "DOLARES",
+}
+moneda_bd = MAPEO_MONEDA.get(moneda, moneda)
 
 # =========================
 # MYSQL
@@ -27,6 +34,29 @@ conexion = mysql.connector.connect(
 )
 
 cursor = conexion.cursor(dictionary=True)
+
+# =========================
+# DIAGNÓSTICO CONEXIÓN
+# =========================
+
+cursor.execute("SELECT DATABASE() AS db")
+fila_db = cursor.fetchone()
+sys.stderr.write("PYTHON DIAG DATABASE: " + json.dumps(fila_db, ensure_ascii=False) + "\n")
+sys.stderr.flush()
+
+cursor.execute("SELECT @@hostname AS host, @@port AS port")
+fila_host = cursor.fetchone()
+sys.stderr.write("PYTHON DIAG HOST: " + json.dumps(fila_host, ensure_ascii=False) + "\n")
+sys.stderr.flush()
+
+sys.stderr.write("PYTHON DIAG CONNECTION PARAMS: " + json.dumps({
+    "host": db_host,
+    "port": conexion.server_port,
+    "database": db_name,
+    "user": db_user,
+    "password_length": len(db_password),
+}, ensure_ascii=False) + "\n")
+sys.stderr.flush()
 
 # =========================
 # EXCEL
@@ -101,7 +131,7 @@ def construir_coincidencia_pagar(reg):
 # QUERIES CON JOIN
 # =========================
 
-QUERY_COBRAR = """
+QUERY_COBRAR = f"""
     SELECT
     cxc.id,
     cxc.numero_factura,
@@ -114,9 +144,11 @@ QUERY_COBRAR = """
     LEFT JOIN clientes  c ON c.id = cxc.cliente_id
     LEFT JOIN proyectos p ON p.id = cxc.proyecto_id
     WHERE cxc.fecha_emision IS NOT NULL
+      AND cxc.moneda = '{moneda_bd}'
+      AND cxc.estado != 'COBRADO'
 """
 
-QUERY_PAGAR = """
+QUERY_PAGAR = f"""
     SELECT
     cxp.id,
     cxp.numero_documento,
@@ -129,6 +161,8 @@ QUERY_PAGAR = """
     LEFT JOIN proveedores v ON v.id = cxp.proveedor_id
     LEFT JOIN proyectos   p ON p.id = cxp.proyecto_id
     WHERE cxp.fecha_emision IS NOT NULL
+      AND cxp.moneda = '{moneda_bd}'
+      AND cxp.estado != 'PAGADO'
 """
 
 # =========================
@@ -232,7 +266,6 @@ for index, fila in excel.iterrows():
         if len(coincidencias_exactas) == 1:
 
             estado = "conciliado"
-            diferencia = 0
 
             coincidencias.append(
                 construir_coincidencia(coincidencias_exactas[0])
@@ -245,7 +278,6 @@ for index, fila in excel.iterrows():
         elif len(coincidencias_exactas) > 1:
 
             estado = "observacion"
-            diferencia = 0
 
             for reg in coincidencias_exactas:
                 coincidencias.append(
@@ -261,7 +293,6 @@ for index, fila in excel.iterrows():
         else:
 
             estado     = "pendiente"
-            diferencia = 0
 
         # =========================
         # ARMAR MOVIMIENTO
@@ -273,18 +304,12 @@ for index, fila in excel.iterrows():
             "referencia":    referencia,
             "descripcion":   descripcion,
             "monto":         monto,
-            "moneda":        "PEN",
+            "moneda":        moneda,
             "estado":        estado,
             "tipo":          tipo,
             "banco":         "BCP",
             "coincidencias": coincidencias,
         }
-
-        if estado == "diferencia":
-            movimiento["diferencia"]      = diferencia
-            movimiento["causaDiferencia"] = (
-                "Monto distinto entre banco y sistema"
-            )
 
         movimientos.append(movimiento)
 
@@ -296,7 +321,7 @@ for index, fila in excel.iterrows():
             "referencia":    "",
             "descripcion":   str(e),
             "monto":         0,
-            "moneda":        "PEN",
+            "moneda":        moneda,
             "estado":        "pendiente",
             "tipo":          "debito",
             "banco":         "BCP",
@@ -321,9 +346,6 @@ resultado = {
 
     "observaciones":
         len([m for m in movimientos if m["estado"] == "observacion"]),
-
-    "diferencias":
-        len([m for m in movimientos if m["estado"] == "diferencia"]),
 
     "pendientes":
         len([m for m in movimientos if m["estado"] == "pendiente"]),

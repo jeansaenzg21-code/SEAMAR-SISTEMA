@@ -69,18 +69,15 @@ export interface DashboardActivity {
   createdAt: string // ISO 8601, p.ej. "2026-07-11T18:30:00Z"
 }
 
-// ClienteEstado es un identificador interno enviado por el backend.
-// El Dashboard es el único responsable de traducirlo a etiqueta y color
-// visibles, a través de CLIENT_STATUS_CONFIG.
-export type ClienteEstado = "healthy" | "normal" | "risk"
+export type Riesgo = "VERDE" | "AMARILLO" | "ROJO"
 
 export interface DashboardClient {
   id: string
   nombre: string
   cxc: number
   valorizaciones: number
-  diasMora: number
-  estado: ClienteEstado
+  mora: number
+  riesgo: Riesgo
 }
 
 export interface DashboardData {
@@ -177,22 +174,10 @@ const ALERT_STATUS_CONFIG = {
   },
 } as const
 
-// Traduce el identificador interno de estado de cliente (enviado por el
-// backend) a su etiqueta visible y color. El backend nunca conoce "Óptimo",
-// "Normal", "En Riesgo" ni clases de Tailwind: solo envía healthy | normal | risk.
-const CLIENT_STATUS_CONFIG: Record<ClienteEstado, { label: string; dotColor: string }> = {
-  healthy: {
-    label: "Óptimo",
-    dotColor: "bg-emerald-400",
-  },
-  normal: {
-    label: "Normal",
-    dotColor: "bg-blue-400",
-  },
-  risk: {
-    label: "En Riesgo",
-    dotColor: "bg-red-400",
-  },
+const RIESGO_CONFIG: Record<Riesgo, { label: string; className: string }> = {
+  VERDE: { label: "VERDE", className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+  AMARILLO: { label: "AMARILLO", className: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+  ROJO: { label: "ROJO", className: "bg-red-500/10 text-red-400 border-red-500/20" },
 }
 
 // =============================================================================
@@ -381,27 +366,44 @@ function ActivityItem({
   )
 }
 
+function RiesgoBadge({ riesgo }: { riesgo: Riesgo }) {
+  const config = RIESGO_CONFIG[riesgo]
+  return (
+    <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium", config.className)}>
+      {config.label}
+    </span>
+  )
+}
+
 function ClientRow({
   client,
   moneda,
+  isLast,
 }: {
   client: DashboardClient
   moneda: Moneda
+  isLast: boolean
 }) {
-  const statusConfig = CLIENT_STATUS_CONFIG[client.estado]
   return (
-    <tr className="border-b border-border/60 last:border-0 hover:bg-secondary/30">
-      <td className="py-3 pr-4 font-medium">{client.nombre}</td>
-      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.cxc, moneda)}</td>
-      <td className="py-3 pr-4 text-muted-foreground">{formatCurrency(client.valorizaciones, moneda)}</td>
-      <td className="py-3 pr-4 text-muted-foreground">{client.diasMora} días</td>
-      <td className="py-3">
-        <span className="inline-flex items-center gap-2">
-          <span className={cn("h-2 w-2 rounded-full", statusConfig.dotColor)} />
-          <span className="text-xs font-medium">{statusConfig.label}</span>
-        </span>
-      </td>
-    </tr>
+    <div className="relative flex gap-4">
+      <div className="relative flex flex-col items-center">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-primary">
+          {client.nombre.charAt(0).toUpperCase()}
+        </div>
+        {!isLast && <span className="mt-1 w-px flex-1 bg-border" />}
+      </div>
+      <div className="min-w-0 flex-1 pb-1">
+        <p className="text-sm font-medium leading-snug">{client.nombre}</p>
+        <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+          <span>CxC: {formatCurrency(client.cxc, moneda)}</span>
+          <span>Valorizaciones: {client.valorizaciones}</span>
+          <span>Mora: {formatCurrency(client.mora, moneda)}</span>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center">
+        <RiesgoBadge riesgo={client.riesgo} />
+      </div>
+    </div>
   )
 }
 
@@ -632,30 +634,18 @@ export function DashboardContent() {
             </div>
           ) : !dashboardData || dashboardData.topClients.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                No existen alertas críticas.
+                No hay información disponible
               </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                    <th className="pb-3 pr-4 font-medium">Cliente</th>
-                    <th className="pb-3 pr-4 font-medium">Cuentas por Cobrar</th>
-                    <th className="pb-3 pr-4 font-medium">Valorizaciones Aprovadas</th>
-                    <th className="pb-3 pr-4 font-medium">Mora Promedio</th>
-                    <th className="pb-3 font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardData.topClients.map((client) => (
-                    <ClientRow
-  key={client.id}
-  client={client}
-  moneda={moneda}
-/>
-                  ))}
-                </tbody>
-              </table>
+            <div className="relative space-y-5 pl-1">
+              {dashboardData.topClients.map((client, index) => (
+                <ClientRow
+                  key={client.id}
+                  client={client}
+                  moneda={moneda}
+                  isLast={index === dashboardData.topClients.length - 1}
+                />
+              ))}
             </div>
           )}
         </CardContent>

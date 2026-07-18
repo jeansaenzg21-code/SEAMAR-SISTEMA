@@ -82,7 +82,7 @@ export default function LoginPage() {
      
       <div
   className="relative mx-auto"
-  style={{ width: "440px" }}
+  style={{ width: "27.5rem" }}
 >
         {/* Logo + Brand */}
         <div className="flex flex-col items-center mb-10">

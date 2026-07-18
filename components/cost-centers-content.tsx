@@ -131,7 +131,7 @@ const disponible = 0
       {/* View Selector and Client Filter */}
       <div className="flex items-center justify-between">
         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "operativa" | "global")}>
-          <TabsList className="grid w-[400px] grid-cols-2">
+          <TabsList className="grid w-[25rem] grid-cols-2">
             <TabsTrigger value="operativa" className="gap-2">
               <Target className="h-4 w-4" />
               Vista Operativa

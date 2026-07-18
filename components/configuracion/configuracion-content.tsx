@@ -47,7 +47,7 @@ export function ConfiguracionContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-[1500px] px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[93.75rem] px-4 py-6 md:px-6 lg:px-8">
         {/* Back button */}
         <button
           type="button"

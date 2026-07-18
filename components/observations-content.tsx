@@ -287,7 +287,7 @@ export function ObservationsContent() {
         </Tabs>
 
         <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-          <DialogContent className="w-[95vw] sm:max-w-[500px]">
+          <DialogContent className="w-[95vw] sm:max-w-[31.25rem]">
             <DialogHeader>
               <DialogTitle>
                 {selectedObservation?.status === "resolved"

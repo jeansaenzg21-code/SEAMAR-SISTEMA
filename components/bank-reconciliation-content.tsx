@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useEmpresa } from "@/hooks/use-empresa";
 import {
   Upload,
@@ -11,7 +12,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  XCircle,
   FileText,
   Building2,
   Calendar,
@@ -132,6 +132,9 @@ interface RawHistorialConciliacion {
   fecha?: string;
   moneda?: Moneda;
   totalMovimientos?: number;
+  conciliados?: number;
+  pendientes?: number;
+  observaciones?: number;
   estado?: string;
 }
 
@@ -183,13 +186,6 @@ const statusMeta: Record<
     bg: "bg-amber-400/10",
     ring: "border-l-amber-500/60",
     icon: <AlertTriangle size={12} />,
-  },
-  diferencia: {
-    label: "Diferencia",
-    color: "text-rose-400",
-    bg: "bg-rose-400/10",
-    ring: "border-l-rose-500/60",
-    icon: <XCircle size={12} />,
   },
   pendiente: {
     label: "Pendiente",
@@ -330,21 +326,13 @@ function mapHistorialFromApi(
   fallbackMoneda: Moneda
 ): HistorialConciliacion {
 
-  let estado: EstadoConciliacion = "en_proceso";
+  const total = typeof h.totalMovimientos === "number" ? h.totalMovimientos : 0;
+  const conciliados = typeof h.conciliados === "number" ? h.conciliados : 0;
 
-  if (
-    h.estado === "PROCESADA" ||
-    h.estado === "completado"
-  ) {
-    estado = "completado";
-  }
-
-  if (
-    h.estado === "OBSERVACION" ||
-    h.estado === "con_observaciones"
-  ) {
-    estado = "con_observaciones";
-  }
+  let estado: EstadoConciliacion =
+    total > 0 && conciliados >= total
+      ? "completado"
+      : "en_proceso";
 
   const fechaFormateada = h.fecha
   ? new Date(h.fecha).toLocaleDateString("es-PE", {
@@ -439,9 +427,9 @@ function CoincidenciaCard({
   return (
     <div
       className={cn(
-        "rounded-xl border p-4 space-y-3",
+        "rounded-xl border p-4 space-y-3 transition-all duration-200 hover:shadow-md hover:border-foreground/15",
         borderColor ?? "border-border",
-        bgColor ?? "bg-muted/30"
+        bgColor ?? "bg-card hover:bg-muted/20"
       )}
     >
       {/* Badge de origen */}
@@ -463,7 +451,7 @@ function CoincidenciaCard({
       </div>
 
       {/* Proyecto + documento + fecha */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
         <div className="space-y-0.5">
           <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Proyecto</div>
           <div className="text-xs text-muted-foreground truncate">{match.proyecto}</div>
@@ -472,28 +460,23 @@ function CoincidenciaCard({
           <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">
             {esCobrar ? "Factura" : "Documento"}
           </div>
-          <div className="text-xs text-muted-foreground font-mono">{match.documento}</div>
+          <div className="text-xs text-muted-foreground font-mono truncate">{match.documento}</div>
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Fecha</div>
+          <div className="text-xs text-muted-foreground">
+            {match.fecha
+              ? new Date(match.fecha).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })
+              : "-"}
+          </div>
         </div>
       </div>
 
-      <div className="text-[11px] text-muted-foreground/70">
-  {match.fecha
-    ? new Date(match.fecha).toLocaleDateString(
-        "es-PE",
-        {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        }
-      )
-    : "-"}
-</div>
-
       {/* Glosa (descripción) — solo si el backend la envía */}
       {match.descripcion && (
-        <div className="space-y-0.5">
+        <div className="pt-1 space-y-0.5">
           <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Glosa</div>
-          <div className="text-xs text-muted-foreground">{match.descripcion}</div>
+          <div className="text-xs text-muted-foreground leading-relaxed">{match.descripcion}</div>
         </div>
       )}
 
@@ -502,9 +485,9 @@ function CoincidenciaCard({
         <button
           onClick={onAccion}
           className={cn(
-            "w-full mt-1 py-1.5 rounded-lg text-xs font-medium border transition-all",
+            "w-full py-2 rounded-lg text-xs font-medium border transition-all duration-200",
             accionColor ??
-              "border-border text-muted-foreground hover:text-foreground hover:border-border"
+              "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-foreground/20"
           )}
         >
           {accionLabel}
@@ -631,7 +614,6 @@ function ProgressBar({ movimientos }: { movimientos: MovimientoBancario[] }) {
   const total        = movimientos.length;
   const conciliados  = movimientos.filter((m) => m.estado === "conciliado").length;
   const observaciones = movimientos.filter((m) => m.estado === "observacion").length;
-  const diferencias  = movimientos.filter((m) => m.estado === "diferencia").length;
   const pendientes   = movimientos.filter((m) => m.estado === "pendiente").length;
 
   const pct = (n: number) => (total ? (n / total) * 100 : 0);
@@ -647,13 +629,11 @@ function ProgressBar({ movimientos }: { movimientos: MovimientoBancario[] }) {
       <div className="h-1.5 rounded-full bg-border/50 flex overflow-hidden gap-px">
         <div className={cn("h-full bg-emerald-500 rounded-l-full transition-all duration-700", progressWidthClass(pct(conciliados)))} />
         <div className={cn("h-full bg-amber-500 transition-all duration-700",              progressWidthClass(pct(observaciones)))} />
-        <div className={cn("h-full bg-rose-500 transition-all duration-700",               progressWidthClass(pct(diferencias)))} />
         <div className={cn("h-full bg-muted-foreground/30 rounded-r-full transition-all duration-700", progressWidthClass(pct(pendientes)))} />
       </div>
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />{conciliados} conc.</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" />{observaciones} obs.</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />{diferencias} dif.</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30" />{pendientes} pend.</span>
       </div>
     </div>
@@ -682,7 +662,7 @@ function MovementRow({
       )}
     >
       <div className="flex flex-col items-start gap-0.5 min-w-[90px]">
-        <span className="text-xs text-muted-foreground tabular-nums">{movimiento.fecha}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{new Date(movimiento.fecha).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
         <span className="text-[11px] text-muted-foreground/70 font-mono">{movimiento.referencia}</span>
       </div>
       <div className="flex items-center gap-2 min-w-0">
@@ -715,79 +695,6 @@ function MovementRow({
         <ChevronRight size={14} className={cn("text-muted-foreground/70 transition-transform", selected && "text-muted-foreground rotate-90")} />
       </div>
     </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CORRECCIÓN 6: DifferencePanel — ahora usa CoincidenciaCard, que detecta
-// origen y muestra cliente o proveedor correctamente.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function DifferencePanel({ movimiento }: { movimiento: MovimientoBancario }) {
-  const match = movimiento.coincidencias?.[0];
-  const causeOptions = ["Comisión bancaria", "ITF", "Comisión SWIFT", "Tipo de cambio", "Ajuste"];
-
-  if (!match) return null;
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-4">
-        <div className="flex items-center gap-2 text-rose-400 text-xs font-medium uppercase tracking-widest">
-          <XCircle size={12} />
-          Diferencia detectada
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Monto Sistema</div>
-            <div className="text-sm font-medium text-foreground/90 tabular-nums">
-              {fmt(match.monto, movimiento.moneda)}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Monto Banco</div>
-            <div className="text-sm font-medium text-foreground tabular-nums">
-              {fmt(movimiento.monto, movimiento.moneda)}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Diferencia</div>
-            <div className="text-sm font-semibold text-rose-400 tabular-nums">
-              {fmt(movimiento.diferencia ?? 0, movimiento.moneda)}
-            </div>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Posible causa</div>
-          <div className="flex flex-wrap gap-1.5">
-            {causeOptions.map((c) => (
-              <button
-                key={c}
-                className={cn(
-                  "text-xs px-2.5 py-1 rounded-lg border transition-all",
-                  movimiento.causaDiferencia === c
-                    ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
-                    : "border-border bg-muted/30 text-muted-foreground hover:text-foreground/80 hover:border-border/70"
-                )}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Coincidencia con badge de origen */}
-      <CoincidenciaCard
-        match={match}
-        moneda={movimiento.moneda}
-        borderColor="border-rose-500/20"
-        bgColor="bg-rose-500/[0.04]"
-      />
-
-      <button className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm font-medium hover:bg-rose-500/15 transition-all">
-        Aprobar diferencia
-      </button>
-    </div>
   );
 }
 
@@ -830,7 +737,7 @@ function ObservationPanel({
           El sistema no puede resolver automáticamente. Selecciona la coincidencia correcta.
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {coincidencias.map((match) => (
           <CoincidenciaCard
   key={match.id}
@@ -873,38 +780,25 @@ function MovementDetail({
 }) {
   const coincidencias = movimiento.coincidencias ?? [];
 
+  const headerTitle =
+    movimiento.estado === "observacion" ? "Resolver coincidencia" :
+    movimiento.estado === "conciliado" ? "Coincidencia confirmada" :
+    movimiento.estado === "pendiente" ? "Movimiento pendiente" :
+    "Movimiento bancario";
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-        <div className="space-y-0.5">
-          <div className="text-xs text-muted-foreground uppercase tracking-widest">Movimiento bancario</div>
-          <div className="text-sm font-mono text-foreground/80">{movimiento.referencia}</div>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-lg text-muted-foreground hover:text-foreground/80 hover:bg-muted/50 transition-all"
-        >
-          <X size={16} />
-        </button>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0 px-6 py-5 pr-14 border-b border-border space-y-0.5">
+        <div className="text-sm font-semibold text-foreground">{headerTitle}</div>
+        <div className="text-xs text-muted-foreground">Movimiento bancario</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Metadata del movimiento */}
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-4">
-            {[
+      <div className="flex-shrink-0 px-6 py-4 border-b border-border/50 space-y-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {[
   {
     label: "Fecha",
-    value: new Date(
-      movimiento.fecha
-    ).toLocaleDateString(
-      "es-PE",
-      {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }
-    ),
+    value: new Date(movimiento.fecha).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }),
   },
   {
     label: "Referencia",
@@ -918,25 +812,22 @@ function MovementDetail({
     label: "Descripción",
     value: movimiento.descripcion,
   },
-
 ].map(({ label, value }) => (
-              <div key={label} className="space-y-1">
+              <div key={label} className="space-y-0.5">
                 <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">{label}</div>
-                <div className="text-sm text-foreground/90">{value}</div>
+                <div className="text-sm text-foreground/90 truncate">{value}</div>
               </div>
             ))}
           </div>
-          
-          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 border border-border/50">
-            <span className="text-xs text-muted-foreground">Importe</span>
-            <span className={cn("text-xl font-light tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-foreground")}>
+          <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50">
+            <span className="text-[11px] text-muted-foreground">Importe</span>
+            <span className={cn("text-lg font-light tabular-nums", movimiento.tipo === "credito" ? "text-emerald-400" : "text-foreground")}>
               {movimiento.tipo === "credito" ? "+" : "−"} {fmt(movimiento.monto, movimiento.moneda)}
             </span>
           </div>
         </div>
 
-        <div className="border-t border-border/50" />
-
+      <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
         {/* ── Panel OBSERVACIÓN ── */}
         {movimiento.estado === "observacion" && (
           <ObservationPanel
@@ -945,11 +836,6 @@ function MovementDetail({
     onSeleccionarCoincidencia
   }
 />
-        )}
-
-        {/* ── Panel DIFERENCIA ── */}
-        {movimiento.estado === "diferencia" && movimiento.diferencia !== undefined && (
-          <DifferencePanel movimiento={movimiento} />
         )}
 
         {/* ── Panel CONCILIADO ── */}
@@ -986,7 +872,7 @@ function MovementDetail({
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
                   Se encontraron posibles coincidencias. Revisa y confirma manualmente.
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {coincidencias.map((match) => (
                     <CoincidenciaCard
                       key={match.id}
@@ -1214,6 +1100,27 @@ export default function BankReconciliationContent() {
   const [extracto, setExtracto]               = useState<ExtractoCargado | null>(null);
   const [isLoadingMovimientos, setIsLoadingMovimientos] = useState(false);
   const [isLoadingHistorial, setIsLoadingHistorial]     = useState(false);
+  const [currentConciliacionId, setCurrentConciliacionId] = useState<string | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{ conciliacionId: string; archivoNombre: string } | null>(null);
+  const [isReexecuting, setIsReexecuting] = useState(false);
+
+  const loadHistorial = useCallback(async () => {
+    setIsLoadingHistorial(true);
+    try {
+      const response = await fetch(`/api/bank-reconciliation/history?moneda=${currency}`);
+      if (response.status === 404) { setHistorial([]); return; }
+      if (!response.ok) { throw new Error(await extractErrorMessage(response)); }
+      const data: BankReconciliationHistoryApiResponse = await response.json();
+      const nuevoHistorial = (data.historial ?? []).map((h, index) => mapHistorialFromApi(h, index, currency));
+      setHistorial(nuevoHistorial);
+    } catch (error) {
+      console.error("No se pudo cargar el historial de conciliaciones:", error);
+      setHistorial([]);
+    } finally {
+      setIsLoadingHistorial(false);
+    }
+  }, [currency]);
 
   const handleProcess = useCallback(
     async (file: File) => {
@@ -1225,6 +1132,7 @@ export default function BankReconciliationContent() {
       try {
         const formData = new FormData();
         formData.append("archivo", file);
+        formData.append("moneda", currency);
 
         const response = await fetch("/api/bank-reconciliation", {
           method: "POST",
@@ -1235,21 +1143,35 @@ export default function BankReconciliationContent() {
           throw new Error(await extractErrorMessage(response));
         }
 
-        let data: BankReconciliationApiResponse;
+        let data: any;
         try {
           data = await response.json();
         } catch {
           throw new Error("La respuesta del servidor no es válida.");
         }
 
+        // Duplicado detectado
+        if (data.duplicate) {
+          setDuplicateInfo({
+            conciliacionId: data.conciliacionId,
+            archivoNombre: data.archivoNombre,
+          });
+          setShowDuplicateDialog(true);
+          setIsLoadingMovimientos(false);
+          setExtracto(null);
+          return;
+        }
+
         if (!data.success) {
           throw new Error("El backend reportó un error al procesar el extracto.");
         }
 
-        const nuevosMovimientos = (data.movimientos ?? []).map((m, index) =>
+        const nuevosMovimientos = (data.movimientos ?? []).map((m: RawMovimientoBancario, index: number) =>
           mapMovimientoFromApi(m, index, currency)
         );
 
+        setCurrentConciliacionId(String(data.conciliacionId));
+        setHistorialSeleccionado(null);
         setMovimientos(nuevosMovimientos);
         setSelectedMovimiento(nuevosMovimientos[0] ?? null);
         setExtracto({
@@ -1260,6 +1182,7 @@ export default function BankReconciliationContent() {
           estado:          "cargado",
           totalMovimientos: data.totalMovimientos ?? nuevosMovimientos.length,
         });
+        await loadHistorial();
       } catch (error) {
         console.error(error);
         setExtracto({
@@ -1272,16 +1195,80 @@ export default function BankReconciliationContent() {
         setIsLoadingMovimientos(false);
       }
     },
-    [currency]
+    [currency, loadHistorial]
   );
 
   const handleFileSelected = useCallback((file: File) => { handleProcess(file); }, [handleProcess]);
+
+  const handleReeject = useCallback(async () => {
+    const targetId = historialSeleccionado || currentConciliacionId;
+    if (!targetId) return;
+
+    setIsReexecuting(true);
+    setIsLoadingMovimientos(true);
+    setMovimientos([]);
+    setSelectedMovimiento(null);
+
+    try {
+      const response = await fetch(`/api/bank-reconciliation/${targetId}/reejecutar`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await extractErrorMessage(response));
+      }
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("La respuesta del servidor no es válida.");
+      }
+
+      if (!data.success) {
+        throw new Error("El backend reportó un error al re-ejecutar la conciliación.");
+      }
+
+      const nuevosMovimientos = (data.movimientos ?? []).map((m: RawMovimientoBancario, index: number) =>
+        mapMovimientoFromApi(m, index, currency)
+      );
+
+      setCurrentConciliacionId(String(data.conciliacionId));
+      setHistorialSeleccionado(String(data.conciliacionId));
+      setMovimientos(nuevosMovimientos);
+      setSelectedMovimiento(nuevosMovimientos[0] ?? null);
+      setExtracto({
+        nombreArchivo: `Re-ejecutada #${targetId}`,
+        banco: data.banco,
+        periodo: data.periodo,
+        moneda: currency,
+        estado: "cargado",
+        totalMovimientos: data.totalMovimientos ?? nuevosMovimientos.length,
+      });
+      await loadHistorial();
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Error al re-ejecutar la conciliación.");
+    } finally {
+      setIsReexecuting(false);
+      setIsLoadingMovimientos(false);
+    }
+  }, [historialSeleccionado, currentConciliacionId, currency, loadHistorial]);
+
+  const handleActualizarDuplicado = useCallback(async () => {
+    if (!duplicateInfo) return;
+    setShowDuplicateDialog(false);
+    setDuplicateInfo(null);
+    await handleReeject();
+  }, [duplicateInfo, handleReeject]);
 
   const handleClearExtracto = useCallback(() => {
     setExtracto(null);
     setMovimientos([]);
     setSelectedMovimiento(null);
     setActiveFilter(null);
+    setCurrentConciliacionId(null);
+    setHistorialSeleccionado(null);
   }, []);
 
   const handleExport = async () => {
@@ -1467,6 +1454,8 @@ setSelectedMovimiento(
       conciliacionId
     );
 
+    setCurrentConciliacionId(null);
+
   } catch (error) {
 
     console.error(error);
@@ -1538,28 +1527,8 @@ const seleccionarCoincidencia = async (
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadHistorial() {
-      setIsLoadingHistorial(true);
-      try {
-        const response = await fetch(`/api/bank-reconciliation/history?moneda=${currency}`);
-        if (response.status === 404) { if (!cancelled) setHistorial([]); return; }
-        if (!response.ok) { throw new Error(await extractErrorMessage(response)); }
-        const data: BankReconciliationHistoryApiResponse = await response.json();
-        const nuevoHistorial = (data.historial ?? []).map((h, index) => mapHistorialFromApi(h, index, currency));
-        if (!cancelled) setHistorial(nuevoHistorial);
-      } catch (error) {
-        console.error("No se pudo cargar el historial de conciliaciones:", error);
-        if (!cancelled) setHistorial([]);
-      } finally {
-        if (!cancelled) setIsLoadingHistorial(false);
-      }
-    }
-
     loadHistorial();
-    return () => { cancelled = true; };
-  }, [currency]);
+  }, [loadHistorial]);
 
   const filtered = useMemo(
     () => activeFilter ? movimientos.filter((m) => m.estado === activeFilter) : movimientos,
@@ -1570,7 +1539,6 @@ const seleccionarCoincidencia = async (
     () => ({
       conciliado:  movimientos.filter((m) => m.estado === "conciliado"),
       observacion: movimientos.filter((m) => m.estado === "observacion"),
-      diferencia:  movimientos.filter((m) => m.estado === "diferencia"),
       pendiente:   movimientos.filter((m) => m.estado === "pendiente"),
     }),
     [movimientos]
@@ -1594,10 +1562,11 @@ const seleccionarCoincidencia = async (
             variant="outline"
             size="sm"
             className="min-h-[44px]"
-            disabled={movimientos.length === 0}
+            disabled={(!historialSeleccionado && !currentConciliacionId) || isReexecuting}
+            onClick={handleReeject}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Ejecutar
+            <RefreshCw className={`mr-2 h-4 w-4 ${isReexecuting ? "animate-spin" : ""}`} />
+            {isReexecuting ? "Re-ejecutando..." : "Ejecutar"}
           </Button>
           <Button
             variant="outline"
@@ -1637,7 +1606,7 @@ const seleccionarCoincidencia = async (
 
       {/* Summary cards */}
       <div className="flex flex-col lg:flex-row gap-3">
-        {(["observacion", "diferencia", "pendiente", "conciliado"] as EstadoMovimiento[]).map((s) => (
+        {(["observacion", "pendiente", "conciliado"] as EstadoMovimiento[]).map((s) => (
           <SummaryCard
             key={s}
             status={s}
@@ -1710,17 +1679,63 @@ const seleccionarCoincidencia = async (
         onOpenHistorial={abrirHistorial}
       />
 
-      {/* Right panel */}
-      {selectedMovimiento && (
+      {/* Right drawer */}
+      <Sheet open={selectedMovimiento !== null} onOpenChange={(open) => { if (!open) setSelectedMovimiento(null); }}>
+        <SheetContent side="right" className="w-[95vw] sm:w-[460px] max-w-[500px] p-0 flex flex-col gap-0 border-l border-border overflow-hidden">
+          <SheetTitle className="sr-only">Resolver coincidencia</SheetTitle>
+          <SheetDescription className="sr-only">Panel de resolución de coincidencias bancarias</SheetDescription>
+          {selectedMovimiento && (
+            <MovementDetail
+              movimiento={selectedMovimiento}
+              onClose={() => setSelectedMovimiento(null)}
+              onSeleccionarCoincidencia={seleccionarCoincidencia}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Duplicate file dialog */}
+      {showDuplicateDialog && duplicateInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedMovimiento(null)} />
-          <div className="relative z-10 w-full max-w-lg mx-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowDuplicateDialog(false); setDuplicateInfo(null); }} />
+          <div className="relative z-10 w-full max-w-md mx-4">
             <Card className="bg-card border-border">
-              <MovementDetail
-                movimiento={selectedMovimiento}
-                onClose={() => setSelectedMovimiento(null)}
-                onSeleccionarCoincidencia={seleccionarCoincidencia}
-              />
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <AlertTriangle size={20} className="text-amber-400" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-semibold">Extracto ya importado</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Este extracto bancario ya fue importado anteriormente.
+                    </p>
+                    {duplicateInfo.archivoNombre && (
+                      <p className="text-xs text-muted-foreground/70 font-mono mt-1">
+                        Archivo original: {duplicateInfo.archivoNombre}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <p className="text-sm text-foreground/90">
+                    ¿Desea actualizar la conciliación existente con la información más reciente?
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setShowDuplicateDialog(false); setDuplicateInfo(null); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleActualizarDuplicado}>
+                    Actualizar
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           </div>
         </div>

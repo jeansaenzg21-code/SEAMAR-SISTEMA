@@ -149,6 +149,47 @@ if (alertasData.observado_5d > 0) {
   });
 }
 
+    // =========================
+    // TOP CLIENTES POR INDICADOR
+    // =========================
+    const [topRows]: any = await pool.query(`
+      SELECT
+        c.id,
+        c.razon_social AS nombre,
+        COALESCE(SUM(cxc.saldo), 0) AS cxc,
+        COUNT(DISTINCT v.id) AS valorizaciones,
+        COALESCE(SUM(CASE WHEN cxc.fecha_vencimiento < CURDATE() AND cxc.estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO') THEN cxc.saldo ELSE 0 END), 0) AS mora
+      FROM clientes c
+      INNER JOIN cuentas_por_cobrar cxc ON c.id = cxc.cliente_id
+        AND cxc.moneda = ?
+        AND cxc.estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO')
+      LEFT JOIN valorizaciones v ON c.id = v.cliente_id
+      GROUP BY c.id, c.razon_social
+      ORDER BY cxc DESC
+      LIMIT 5
+    `, [moneda]);
+
+    const topClients = topRows.map((row: any) => {
+      const cxc = Number(row.cxc);
+      const mora = Number(row.mora);
+      let riesgo: string;
+      if (mora === 0) {
+        riesgo = "VERDE";
+      } else if (mora / cxc < 0.2) {
+        riesgo = "AMARILLO";
+      } else {
+        riesgo = "ROJO";
+      }
+      return {
+        id: String(row.id),
+        nombre: row.nombre,
+        cxc,
+        valorizaciones: Number(row.valorizaciones),
+        mora,
+        riesgo,
+      };
+    });
+
     return NextResponse.json({
       kpis: [
         {
@@ -186,7 +227,7 @@ if (alertasData.observado_5d > 0) {
   createdAt: actividad.created_at,
 
 })),
-      topClients: [],
+      topClients: topClients,
     });
   } catch (error) {
     console.error(error);

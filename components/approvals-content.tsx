@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { DocumentosPreview } from "@/components/DocumentosPreview"
 
-type Status = "under_review" | "observed" | "approved"
+type Status = "draft" | "under_review" | "observed" | "approved"
 
 type Approval = {
   id: string
@@ -55,12 +55,14 @@ const formatearFecha = (fecha?: string) => {
 
 function StatusBadge({ status }: { status: Status }) {
   const labels = {
+    draft: "Borrador",
     under_review: "En revisión",
     observed: "Observado",
     approved: "Aprobado",
   }
 
   const styles = {
+    draft: "bg-gray-500/10 text-gray-400 border-gray-500/20",
     under_review: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     observed: "bg-red-500/10 text-red-400 border-red-500/20",
     approved: "bg-green-500/10 text-green-400 border-green-500/20",

@@ -140,7 +140,7 @@ const handleCancelar = () => {
 }
 
   return (
-    <div className="max-w-[600px] mx-auto pt-8">
+    <div className="max-w-[37.5rem] mx-auto pt-8">
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle>Registrar Cliente</CardTitle>

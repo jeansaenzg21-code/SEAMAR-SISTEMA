@@ -256,7 +256,7 @@ export function ExportDialog({ open, onOpenChange, clientes, valuations, nombreU
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[420px]">
+      <DialogContent className="w-[95vw] sm:max-w-[26.25rem]">
         <DialogHeader>
           <DialogTitle>Exportar valorizaciones</DialogTitle>
           <DialogDescription>
