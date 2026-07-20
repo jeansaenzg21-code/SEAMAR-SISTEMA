@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
 import bcrypt from "bcryptjs"
 import { registrarActividad } from "@/lib/actividad"
+import { obtenerSesion } from "@/lib/session"
 
 export async function GET() {
   try {
@@ -99,11 +100,14 @@ export async function POST(request: Request) {
       [result.insertId]
     )
 
+    const sesionCrear = await obtenerSesion()
+
     await registrarActividad({
       tipo: "configuracion",
       accion: "crear",
       titulo: `Usuario creado: ${nombre.trim()}`,
       subtitulo: `Rol: ${rol}`,
+      usuarioNombre: sesionCrear?.nombre || null,
       referenciaId: result.insertId,
     })
 

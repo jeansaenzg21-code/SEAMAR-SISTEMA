@@ -1,13 +1,15 @@
 export type RolSistema = "ADMINISTRADOR" | "SUPERVISOR" | "OPERADOR";
 
 const RUTAS_PERMITIDAS: Record<string, string[]> = {
-  SUPERVISOR: ["/dashboard", "/approvals", "/", "/login"],
+  SUPERVISOR: ["/dashboard", "/approvals", "/configuracion", "/", "/login"],
 };
 
 const APIS_PERMITIDAS: Record<string, string[]> = {
   SUPERVISOR: [
     "/api/auth/session",
     "/api/configuracion/empresa",
+    "/api/configuracion/apariencia",
+    "/api/configuracion/seguridad",
     "/api/dashboard",
     "/api/actividad",
     "/api/valorizaciones",

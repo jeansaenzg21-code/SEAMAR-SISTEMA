@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
 import bcrypt from "bcryptjs"
 import { registrarActividad } from "@/lib/actividad"
+import { obtenerSesion } from "@/lib/session"
 
 export async function PUT(
   request: Request,
@@ -74,11 +75,14 @@ export async function PUT(
       )
     }
 
+    const sesionActualizar = await obtenerSesion()
+
     await registrarActividad({
       tipo: "configuracion",
       accion: "actualizar",
       titulo: `Usuario actualizado: ${nombre.trim()}`,
       subtitulo: `Rol: ${rol}`,
+      usuarioNombre: sesionActualizar?.nombre || null,
       referenciaId: Number(id),
     })
 

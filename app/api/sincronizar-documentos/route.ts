@@ -12,6 +12,7 @@ import {
 import { enviarCorreo } from "@/lib/outlook";
 
 import { registrarActividad } from "@/lib/actividad";
+import { obtenerSesion } from "@/lib/session";
 
 const TAMANO_LOTE = 10;
 
@@ -24,6 +25,8 @@ const body =
 const sincronizacionId =
   body.sincronizacionId;
   try {
+const sesionDocs =
+  await obtenerSesion();
 const data =
   await listarDocumentos();
 
@@ -869,6 +872,7 @@ if (nuevasCxc > 0) {
     accion: "importacion",
     titulo: `Se registraron ${nuevasCxc} cuentas por cobrar`,
     subtitulo: "Sincronización con OneDrive",
+    usuarioNombre: sesionDocs?.nombre || null,
   });
 }
 
@@ -878,6 +882,7 @@ if (nuevasCxp > 0) {
     accion: "importacion",
     titulo: `Se registraron ${nuevasCxp} cuentas por pagar`,
     subtitulo: "Sincronización con OneDrive",
+    usuarioNombre: sesionDocs?.nombre || null,
   });
 }
 

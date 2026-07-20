@@ -12,8 +12,7 @@ export type TipoActividad =
   | "cliente"
   | "proyecto"
   | "conciliacion"
-  | "configuracion"
-  | "logout";
+  | "configuracion";
 
 // =============================================================================
 // ACCIONES
@@ -30,8 +29,7 @@ export type AccionActividad =
   | "cobrar"
   | "importacion"
   | "activar"
-  | "desactivar"
-  | "cerrar_sesion";
+  | "desactivar";
 
 // =============================================================================
 // INPUT
@@ -43,6 +41,8 @@ export interface RegistrarActividadInput {
 
   titulo: string;
   subtitulo?: string | null;
+
+  usuarioNombre?: string | null;
 
   referenciaId?: number | null;
 }
@@ -59,6 +59,8 @@ export interface ActividadSistema {
 
   titulo: string;
   subtitulo: string | null;
+
+  usuarioNombre: string | null;
 
   referenciaId: number | null;
 
@@ -80,6 +82,7 @@ export async function registrarActividad(
     accion,
     titulo,
     subtitulo = null,
+    usuarioNombre = null,
     referenciaId = null,
   } = input;
 
@@ -91,15 +94,17 @@ export async function registrarActividad(
       accion,
       titulo,
       subtitulo,
+      usuario_nombre,
       referencia_id
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?)
     `,
     [
       tipo,
       accion,
       titulo.trim(),
       subtitulo?.trim() || null,
+      usuarioNombre?.trim() || null,
       referenciaId,
     ]
   );

@@ -7,6 +7,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const url = new URL(req.url)
+    const soloActivas = url.searchParams.get("activas") === "true"
 
     const [observaciones] = await pool.query(
       `
@@ -20,7 +22,7 @@ export async function GET(
         fecha_en_progreso,
         fecha_resolucion
       FROM valorizacion_observaciones
-      WHERE valorizacion_id = ?
+      WHERE valorizacion_id = ?${soloActivas ? " AND estado <> 'RESUELTA'" : ""}
       ORDER BY id DESC
       `,
       [id]

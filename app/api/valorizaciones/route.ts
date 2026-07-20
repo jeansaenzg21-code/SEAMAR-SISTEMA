@@ -28,15 +28,16 @@ export async function GET() {
           FROM valorizacion_documentos vd
           WHERE vd.valorizacion_id = v.id
         ) AS documentos_adjuntos,
-         (
- SELECT JSON_ARRAYAGG(
-   JSON_OBJECT(
-     'nombre', vd.nombre,
-     'url', vd.url
-   )
- )
- FROM valorizacion_documentos vd
- WHERE vd.valorizacion_id = v.id
+  (
+  SELECT JSON_ARRAYAGG(
+    JSON_OBJECT(
+      'id', vd.id,
+      'nombre', vd.nombre,
+      'url', vd.url
+    )
+  )
+  FROM valorizacion_documentos vd
+  WHERE vd.valorizacion_id = v.id
 ) AS documentos,
         (
           SELECT vo.observacion

@@ -85,16 +85,19 @@ function obtenerPrompt(
 export async function procesarDocumento(
   buffer: Buffer,
   nombreArchivo: string,
-  tipo: "factura" | "valorizacion" | "contrato"
+  tipo: "factura" | "valorizacion" | "contrato",
+  promptPersonalizado?: string
   
 ) {
 
   const nombre = nombreArchivo.toLowerCase();
 
+  console.time("pdf_hash")
   const hashArchivo = crypto
   .createHash("sha256")
   .update(buffer)
   .digest("hex");
+  console.timeEnd("pdf_hash")
 
 const esExcel =
   nombre.endsWith(".xlsx") ||
@@ -106,7 +109,9 @@ const esExcel =
 if (esExcel) {
   textoDocumento = leerExcel(buffer);
 } else {
+  console.time("pdf_lectura")
   textoDocumento = await leerPdf(buffer);
+  console.timeEnd("pdf_lectura")
 }
 
 const esEscaneado = textoDocumento.trim().length < 100;
@@ -125,7 +130,9 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
   try {
 
+    console.time("pdf_ocr")
     textoDocumento = await leerPdfConOCR(buffer);
+    console.timeEnd("pdf_ocr")
 
     console.log(
       `OCR terminó correctamente. Caracteres: ${textoDocumento.length}`
@@ -152,7 +159,7 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
     try {
 
-      const prompt = obtenerPrompt(tipo);
+      const prompt = promptPersonalizado ?? obtenerPrompt(tipo);
 
       console.log("================================");
 console.log("LONGITUD DEL TEXTO:", textoDocumento.length);
@@ -163,6 +170,7 @@ console.log("========== TEXTO EXTRAÍDO ==========");
 console.log(textoDocumento);
 console.log("====================================");
 
+console.time("openai_llamada")
 const response = await openai.responses.create({
   model: process.env.OPENAI_MODEL || "gpt-5-mini",
   input: `
@@ -175,6 +183,7 @@ EL NOMBRE DEL ARCHIVO ES: ${nombreArchivo}
 ${textoDocumento}
 `,
 });
+console.timeEnd("openai_llamada")
 
 
       const resultado = parsearJson(

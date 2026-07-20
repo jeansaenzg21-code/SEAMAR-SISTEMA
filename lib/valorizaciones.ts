@@ -13,15 +13,18 @@ export async function guardarValorizacion(
 const documentosCompletos =
   Number(data.documentosAdjuntos || 0) >= 4;
 
+console.time("buscar_os_onedrive")
 const os =
   esRepsol && documentosCompletos
     ? { name: null, id: null, webUrl: null }
     : await buscarOSPorNumero(
         data.numeroOrdenServicio
       );
+console.timeEnd("buscar_os_onedrive")
 
 console.log("HASH:", data.hashArchivo);
 
+console.time("busqueda_duplicado")
       const [duplicado]: any = await pool.query(
   `
   SELECT id
@@ -31,6 +34,7 @@ console.log("HASH:", data.hashArchivo);
   `,
   [data.hashArchivo]
 );
+console.timeEnd("busqueda_duplicado")
 
 console.log("DUPLICADO:", duplicado);
 
@@ -51,23 +55,16 @@ let codigo = data.codigo;
 
 if (!codigo) {
 
-  const cliente =
-    data.empresaCliente ??
-    data.proveedor ??
-    "SIN PROVEEDOR";
-
   const [rows]: any = await pool.query(
     `
     SELECT codigo
     FROM valorizaciones
     WHERE codigo LIKE ?
-      AND proveedor = ?
     ORDER BY id DESC
     LIMIT 1
     `,
     [
-      `VAL-${anio}-%`,
-      cliente
+      `VAL-${anio}-%`
     ]
   );
 
@@ -90,7 +87,26 @@ if (!codigo) {
 
 }
 
-    
+  console.log("=== DATOS RECIBIDOS ===");
+  console.log("RUC:", data.ruc);
+  console.log("empresaCliente:", data.empresaCliente);
+  console.log("proveedor:", data.proveedor);
+
+  if (data.ruc) {
+    console.time("busqueda_cliente_ruc")
+    const [cliente]: any = await pool.query(
+      `SELECT razon_social FROM clientes WHERE ruc = ? LIMIT 1`,
+      [data.ruc]
+    )
+    console.log("Cliente encontrado:", cliente);
+    console.timeEnd("busqueda_cliente_ruc")
+    if (cliente.length > 0) {
+      data.empresaCliente = cliente[0].razon_social
+      data.proveedor = cliente[0].razon_social
+    }
+  }
+
+console.time("insert_valorizacion_mysql")
   const [result]: any =
   await pool.query(
     `
@@ -193,6 +209,7 @@ data.hashArchivo
 
     ]
   );
+console.timeEnd("insert_valorizacion_mysql")
 
   const valorizacionId =
   result.insertId;

@@ -18,8 +18,11 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { DocumentosPreview } from "@/components/DocumentosPreview"
-
-type Status = "draft" | "under_review" | "observed" | "approved"
+import { ObservationHistory } from "@/components/observation-history"
+import { ValuationMetricsCards } from "@/components/valuation-metrics-cards"
+import type { ValorizacionStatus } from "@/lib/types"
+import { formatDate } from "@/lib/utils"
+import { StatusBadge } from "@/components/status-badge"
 
 type Approval = {
   id: string
@@ -27,7 +30,7 @@ type Approval = {
   codigo: string
   description: string
   amount: string
-  status: Status
+  status: ValorizacionStatus
   submittedBy: string
   submittedDate: string
   priority: "high" | "medium" | "low"
@@ -41,47 +44,13 @@ aprobado_por?: string
 observado_por?: string
 }
 
-const formatearFecha = (fecha?: string) => {
-  if (!fecha) return "-"
-
-  return new Date(fecha).toLocaleString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-function StatusBadge({ status }: { status: Status }) {
-  const labels = {
-    draft: "Borrador",
-    under_review: "En revisión",
-    observed: "Observado",
-    approved: "Aprobado",
-  }
-
-  const styles = {
-    draft: "bg-gray-500/10 text-gray-400 border-gray-500/20",
-    under_review: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    observed: "bg-red-500/10 text-red-400 border-red-500/20",
-    approved: "bg-green-500/10 text-green-400 border-green-500/20",
-  }
-
-  return (
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status]}`}>
-      {labels[status]}
-    </span>
-  )
-}
-
 function mapApiToApproval(v: any): Approval {
   return {
     id: v.id,
     codigo: v.codigo,
     client: v.proveedor,
     description: v.descripcion,
-    amount: `S/ ${v.monto}`,
+    amount: `${v.moneda === "USD" ? "$" : "S/"} ${Number(v.monto ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     status:
       v.estado === "BORRADOR"
         ? "draft"
@@ -120,7 +89,7 @@ export function ApprovalsContent() {
   const { rol: rolUsuario } = useRol()
   const [searchQuery, setSearchQuery] = useState("")
   const [approvals, setApprovals] = useState<Approval[]>([])
-  const [approvalFiles, setApprovalFiles] = useState<File[]>([])
+
 
   const cargarAprobaciones = useCallback(async () => {
     const response = await fetch("/api/valorizaciones")
@@ -229,7 +198,7 @@ const abrirDetalle = async (item: Approval) => {
               <p><span className="text-muted-foreground">Enviado por:</span> {item.submittedBy}</p>
               <p>
   <span className="text-muted-foreground">Fecha:</span>{" "}
-  {formatearFecha(item.submittedDate)}
+  {formatDate(item.submittedDate)}
 </p>
             </div>
           </div>
@@ -458,35 +427,16 @@ const abrirDetalle = async (item: Approval) => {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{selectedApproval?.client}</span>
           <span>·</span>
-          <span>{formatearFecha(selectedApproval?.submittedDate)}</span>
+          <span>{formatDate(selectedApproval?.submittedDate)}</span>
         </div>
       </div>
     </DialogHeader>
 
-    <div className="grid grid-cols-3 gap-3 border-y py-6">
-      <div className="rounded-lg border p-4 text-center">
-        <p className="text-xs text-muted-foreground">MONTO</p>
-        <p className="text-lg font-bold">
-          {selectedApproval?.amount
-  ? `S/ ${Number(String(selectedApproval.amount).replace("S/", "").trim()).toLocaleString("es-PE")}`
-  : "Sin monto"}
-        </p>
-      </div>
-
-      <div className="rounded-lg border p-4 text-center">
-        <p className="text-xs text-muted-foreground">PRIORIDAD</p>
-        <p className="text-lg font-bold">
-          {selectedApproval?.priority || "—"}
-        </p>
-      </div>
-
-      <div className="rounded-lg border p-4 text-center">
-        <p className="text-xs text-muted-foreground">ENVIADO POR</p>
-        <p className="text-lg font-bold">
-          {selectedApproval?.submittedBy || "—"}
-        </p>
-      </div>
-    </div>
+    <ValuationMetricsCards items={[
+      { label: "MONTO", value: selectedApproval?.amount || "Sin monto" },
+      { label: "PRIORIDAD", value: selectedApproval?.priority || "—" },
+      { label: "ENVIADO POR", value: selectedApproval?.submittedBy || "—" },
+    ]} />
 
     <div className="space-y-3">
   <p className="text-xs font-semibold tracking-widest text-muted-foreground">
@@ -522,7 +472,7 @@ const abrirDetalle = async (item: Approval) => {
 </p>
 
     <p className="text-xs text-muted-foreground">
-  {formatearFecha(selectedApproval?.submittedDate)}
+  {formatDate(selectedApproval?.submittedDate)}
 </p>
   </div>
 
@@ -558,48 +508,18 @@ const abrirDetalle = async (item: Approval) => {
 </p>
 
       <p className="text-xs text-muted-foreground">
-  {formatearFecha(selectedApproval?.submittedDate)}
+  {formatDate(selectedApproval?.submittedDate)}
 </p>
     </div>
   )}
 
 </div>
 
-    <div className="space-y-3 pt-4">
-      <p className="text-xs font-semibold tracking-widest text-muted-foreground">
-        OBSERVACIONES
-      </p>
-
-      <div className="rounded-lg border bg-muted/30 p-4">
-  {selectedApproval?.historial_observaciones &&
-  selectedApproval.historial_observaciones.length > 0 ? (
-    <div className="space-y-3">
-      {selectedApproval.historial_observaciones.map((obs: any) => (
-        <div
-          key={obs.id}
-          className="rounded-md border border-border bg-background p-3"
-        >
-          <p className="text-sm font-medium">
-            {obs.tipo === "SISTEMA"
-              ? "Observación del sistema"
-              : "Observación de usuario"}
-          </p>
-
-          <p className="text-sm mt-1">
-            {obs.observacion}
-          </p>
-
-          <p className="text-xs text-muted-foreground mt-2">
-            Estado: {obs.estado} · {obs.fecha}
-          </p>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p className="text-sm text-muted-foreground">
-      No hay observaciones registradas.
-    </p>
-  )}
+    <ObservationHistory
+      observaciones={selectedApproval?.historial_observaciones || []}
+      variant="card"
+      titulo="OBSERVACIONES"
+    />
 
   {selectedApproval?.respuesta_observacion && (
     <div className="mt-3 rounded-md border border-green-500/20 bg-green-500/10 p-3">
@@ -659,43 +579,7 @@ const abrirDetalle = async (item: Approval) => {
     </Button>
   
         </div>
-      </div>
-    </div>
-
-    {/* DOCUMENTOS DE APROBACIÓN */}
-<div className="mt-4 rounded-lg border p-3 space-y-3">
-  <p className="text-xs font-semibold tracking-widest text-muted-foreground">
-    DOCUMENTOS DE APROBACIÓN
-  </p>
-
-  <Input
-    type="file"
-    multiple
-    onChange={(e) => {
-  setApprovalFiles(
-    e.target.files
-      ? Array.from(e.target.files)
-      : []
-  )
-}}
-  />
-
-  <Button
-  size="sm"
-  className="w-full"
-  onClick={() => {
-    console.log(approvalFiles)
-    alert(`${approvalFiles.length} archivo(s) seleccionado(s)`)
-  }}
->
-  Adjuntar documento
-</Button>
-
-  <div className="space-y-2">
-    {/* aquí aparecerán los documentos guardados */}
-  </div>
-</div> 
-
+  
     <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
       {rolUsuario === "SUPERVISOR" || rolUsuario === "ADMINISTRADOR" ? (
   <Button

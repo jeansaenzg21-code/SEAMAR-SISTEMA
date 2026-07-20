@@ -204,6 +204,7 @@ if (esValorizacion) {
     accion: "importacion",
     titulo: `Se registraron ${nuevos} valorizaciones`,
     subtitulo: "Sincronización con OneDrive",
+    usuarioNombre: creadoPor || null,
   });
 }
 

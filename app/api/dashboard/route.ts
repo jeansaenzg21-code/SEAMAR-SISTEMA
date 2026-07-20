@@ -99,6 +99,7 @@ const [actividadRows]: any = await pool.query(`
     accion,
     titulo,
     subtitulo,
+    usuario_nombre,
     created_at
   FROM actividad_sistema
   ORDER BY created_at DESC
@@ -242,6 +243,8 @@ if (alertasData.observado_5d > 0) {
   title: actividad.titulo,
 
   subtitle: actividad.subtitulo ?? "",
+
+  usuarioNombre: actividad.usuario_nombre ?? null,
 
   createdAt: actividad.created_at,
 

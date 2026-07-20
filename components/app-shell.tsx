@@ -495,14 +495,14 @@ px-3 md:px-6
                       {actividad.titulo}
                     </div>
 
-                    {actividad.subtitulo && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {actividad.subtitulo}
-                      </div>
-                    )}
-
-                    <div className="text-[11px] text-muted-foreground mt-2">
-                      {new Date(actividad.created_at).toLocaleString("es-PE")}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                      {actividad.usuario_nombre && (
+                        <span className="font-medium text-foreground/70">{actividad.usuario_nombre}</span>
+                      )}
+                      {actividad.usuario_nombre && <span>·</span>}
+                      {actividad.subtitulo && <span>{actividad.subtitulo}</span>}
+                      {actividad.subtitulo && <span>·</span>}
+                      <span>{new Date(actividad.created_at).toLocaleString("es-PE")}</span>
                     </div>
                   </div>
                 ))

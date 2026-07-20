@@ -99,78 +99,161 @@ export async function subirArchivoAOneDrive(
   buffer: Buffer,
   folderId: string,
   token: string
-)
- {
+) {
   const nombreLimpio = nombreArchivo.replace(/[<>:"/\\|?*]/g, "-");
 
-  // 1. Crear sesión de carga, anclada al folderId (NO a un path)
+  const debugId = `UPLOAD_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  console.log(`[${debugId}] INICIO subirArchivoAOneDrive`);
+  console.log(`[${debugId}] nombreArchivo original:`, nombreArchivo);
+  console.log(`[${debugId}] nombreLimpio:`, nombreLimpio);
+  console.log(`[${debugId}] folderId:`, folderId);
+  console.log(`[${debugId}] buffer.length:`, buffer.length);
+  console.log(`[${debugId}] USER:`, USER);
+  console.log(`[${debugId}] token (primeros 20):`, token?.slice(0, 20) + "...");
 
-  console.log("Folder ID:", folderId);
-console.log("Usuario:", USER);
-const sessionRes = await fetch(
-  `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${folderId}:/${encodeURIComponent(nombreLimpio)}:/createUploadSession`,
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      item: {
-        "@microsoft.graph.conflictBehavior": "replace"
+  let uploadUrl: string | null = null;
+  let uploadCompleted = false;
+  let nombreEfectivo = nombreLimpio;
+
+  const cancelarSesion = async () => {
+    if (uploadUrl) {
+      try {
+        const res = await fetch(uploadUrl, { method: "DELETE" });
+        console.log(`[${debugId}] CLEANUP: DELETE uploadUrl → ${res.status}`);
+      } catch (e) {
+        console.log(`[${debugId}] CLEANUP: Error cancelando sesión:`, e);
       }
-    }),
-  }
-);
-  if (!sessionRes.ok) {
-  console.log("STATUS:", sessionRes.status);
-  console.log("ERROR:", await sessionRes.text());
+    }
+  };
 
-  throw new Error("Error creando sesión de carga");
-}
+  try {
+    // 1. Crear sesión de carga
+    const createSessionUrl = `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${folderId}:/${encodeURIComponent(nombreEfectivo)}:/createUploadSession`;
+    console.log(`[${debugId}] createUploadSession URL:`, createSessionUrl);
 
-  const { uploadUrl } = await sessionRes.json();
-
-  // 2. Subir en chunks (múltiplos de 320 KB, excepto el último)
-  const chunkSize = 5 * 1024 * 1024; // 5 MB
-  let archivoFinal: any = null;
-
-  for (let start = 0; start < buffer.length; start += chunkSize) {
-    const end = Math.min(start + chunkSize, buffer.length);
-    const chunk = buffer.subarray(start, end);
-
-    // Importante: el uploadUrl ya trae su propia autorización.
-    // NO agregar el header Authorization aquí.
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
+    let sessionRes = await fetch(createSessionUrl, {
+      method: "POST",
       headers: {
-        "Content-Length": String(chunk.length),
-        "Content-Range": `bytes ${start}-${end - 1}/${buffer.length}`,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body: chunk as unknown as BodyInit,
+      body: JSON.stringify({
+        item: {
+          "@microsoft.graph.conflictBehavior": "replace"
+        }
+      }),
     });
 
-    if (!res.ok && res.status !== 202) {
-      const error = await res.text();
-      throw new Error(`Error subiendo chunk a OneDrive: ${error}`);
+    // Log respuesta createUploadSession
+    let sessionStatus = sessionRes.status;
+    let sessionBody: any = null;
+    try {
+      sessionBody = await sessionRes.clone().json();
+    } catch {
+      sessionBody = await sessionRes.clone().text();
+    }
+    console.log(`[${debugId}] createUploadSession RESPONSE: status=${sessionStatus} body=${JSON.stringify(sessionBody)}`);
+
+    // Si el archivo ya tiene una upload session activa (409 nameAlreadyExists),
+    // usar un nombre temporal para no bloquear la subida
+    if (sessionRes.status === 409) {
+      nombreEfectivo = `${nombreLimpio}_${Date.now()}`;
+      console.log(`[${debugId}] 409 nameAlreadyExists → reintentando con nombre temporal: ${nombreEfectivo}`);
+
+      const retryUrl = `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${folderId}:/${encodeURIComponent(nombreEfectivo)}:/createUploadSession`;
+      sessionRes = await fetch(retryUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          item: {
+            "@microsoft.graph.conflictBehavior": "replace"
+          }
+        }),
+      });
+
+      sessionStatus = sessionRes.status;
+      try {
+        sessionBody = await sessionRes.clone().json();
+      } catch {
+        sessionBody = await sessionRes.clone().text();
+      }
+      console.log(`[${debugId}] retry createUploadSession RESPONSE: status=${sessionStatus} body=${JSON.stringify(sessionBody)}`);
     }
 
-    if (end === buffer.length) {
-      archivoFinal = await res.json();
+    if (!sessionRes.ok) {
+      throw new Error(`Error creando sesión de carga: status=${sessionStatus} body=${JSON.stringify(sessionBody)}`);
+    }
+
+    const { uploadUrl: url } = sessionBody;
+    uploadUrl = url;
+    console.log(`[${debugId}] uploadUrl (primeros 80):`, uploadUrl?.slice(0, 80) + "...");
+
+    // 2. Subir en chunks (5 MB cada uno)
+    const chunkSize = 5 * 1024 * 1024;
+    let archivoFinal: any = null;
+    let chunkIndex = 0;
+
+    for (let start = 0; start < buffer.length; start += chunkSize) {
+      const end = Math.min(start + chunkSize, buffer.length);
+      const chunk = buffer.subarray(start, end);
+      chunkIndex++;
+
+      const contentRange = `bytes ${start}-${end - 1}/${buffer.length}`;
+      const contentLength = String(chunk.length);
+      console.log(`[${debugId}] CHUNK ${chunkIndex}: PUT bytes ${start}-${end - 1}/${buffer.length} (size=${chunk.length})`);
+
+      const res = await fetch(uploadUrl!, {
+        method: "PUT",
+        headers: {
+          "Content-Length": contentLength,
+          "Content-Range": contentRange,
+        },
+        body: chunk as unknown as BodyInit,
+      });
+
+      const chunkStatus = res.status;
+      let chunkBody: any = null;
+      try {
+        chunkBody = await res.clone().json();
+      } catch {
+        chunkBody = await res.clone().text();
+      }
+      console.log(`[${debugId}] CHUNK ${chunkIndex} RESPONSE: status=${chunkStatus} ${res.statusText}`);
+
+      if (chunkStatus !== 200 && chunkStatus !== 201 && chunkStatus !== 202) {
+        console.log(`[${debugId}] CHUNK ${chunkIndex} ERROR BODY:`, JSON.stringify(chunkBody, null, 2));
+        throw new Error(`Error subiendo chunk ${chunkIndex} a OneDrive: status=${chunkStatus} body=${JSON.stringify(chunkBody)}`);
+      }
+
+      if (end === buffer.length) {
+        archivoFinal = chunkBody;
+        console.log(`[${debugId}] CHUNK ${chunkIndex} (último):`, JSON.stringify(archivoFinal, null, 2));
+      }
+    }
+
+    if (!archivoFinal) {
+      throw new Error("La subida a OneDrive terminó sin respuesta final de Graph.");
+    }
+
+    uploadCompleted = true;
+    console.log(`[${debugId}] SUBIDA EXITOSA: name=${archivoFinal.name} id=${archivoFinal.id}`);
+
+    return {
+      nombre: archivoFinal.name,
+      itemId: archivoFinal.id,
+      webUrl: archivoFinal.webUrl,
+    };
+  } catch (error) {
+    await cancelarSesion();
+    throw error;
+  } finally {
+    if (!uploadCompleted) {
+      await cancelarSesion();
     }
   }
-
-  if (!archivoFinal) {
-    throw new Error(
-      "La subida a OneDrive terminó sin respuesta final de Graph."
-    );
-  }
-
-  return {
-    nombre: archivoFinal.name,
-    itemId: archivoFinal.id,
-    webUrl: archivoFinal.webUrl,
-  };
 }
 
 export async function subirContratoAOneDrive(
@@ -197,4 +280,27 @@ export async function subirDocumentoRespaldoAOneDrive(
     ONEDRIVE_FOLDERS.DOCUMENTOS_RESPALDO,
     token
   );
+}
+
+export async function generarEnlacePreview(itemId: string): Promise<string> {
+  const token = await getAccessToken();
+
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${itemId}/preview`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Error al generar preview: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.getUrl;
 }

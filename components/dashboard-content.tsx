@@ -66,6 +66,7 @@ export interface DashboardActivity {
   type: keyof typeof ACTIVITY_CONFIG
   title: string
   subtitle: string
+  usuarioNombre: string | null
   createdAt: string // ISO 8601, p.ej. "2026-07-11T18:30:00Z"
 }
 
@@ -352,6 +353,10 @@ function ActivityItem({
       <div className="min-w-0 flex-1 pb-1">
         <p className="text-sm font-medium leading-snug">{activity.title}</p>
         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {activity.usuarioNombre && (
+            <span className="shrink-0 font-medium text-foreground/70">{activity.usuarioNombre}</span>
+          )}
+          {activity.usuarioNombre && <span>·</span>}
           <span className="truncate">{activity.subtitle}</span>
           <span>·</span>
           <span className="shrink-0">{formatRelativeTime(activity.createdAt)}</span>

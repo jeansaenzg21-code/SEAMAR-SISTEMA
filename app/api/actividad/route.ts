@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { obtenerSesion } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
   try {
     const limit =
       Number(request.nextUrl.searchParams.get("limit")) || 20;
 
-    const [rows] = await pool.query(
+    const sesion = await obtenerSesion();
+    const esAdmin = sesion?.rol === "ADMINISTRADOR";
+
+    let query =
       `
       SELECT
         id,
@@ -14,14 +18,23 @@ export async function GET(request: NextRequest) {
         accion,
         titulo,
         subtitulo,
+        usuario_nombre,
         leido,
         created_at
       FROM actividad_sistema
-      ORDER BY created_at DESC
-      LIMIT ?
-      `,
-      [limit]
-    );
+      `;
+
+    const params: any[] = [];
+
+    if (sesion && !esAdmin) {
+      query += ` WHERE usuario_nombre = ?`;
+      params.push(sesion.nombre);
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT ?`;
+    params.push(limit);
+
+    const [rows] = await pool.query(query, params);
 
     return NextResponse.json({
       success: true,

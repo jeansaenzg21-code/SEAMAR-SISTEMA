@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
 import { obtenerSesion } from "@/lib/session"
-import { registrarActividad } from "@/lib/actividad"
 
 export async function GET() {
   try {
@@ -51,15 +50,6 @@ export async function PUT(request: Request) {
       "UPDATE usuarios SET tema = ? WHERE id = ?",
       [tema, sesion.id]
     )
-
-    const nombreActivo = tema === "CLARO" ? "modo claro" : "modo oscuro"
-
-    await registrarActividad({
-      tipo: "configuracion",
-      accion: "actualizar",
-      titulo: `${sesion.nombre} cambió el tema del sistema a ${nombreActivo}.`,
-      referenciaId: sesion.id,
-    })
 
     return NextResponse.json({
       success: true,

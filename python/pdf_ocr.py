@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import numpy as np
+import cv2
 
 from paddleocr import PaddleOCR
 
@@ -27,6 +28,11 @@ def extraer_texto(pdf_path):
             pix.height,
             pix.width,
             pix.n
+        )
+
+        imagen = cv2.rotate(
+            imagen,
+            cv2.ROTATE_90_CLOCKWISE
         )
 
         try:

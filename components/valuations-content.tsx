@@ -33,22 +33,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DocumentosPreview } from "@/components/DocumentosPreview"
 import { ExportDialog } from "@/components/export-dialog"
+import type { ValorizacionStatus, DocumentoValorizacion } from "@/lib/types"
+import { formatCurrency, mapEstadoApiToStatus } from "@/lib/utils"
+import { StatusBadge } from "@/components/status-badge"
+import { ValuationMetricsCards } from "@/components/valuation-metrics-cards"
 
 /* ============================================================================
  * 1) TYPES
  * ==========================================================================*/
-
-type ValorizacionStatus = "draft" | "under_review" | "observed" | "approved" | "invoiced"
-
-interface DocumentoValorizacion {
-  id: string | number
-  nombre?: string
-  archivo_nombre?: string
-  nombre_archivo?: string
-  url?: string
-  archivo_url?: string
-  [key: string]: unknown
-}
 
 interface Valuation {
   id: string
@@ -166,22 +158,6 @@ const VALORIZATION_API_STATUS = {
   APROBADO: "APROBADO",
 } as const
 
-const VALORIZATION_STATUS_LABEL: Record<ValorizacionStatus, string> = {
-  draft: "Borrador",
-  under_review: "En revisión",
-  observed: "Observado",
-  approved: "Aprobado",
-  invoiced: "Facturado",
-}
-
-const VALORIZATION_STATUS_STYLE: Record<ValorizacionStatus, string> = {
-  draft: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  under_review: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  observed: "bg-red-500/10 text-red-400 border-red-500/20",
-  approved: "bg-green-500/10 text-green-400 border-green-500/20",
-  invoiced: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-}
-
 /**
  * Reglas de cantidad de documentos requeridos por empresa.
  * Mismo orden y mismos matches que la lógica original
@@ -205,22 +181,6 @@ const ORDEN_SERVICIO_LABEL: Record<Extract<VistaCliente, "repsol" | "tdp">, stri
 /* ============================================================================
  * 3) LÓGICA DE NEGOCIO / MAPEOS (funciones puras)
  * ==========================================================================*/
-
-/** BORRADOR/EN_REVISION/OBSERVADO/APROBADO (backend) -> ValorizacionStatus (UI). */
-function mapEstadoApiToStatus(estado: string | undefined): ValorizacionStatus {
-  switch (estado) {
-    case VALORIZATION_API_STATUS.BORRADOR:
-      return VALORIZATION_STATUS.DRAFT
-    case VALORIZATION_API_STATUS.EN_REVISION:
-      return VALORIZATION_STATUS.UNDER_REVIEW
-    case VALORIZATION_API_STATUS.OBSERVADO:
-      return VALORIZATION_STATUS.OBSERVED
-    case VALORIZATION_API_STATUS.APROBADO:
-      return VALORIZATION_STATUS.APPROVED
-    default:
-      return VALORIZATION_STATUS.DRAFT
-  }
-}
 
 /** Traduce un registro crudo de `/api/valorizaciones` al shape usado por la UI. */
 function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
@@ -333,11 +293,6 @@ function validarDocumentosRequeridos(params: {
   }
 
   return { valid: true }
-}
-
-function formatCurrencyPEN(amount: number | null | undefined): string {
-  if (amount == null) return "-"
-  return `S/ ${Number(amount).toLocaleString("es-PE")}`
 }
 
 /* ============================================================================
@@ -781,18 +736,6 @@ const [sincronizando, setSincronizando] = useState(false)
  * 6) COMPONENTES DE UI
  * ==========================================================================*/
 
-function StatusBadgeComponent({ status }: { status: ValorizacionStatus }) {
-  return (
-    <span
-      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${VALORIZATION_STATUS_STYLE[status]}`}
-    >
-      {VALORIZATION_STATUS_LABEL[status]}
-    </span>
-  )
-}
-
-const StatusBadge = memo(StatusBadgeComponent)
-
 interface ValorizacionesTableProps {
   valuations: Valuation[]
   vistaCliente: VistaCliente
@@ -890,12 +833,12 @@ function ValorizacionesTableComponent({
 
                   {vistaCliente === "repsol" && (
                     <td className="px-5 py-4 whitespace-nowrap align-top">
-                      {item.pu ? formatCurrencyPEN(item.pu) : "-"}
+                      {item.pu ? formatCurrency(item.pu) : "-"}
                     </td>
                   )}
 
                   <td className="px-5 py-4 whitespace-nowrap align-top">
-                    {item.amount != null ? formatCurrencyPEN(item.amount) : "-"}
+                    {item.amount != null ? formatCurrency(item.amount) : "-"}
                   </td>
 
                   <td className="px-5 py-4 whitespace-nowrap align-top">{item.date || "-"}</td>
@@ -1409,22 +1352,11 @@ function ValorizacionDetailDialog({
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-3 gap-3 border-y py-6">
-          <div className="rounded-lg border p-4 text-center">
-            <p className="text-xs text-muted-foreground">MONTO</p>
-            <p className="text-lg font-bold">S/ {Number(valuation.amount).toLocaleString("es-PE")}</p>
-          </div>
-
-          <div className="rounded-lg border p-4 text-center">
-            <p className="text-xs text-muted-foreground">AVANCE</p>
-            <p className="text-lg font-bold">{getAvanceValorizacion(valuation.status)}%</p>
-          </div>
-
-          <div className="rounded-lg border p-4 text-center">
-            <p className="text-xs text-muted-foreground">RESP.</p>
-            <p className="text-lg font-bold">{valuation.encargado || "Sin responsable"}</p>
-          </div>
-        </div>
+        <ValuationMetricsCards items={[
+          { label: "MONTO", value: formatCurrency(valuation.amount) },
+          { label: "AVANCE", value: `${getAvanceValorizacion(valuation.status)}%` },
+          { label: "RESP.", value: valuation.encargado || "Sin responsable" },
+        ]} />
 
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-widest text-muted-foreground">DOCUMENTOS ADJUNTOS</p>
@@ -1540,6 +1472,7 @@ export function ValuationsContent() {
     eliminarDocumento,
     guardarValorizacion,
     descargarExcel,
+    reload: cargarValorizaciones,
     currentPage,
     setCurrentPage,
     totalPages,
@@ -1551,11 +1484,10 @@ export function ValuationsContent() {
   const [empresaImportacion, setEmpresaImportacion] = useState("")
   const [modoImportacion, setModoImportacion] = useState("individual")
   const [archivoImportacion, setArchivoImportacion] = useState<File | null>(null)
+  const [importando, setImportando] = useState(false)
 
   const [valorizacionesDetectadas, setValorizacionesDetectadas] = useState<string[]>([])
 const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<string[]>([])
-  const [hojasExcel, setHojasExcel] = useState<string[]>([])
-const [hojaSeleccionada, setHojaSeleccionada] = useState("")
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
 
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -1824,273 +1756,280 @@ const pasosCompilacion = [
       )}
 <Dialog
   open={mostrarImportador}
-  onOpenChange={setMostrarImportador}
+  onOpenChange={(next) => {
+    if (!importando) {
+      setMostrarImportador(next)
+      if (!next) {
+        setValorizacionesDetectadas([])
+        setValorizacionesSeleccionadas([])
+        setArchivoImportacion(null)
+        setEmpresaImportacion("")
+      }
+    }
+  }}
 >
   <DialogContent className="w-full sm:max-w-[40.625rem] max-h-[85vh] overflow-y-auto">
     <DialogHeader>
-      <DialogTitle>
+      <DialogTitle className="text-xl">
         Importar valorización
       </DialogTitle>
-
       <DialogDescription>
-        Seleccione la empresa y el archivo a importar.
+        {valorizacionesDetectadas.length === 0
+          ? "Seleccione la empresa y el archivo a importar."
+          : `Se detectaron ${valorizacionesDetectadas.length} valorizaciones en el archivo.`}
       </DialogDescription>
     </DialogHeader>
 
-    <div className="space-y-4 py-4">
+    <div className="space-y-5 py-4">
 
-      <div className="grid gap-2">
-        <Label>Empresa</Label>
+      {/* Selección de empresa */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label>Empresa</Label>
+            <Select
+              value={empresaImportacion}
+              onValueChange={setEmpresaImportacion}
+              disabled={valorizacionesDetectadas.length > 0 || importando}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="REPSOL">REPSOL</SelectItem>
+                <SelectItem value="TDP">TERMINALES DEL PERÚ</SelectItem>
+                <SelectItem value="TRALZA">TRANSPORTES Y ALMACENAMIENTO DE LIQUIDOS S.A. - TRALSA</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Select
-          value={empresaImportacion}
-          onValueChange={setEmpresaImportacion}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar empresa" />
-          </SelectTrigger>
+          <div className="grid gap-2">
+            <Label>Modo</Label>
+            <Select
+              value={modoImportacion}
+              onValueChange={setModoImportacion}
+              disabled={valorizacionesDetectadas.length > 0 || importando}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="masivo">Masivo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          <SelectContent>
-            <SelectItem value="REPSOL">
-              REPSOL
-            </SelectItem>
-
-            <SelectItem value="TDP">
-              TERMINALES DEL PERÚ
-            </SelectItem>
-          </SelectContent>
-        </Select>
         <div className="grid gap-2">
-  <Label>Modo</Label>
-
-  <Select
-    value={modoImportacion}
-    onValueChange={setModoImportacion}
-  >
-    <SelectTrigger>
-      <SelectValue />
-    </SelectTrigger>
-
-    <SelectContent>
-      <SelectItem value="individual">
-        Individual
-      </SelectItem>
-
-      <SelectItem value="masivo">
-        Masivo
-      </SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-        <div className="grid gap-2">
-  <Label>Archivo</Label>
-
-  <Input
-  type="file"
-  accept={
-    empresaImportacion === "REPSOL"
-      ? ".xlsx,.xls"
-      : ".pdf"
-  }
-  onChange={(e) => {
-    const archivo = e.target.files?.[0]
-
-    if (archivo) {
-      setArchivoImportacion(archivo)
-    }
-    
-  }}
-/>
-{archivoImportacion && (
-  <p className="text-sm text-muted-foreground">
-    Archivo seleccionado: {archivoImportacion.name}
-  </p>
-)}
-{
-  valorizacionesDetectadas.length > 0 && (
-    <div className="space-y-3">
-
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {valorizacionesSeleccionadas.length} valorizaciones seleccionadas
-        </span>
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              setValorizacionesSeleccionadas(
-                valorizacionesDetectadas
-              )
+          <Label>Archivo</Label>
+          <Input
+            type="file"
+            accept={
+              empresaImportacion === "REPSOL"
+                ? ".xlsx,.xls"
+                : ".pdf"  
             }
-          >
-            Todas
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              setValorizacionesSeleccionadas([])
-            }
-          >
-            Limpiar
-          </Button>
+            disabled={importando}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0]
+              if (archivo) {
+                setArchivoImportacion(archivo)
+                setValorizacionesDetectadas([])
+                setValorizacionesSeleccionadas([])
+              }
+            }}
+          />
+          {archivoImportacion && valorizacionesDetectadas.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {archivoImportacion.name} ({(archivoImportacion.size / 1024).toFixed(1)} KB)
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="
-        max-h-48
-        overflow-y-auto
-        border
-        border-border
-        rounded-lg
-        p-3
-        bg-muted/20
-        space-y-2
-      ">
-        {valorizacionesDetectadas.map((valor) => (
-          <label
-            key={valor}
-            className="
-              flex items-center
-              gap-2
-              px-2
-              py-2
-              rounded-md
-              hover:bg-muted/50
-              cursor-pointer
-            "
-          >
-            <input
-              type="checkbox"
-              checked={valorizacionesSeleccionadas.includes(valor)}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setValorizacionesSeleccionadas(prev => [...prev, valor])
-                } else {
-                  setValorizacionesSeleccionadas(
-                    prev => prev.filter(v => v !== valor)
-                  )
-                }
-              }}
-            />
-
-            <span className="text-sm">
-              {valor}
+      {/* Valorizaciones detectadas */}
+      {valorizacionesDetectadas.length > 0 && (
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <span className="text-sm font-medium">
+              {valorizacionesSeleccionadas.length} de {valorizacionesDetectadas.length} seleccionadas
             </span>
-          </label>
-        ))}
-      </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => setValorizacionesSeleccionadas([...valorizacionesDetectadas])}
+              >
+                Todas
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => setValorizacionesSeleccionadas([])}
+              >
+                Limpiar
+              </Button>
+            </div>
+          </div>
 
-    </div>
-  )
-}
+          <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+            {valorizacionesDetectadas.map((valor) => (
+              <label
+  key={valor}
+  onClick={() => {
+    if (valorizacionesSeleccionadas.includes(valor)) {
+      setValorizacionesSeleccionadas(prev =>
+        prev.filter(v => v !== valor)
+      )
+    } else {
+      setValorizacionesSeleccionadas(prev => [
+        ...prev,
+        valor
+      ])
+    }
+  }}
+  className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+>
+                <div
+                  className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+                    valorizacionesSeleccionadas.includes(valor)
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border"
+                  }`}
+                >
+                  {valorizacionesSeleccionadas.includes(valor) && (
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-sm">{valor}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
-{
-  empresaImportacion === "REPSOL" &&
-  modoImportacion === "individual" &&
-  hojasExcel.length > 0 && (
-    <div className="grid gap-2">
-      <Label>Hoja</Label>
-
-      <Select
-        value={hojaSeleccionada}
-        onValueChange={setHojaSeleccionada}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-
-        <SelectContent>
-          {hojasExcel.map((hoja) => (
-            <SelectItem
-              key={hoja}
-              value={hoja}
-            >
-              {hoja}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-</div>
-      </div>
-
+      {/* Indicador de carga */}
+      {importando && (
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 flex items-center gap-3">
+          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+          <div className="text-sm">
+            <p className="font-medium text-blue-400">Importando valorizaciones...</p>
+            <p className="text-xs text-muted-foreground">Subiendo archivo y guardando datos</p>
+          </div>
+        </div>
+      )}
     </div>
 
     <DialogFooter>
-  <Button
-    variant="outline"
-    onClick={() => setMostrarImportador(false)}
-  >
-    Cancelar
-  </Button>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setMostrarImportador(false)
+          setValorizacionesDetectadas([])
+          setValorizacionesSeleccionadas([])
+          setArchivoImportacion(null)
+          setEmpresaImportacion("")
+        }}
+        disabled={importando}
+      >
+        Cancelar
+      </Button>
 
-  <Button
-    disabled={
-      !empresaImportacion ||
-      !archivoImportacion
-    }
-    onClick={async () => {
+      <Button
+        disabled={
+          !empresaImportacion ||
+          !archivoImportacion ||
+          importando ||
+          (valorizacionesDetectadas.length > 0 && valorizacionesSeleccionadas.length === 0)
+        }
+        onClick={async () => {
+          setImportando(true)
 
-  const formData = new FormData();
+          try {
+            const formData = new FormData()
+            formData.append("empresa", empresaImportacion)
+            formData.append("modo", modoImportacion)
+            formData.append("archivo", archivoImportacion!)
 
-  formData.append(
-    "empresa",
-    empresaImportacion
-  );
+            // Fase 1: detectar valorizaciones
+            if (valorizacionesDetectadas.length === 0) {
+              const response = await fetch("/api/importar-valorizacion", {
+                method: "POST",
+                body: formData,
+              })
 
-  formData.append(
-  "modo",
-  modoImportacion
-);
+              const data = await response.json()
 
-  formData.append(
-    "archivo",
-    archivoImportacion!
-  );
+              if (!data.success) {
+                alert(data.error || "Error al detectar valorizaciones")
+                return
+              }
 
-  const response = await fetch(
-    "/api/importar-valorizacion",
-    {
-      method: "POST",
-      body: formData
-    }
-  );
+              if (!data.items || data.items.length === 0) {
+                alert("No se encontraron valorizaciones en el archivo")
+                return
+              }
 
-const data = await response.json();
+              const ids = data.items.map((item: any) => item.id)
+              setValorizacionesDetectadas(ids)
+              setValorizacionesSeleccionadas(ids)
+              return
+            }
 
-console.log(data);
+            // Fase 2: importar valorizaciones seleccionadas
+            formData.append(
+              "valorizaciones",
+              JSON.stringify(valorizacionesSeleccionadas)
+            )
 
-if (data.hojas) {
-  setValorizacionesDetectadas(data.hojas)
-setValorizacionesSeleccionadas(data.hojas)
+            const response = await fetch("/api/importar-valorizacion", {
+              method: "POST",
+              body: formData,
+            })
 
-  if (data.hojas.length > 0) {
-    setHojaSeleccionada(data.hojas[0])
-  }
+            const data = await response.json()
 
-  return
-}
-formData.append(
-  "valorizaciones",
-  JSON.stringify(valorizacionesSeleccionadas)
-)
+            if (!data.success) {
+              alert(data.error || "Error al importar valorizaciones")
+              return
+            }
 
-alert(data.message)
+            alert(
+              `Importación completada.\nSe importaron ${data.creadas} valorizaciones.`
+            )
 
-}}
-  >
-    Importar
-  </Button>
-  
+            setMostrarImportador(false)
+            setValorizacionesDetectadas([])
+            setValorizacionesSeleccionadas([])
+            setArchivoImportacion(null)
+            setEmpresaImportacion("")
 
-</DialogFooter>
-
+            await cargarValorizaciones()
+          } catch (error) {
+            console.error(error)
+            alert("Error al importar valorizaciones")
+          } finally {
+            setImportando(false)
+          }
+        }}
+      >
+        {importando ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Importando...
+          </>
+        ) : valorizacionesDetectadas.length > 0 ? (
+          "Importar seleccionadas"
+        ) : (
+          "Importar"
+        )}
+      </Button>
+    </DialogFooter>
   </DialogContent>
 </Dialog>
 <ExportDialog

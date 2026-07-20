@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Building2, Users, ShieldCheck, Palette, ArrowLeft, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRol } from "@/lib/role-context"
 import { EmpresaSection } from "@/components/configuracion/sections/empresa-section"
 import { UsuariosSection } from "@/components/configuracion/sections/usuarios-section"
 import { SeguridadSection } from "@/components/configuracion/sections/seguridad-section"
@@ -38,11 +39,29 @@ const SECTIONS_CONFIG = {
 
 type SectionId = keyof typeof SECTIONS_CONFIG
 
+const SECTIONS_VISIBILITY: Record<string, SectionId[]> = {
+  ADMINISTRADOR: ["empresa", "usuarios", "seguridad", "apariencia"],
+  SUPERVISOR: ["seguridad", "apariencia"],
+}
+
 export function ConfiguracionContent() {
   const router = useRouter()
-  const [activeSection, setActiveSection] = useState<SectionId>("empresa")
+  const { rol } = useRol()
 
-  const active = SECTIONS_CONFIG[activeSection]
+  const visibleSections = useMemo(
+    () => SECTIONS_VISIBILITY[rol] ?? SECTIONS_VISIBILITY.ADMINISTRADOR,
+    [rol]
+  )
+
+  const defaultSection = visibleSections[0]
+  const [activeSection, setActiveSection] = useState<SectionId>(defaultSection ?? "empresa")
+
+  // If role changes and current tab is no longer visible, switch to first visible
+  const safeSection = visibleSections.includes(activeSection as any)
+    ? activeSection
+    : defaultSection
+
+  const active = SECTIONS_CONFIG[safeSection]
   const ActiveComponent = active.Component
 
   return (
@@ -73,9 +92,9 @@ export function ConfiguracionContent() {
           aria-label="Secciones de configuración"
           className="mt-6 flex border-b border-border"
         >
-          {(Object.keys(SECTIONS_CONFIG) as SectionId[]).map((id) => {
+          {visibleSections.map((id) => {
             const { label, icon: Icon } = SECTIONS_CONFIG[id]
-            const isActive = id === activeSection
+            const isActive = id === safeSection
             return (
               <button
                 key={id}
@@ -99,7 +118,7 @@ export function ConfiguracionContent() {
 
         {/* Content */}
         <div
-          key={activeSection}
+          key={safeSection}
           className="mt-6 animate-in fade-in slide-in-from-bottom-1 duration-300"
         >
           <div className="mb-5 space-y-1">

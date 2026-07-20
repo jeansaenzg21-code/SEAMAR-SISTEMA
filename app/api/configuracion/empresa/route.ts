@@ -3,6 +3,7 @@ import { writeFile, unlink, mkdir } from "fs/promises"
 import path from "path"
 import pool from "@/lib/mysql"
 import { registrarActividad } from "@/lib/actividad"
+import { obtenerSesion } from "@/lib/session"
 
 export async function GET() {
   try {
@@ -45,7 +46,6 @@ export async function PUT(request: Request) {
     )
 
     let logoPath = existing[0]?.logo || null
-    let huboCambioLogo = false
 
     if (logoFile && logoFile.size > 0 && logoFile.name) {
       const uploadDir = path.join(process.cwd(), "public/uploads/logos")
@@ -65,7 +65,6 @@ export async function PUT(request: Request) {
       await writeFile(filePath, Buffer.from(bytes))
 
       logoPath = `/uploads/logos/${fileName}`
-      huboCambioLogo = true
     }
 
     if (existing.length === 0) {
@@ -76,11 +75,14 @@ export async function PUT(request: Request) {
         [razon_social, nombre_comercial, ruc, direccion, telefono, correo, logoPath]
       )
 
+      const sesionCrear = await obtenerSesion()
+
       await registrarActividad({
         tipo: "configuracion",
         accion: "crear",
         titulo: "Registro inicial de la empresa",
         subtitulo: nombre_comercial || razon_social,
+        usuarioNombre: sesionCrear?.nombre || null,
         referenciaId: result.insertId,
       })
 
@@ -103,23 +105,6 @@ export async function PUT(request: Request) {
       WHERE id = ?`,
       [razon_social, nombre_comercial, ruc, direccion, telefono, correo, logoPath, existing[0].id]
     )
-
-    await registrarActividad({
-      tipo: "configuracion",
-      accion: "actualizar",
-      titulo: "Actualización de datos de la empresa",
-      subtitulo: nombre_comercial || razon_social,
-      referenciaId: existing[0].id,
-    })
-
-    if (huboCambioLogo) {
-      await registrarActividad({
-        tipo: "configuracion",
-        accion: "actualizar",
-        titulo: "Logo de la empresa actualizado",
-        referenciaId: existing[0].id,
-      })
-    }
 
     return NextResponse.json({
       success: true,

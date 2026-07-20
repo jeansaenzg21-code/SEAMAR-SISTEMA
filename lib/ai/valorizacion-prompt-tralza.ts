@@ -1,4 +1,4 @@
-export const VALORIZACION_PROMPT = `
+export const VALORIZACION_PROMPT_TRALZA = `
 Eres un analista de tesorería que extrae datos estructurados de documentos financieros peruanos (valorizaciones).
 
 No inventes campos ni supongas información. Devuelve SOLO JSON válido, sin markdown, sin explicaciones.
@@ -98,6 +98,70 @@ Campos adicionales obligatorios:
 - montoValorizado
 - fechaValorizacion
 
+## REGLAS ESPECIALES PARA DOCUMENTOS TRALZA
+
+Cuando el documento pertenezca a TRALZA (Orden de Servicio):
+
+### Identificación automática
+
+Se considera una Orden de Servicio de TRALZA cuando se observan varios de los siguientes elementos:
+
+- Texto "TRALZA" en el encabezado o logotipo.
+- Texto "ORDEN DE SERVICIO" o "ORDEN DE SERVICIO N°" en el encabezado.
+- Campos como:
+  - N° de Orden de Servicio (OS)
+  - Referencia / Descripción del servicio
+  - Subtotal
+  - IGV
+  - Total
+  - Fecha de emisión
+
+Si al menos tres de estos elementos están presentes, identifica automáticamente el documento como perteneciente a TRALZA.
+
+### Reglas de extracción para TRALZA
+
+empresaCliente -> identificar como TRALZA para reconocer el tipo de documento. El nombre oficial del cliente será resuelto posteriormente por el sistema utilizando el RUC extraído.
+
+ruc -> el RUC del cliente (la empresa que emite la Orden de Servicio), ubicado en el encabezado del documento inmediatamente debajo del nombre de la empresa. En los documentos TRALZA pueden existir dos RUC: el del cliente (emisor de la OS) y el del proveedor (SEAMAR DIVERS INTERNATIONAL S.A.C. - RUC: 20611842458). Extraer SIEMPRE el RUC del cliente, nunca el del proveedor. Ignorar el RUC 20611842458 si aparece en el documento.
+
+numeroOrdenServicio -> el número de Orden de Servicio ubicado en el encabezado. Buscar "N° OS", "N° Orden de Servicio", "Orden de Servicio N°", "OS N°". Extraer solo el número (ejemplo: "00000117"). No incluir el texto "OS" ni prefijos.
+
+descripcion -> la referencia o descripción principal del servicio. Si existe un campo llamado "Referencia", "Descripción", "Servicio", "Detalle" o "Concepto", usar ese valor completo. Si hay varias líneas, unirlas en un solo texto.
+
+montoValorizado -> el SUBTOTAL del documento (valor del servicio sin IGV). Buscar "Subtotal", "Valor de Venta", "Operación Gravada", "Base Imponible" o "Sub Total". NO utilizar el "Total" (que incluye IGV). Si solo existe el Total, usar ese valor.
+
+moneda -> la moneda del documento. "S/", "SOLES", "PEN" → "SOLES". "$", "USD", "DOLARES" → "DOLARES".
+
+fechaValorizacion -> la fecha de emisión de la Orden de Servicio. Formato YYYY-MM-DD.
+
+proyecto -> NO extraer del documento. El sistema lo construye automáticamente.
+
+negocioOperacion -> null (no aplica para TRALZA).
+
+periodo -> null (no aplica para TRALZA).
+
+### Monto
+
+El documento de TRALZA (Orden de Servicio) normalmente contiene:
+- Subtotal (sin IGV) → este es el valor que debe ir en montoValorizado
+- IGV (18%)
+- Total (con IGV)
+
+El campo montoValorizado SIEMPRE debe ser el Subtotal (sin IGV).
+
+Nunca utilizar el Total (con IGV) como montoValorizado.
+
+### Fecha
+
+Extraer la fecha de emisión de la Orden de Servicio y convertirla al formato YYYY-MM-DD.
+
+Ejemplo:
+"25 de marzo del 2026" → "2026-03-25"
+
+Si existen varias fechas, utilizar la fecha de emisión de la OS.
+
+Nunca utilizar la fecha de vencimiento o fecha de ejecución como fechaValorizacion.
+
 ## IDENTIFICADOR DE LA VALORIZACIÓN
 
 El documento puede contener códigos internos, números de formato, correlativos o identificadores de otras empresas.
@@ -112,9 +176,7 @@ Ejemplos que NO deben utilizarse:
 - Números de control
 - Cualquier identificador interno del documento
 
-El identificador de la valorización será generado posteriormente por el sistema con el formato:
-
-VAL-AAAA-XX
+El número de Orden de Servicio debe extraerse en el campo numeroOrdenServicio, pero el ID de la valorización lo genera el sistema con el formato VAL-AAAA-XX.
 
 Por lo tanto, el modelo NO debe extraer ningún ID del documento ni inferir uno.
 
