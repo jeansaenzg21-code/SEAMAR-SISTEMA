@@ -49,10 +49,21 @@ export async function POST(request: Request) {
 
     // Fase 2: importar las valorizaciones seleccionadas
     const importDebugId = `IMPORT_ROUTE_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    console.time("total_importacion")
-    const sesion = await obtenerSesion();
-    const creadoPor = sesion?.nombre || sesion?.correo || "Sistema";
-    const seleccion: string[] = JSON.parse(valorizacionesStr);
+
+console.time("total_importacion");
+
+console.log("A");
+const sesion = await obtenerSesion();
+
+console.log("B");
+const creadoPor = sesion?.nombre || sesion?.correo || "Sistema";
+
+console.log("C");
+const seleccion: string[] = JSON.parse(valorizacionesStr);
+
+console.log("D");
+
+console.log(`[${importDebugId}] Fase 2: importando valorizaciones`);
 
     console.log(`[${importDebugId}] Fase 2: importando valorizaciones`);
     console.log(`[${importDebugId}] empresa:`, empresa);
