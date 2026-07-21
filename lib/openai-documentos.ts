@@ -5,6 +5,7 @@ import { FACTURA_PROMPT } from "./ai/factura-prompt";
 import { VALORIZACION_PROMPT } from "./ai/valorizacion-prompt";
 import { CONTRATO_PROMPT } from "./ai/contrato-prompt";
 import { leerPdfConOCR } from "./pdf-ocr";
+import { extraerCampos, mergeResultados } from "./document-parser";
 import crypto from "crypto";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -147,6 +148,25 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
   }
 
+  }
+
+let autoParsed = null;
+
+if (tipo === "factura" && textoDocumento.trim().length >= 50) {
+  console.time("extraccion_automatica")
+  autoParsed = extraerCampos(textoDocumento);
+  console.timeEnd("extraccion_automatica")
+
+  const camposEncontrados = (Object.entries(autoParsed) as [string, unknown][])
+    .filter(([_, v]) => v !== null && v !== undefined)
+    .map(([k]) => k);
+
+  console.log(
+    "Extracción automática:",
+    camposEncontrados.length > 0
+      ? camposEncontrados.join(", ")
+      : "ningún campo detectado"
+  );
 }
 
   let ultimoError: any;
@@ -212,6 +232,32 @@ console.log("==================================");
 console.log("JSON DEVUELTO POR OPENAI");
 console.log(JSON.stringify(resultado, null, 2));
 console.log("==================================");
+
+if (autoParsed && tipo === "factura") {
+  const antes = { ...resultado };
+  const resultadoFinal = mergeResultados(resultado, autoParsed);
+
+  const camposCompletados = Object.keys(resultadoFinal)
+    .filter((k) => {
+      const antesVal = (antes as Record<string, unknown>)[k];
+      const despuesVal = (resultadoFinal as Record<string, unknown>)[k];
+      return (
+        (antesVal === null || antesVal === undefined || antesVal === "") &&
+        despuesVal !== null &&
+        despuesVal !== undefined &&
+        despuesVal !== ""
+      );
+    });
+
+  if (camposCompletados.length > 0) {
+    console.log(
+      "Fusión híbrida - campos completados:",
+      camposCompletados.join(", ")
+    );
+  }
+
+  Object.assign(resultado, resultadoFinal);
+}
 
 resultado.hashArchivo = hashArchivo;
 
