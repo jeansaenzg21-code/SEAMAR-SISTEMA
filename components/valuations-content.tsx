@@ -904,8 +904,13 @@ function ValorizacionesTableComponent({
           </table>
         </div>
 
+        <p className="text-red-500 lg:hidden">
+          Mobile valuations: {valuations.length}
+        </p>
         <div className="block lg:hidden space-y-3 mt-4">
-            {valuations.map((item) => (
+          {valuations.map((item) => {
+            console.log("MOBILE ITEM", item)
+            return (
               <Card key={item.id} className="bg-card border-border">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -935,7 +940,8 @@ function ValorizacionesTableComponent({
                   </div>
                 </CardContent>
               </Card>
-            ))}
+  )
+})}
           </div>
       </CardContent>
     </Card>
