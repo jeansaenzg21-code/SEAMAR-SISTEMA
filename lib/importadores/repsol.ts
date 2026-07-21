@@ -5,30 +5,38 @@ import { guardarValorizacionesConDocumentos } from "./index"
 
 export const repsolImportador: Importador = {
   async detectar(buffer: Buffer, nombreArchivo: string) {
-    const workbook = new ExcelJS.Workbook()
-    await workbook.xlsx.load(buffer as any)
+  console.log("1. Entré a detectar");
+  console.log("2. Buffer:", buffer.length);
 
-    const hojas = workbook.worksheets
-      .filter((sheet) => {
-        const nombre = sheet.name.toUpperCase().trim()
-        return (
-          nombre.startsWith("VAL") &&
-          !nombre.includes("CONSOLIDADO") &&
-          !nombre.includes("RESUMEN") &&
-          !nombre.includes("COMPRA") &&
-          !nombre.includes("HOJA") &&
-          !nombre.includes("ANEXO")
-        )
-      })
-      .map((sheet) => sheet.name)
+  const workbook = new ExcelJS.Workbook();
 
-    const items: ItemDetectado[] = hojas.map((hoja) => ({
-      id: hoja,
-      nombre: hoja,
-    }))
+  console.log("3. Antes de load");
+  await workbook.xlsx.load(buffer as any);
+  console.log("4. Después de load");
 
-    return { items }
-  },
+  console.log("5. Hojas:", workbook.worksheets.length);
+
+  const hojas = workbook.worksheets
+    .filter((sheet) => {
+      const nombre = sheet.name.toUpperCase().trim();
+      return (
+        nombre.startsWith("VAL") &&
+        !nombre.includes("CONSOLIDADO") &&
+        !nombre.includes("RESUMEN") &&
+        !nombre.includes("COMPRA") &&
+        !nombre.includes("HOJA") &&
+        !nombre.includes("ANEXO")
+      );
+    })
+    .map((sheet) => sheet.name);
+
+  const items: ItemDetectado[] = hojas.map((hoja) => ({
+    id: hoja,
+    nombre: hoja,
+  }));
+
+  return { items };
+},
 
   async importar(
     buffer: Buffer,
