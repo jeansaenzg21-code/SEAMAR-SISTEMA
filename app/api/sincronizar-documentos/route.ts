@@ -9,6 +9,7 @@ import { NextRequest } from "next/server";
 import {
   procesarDocumento
 } from "@/lib/openai-documentos";
+import { DocTiming } from "@/lib/instrumentation";
 import { enviarCorreo } from "@/lib/outlook";
 
 import { registrarActividad } from "@/lib/actividad";
@@ -154,18 +155,28 @@ const UPDATE_CADA_N_DOCUMENTOS = 25;
 
 // ---- Lógica de procesamiento de un archivo individual (sin cambios de negocio) ----
 const procesarArchivo = async (archivo: any) => {
+  const docId = `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const timing = new DocTiming(docId);
+
   try {
 
+  timing.start("Descarga");
   const archivoCompleto =
     await descargarArchivo(
       archivo.id
     );
+  timing.end("Descarga");
+
+    timing.start("OpenAI+OCR");
     const json =
   await procesarDocumento(
     archivoCompleto.buffer,
     archivo.name,
-    "factura"
+    "factura",
+    undefined,
+    timing
   );
+  timing.end("OpenAI+OCR");
 
   const RUC_SEAMAR =
   process.env.SEAMAR_RUC || "20611842458";
@@ -301,6 +312,8 @@ if (!esFactura) {
 }
 
 if (esFactura) {
+
+  timing.start("Inserción BD");
 
   if (json.destino === "COBRAR") {
 
@@ -810,6 +823,9 @@ nuevasCxp++;
   }
 
 }
+
+  timing.end("Inserción BD");
+  timing.log("OK");
 
   } catch (error) {
 

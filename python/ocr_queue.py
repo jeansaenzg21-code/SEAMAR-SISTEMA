@@ -16,10 +16,20 @@ RETRY_BACKOFF_SECONDS = [2, 4]
 
 
 @dataclass
+class OcrResult:
+    texto: str
+    queue_wait_ms: int
+    ocr_ms: int
+
+
+@dataclass
 class OcrJob:
     pdf_bytes: bytes
     document_id: str
     future: asyncio.Future = field(default=None, compare=False)
+    enqueued_at: float = 0.0
+    dequeued_at: float = 0.0
+    ocr_elapsed_ms: int = 0
 
     def __post_init__(self):
         if self.future is None:
@@ -98,11 +108,12 @@ class OcrQueue:
 
         logger.info("Cola OCR detenida")
 
-    async def enqueue(self, pdf_bytes: bytes, document_id: str) -> str:
+    async def enqueue(self, pdf_bytes: bytes, document_id: str) -> OcrResult:
         job = OcrJob(
             pdf_bytes=pdf_bytes,
             document_id=document_id,
         )
+        job.enqueued_at = time.monotonic()
         position = self.queue.qsize() + 1
 
         try:
@@ -119,7 +130,14 @@ class OcrQueue:
             f"[{document_id}] Documento encolado | "
             f"Posición en cola: {position}"
         )
-        return await job.future
+        texto = await job.future
+        total_ms = int((time.monotonic() - job.enqueued_at) * 1000)
+        queue_wait_ms = total_ms - job.ocr_elapsed_ms
+        return OcrResult(
+            texto=texto,
+            queue_wait_ms=max(queue_wait_ms, 0),
+            ocr_ms=job.ocr_elapsed_ms,
+        )
 
     async def _worker_loop(self, worker_id: int):
         logger.info(f"Worker {worker_id} iniciado")
@@ -132,10 +150,13 @@ class OcrQueue:
                 break
 
             job: OcrJob = item
+            job.dequeued_at = time.monotonic()
+            queue_wait_s = job.dequeued_at - job.enqueued_at
             self.metrics.set_queue_size(self.queue.qsize())
 
             logger.info(
-                f"[{job.document_id}] Worker {worker_id} asignado"
+                f"[{job.document_id}] Worker {worker_id} | "
+                f"Esperó en cola: {queue_wait_s:.1f}s"
             )
 
             await self._procesar_con_reintentos(job, worker_id)
@@ -184,6 +205,7 @@ class OcrQueue:
                 )
 
                 self.metrics.record_ocr_end(elapsed_ms, success=True)
+                job.ocr_elapsed_ms = elapsed_ms
 
                 if not job.future.done():
                     job.future.set_result(texto)

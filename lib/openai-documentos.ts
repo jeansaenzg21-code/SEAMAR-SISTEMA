@@ -6,6 +6,7 @@ import { VALORIZACION_PROMPT } from "./ai/valorizacion-prompt";
 import { CONTRATO_PROMPT } from "./ai/contrato-prompt";
 import { leerPdfConOCR } from "./pdf-ocr";
 import { extraerCampos, mergeResultados } from "./document-parser";
+import { DocTiming } from "./instrumentation";
 import crypto from "crypto";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -87,18 +88,22 @@ export async function procesarDocumento(
   buffer: Buffer,
   nombreArchivo: string,
   tipo: "factura" | "valorizacion" | "contrato",
-  promptPersonalizado?: string
+  promptPersonalizado?: string,
+  timing?: DocTiming
   
 ) {
 
   const nombre = nombreArchivo.toLowerCase();
 
-  console.time("pdf_hash")
+  const docId = timing?.docId ?? `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const t = timing ?? new DocTiming(docId);
+
+  t.start("Hash");
   const hashArchivo = crypto
   .createHash("sha256")
   .update(buffer)
   .digest("hex");
-  console.timeEnd("pdf_hash")
+  t.end("Hash");
 
 const esExcel =
   nombre.endsWith(".xlsx") ||
@@ -131,21 +136,24 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 
   try {
 
-    console.time("pdf_ocr")
-    textoDocumento = await leerPdfConOCR(buffer);
-    console.timeEnd("pdf_ocr")
+    t.start("OCR");
+    const ocrResult = await leerPdfConOCR(buffer, docId);
+    textoDocumento = ocrResult.texto;
+    t.end("OCR");
 
     console.log(
-      `OCR terminó correctamente. Caracteres: ${textoDocumento.length}`
+      `[${docId}] OCR terminó | Caracteres: ${textoDocumento.length} | ` +
+      `Cola: ${ocrResult.timing.queue_wait_ms}ms | OCR: ${ocrResult.timing.ocr_ms}ms`
     );
 
   } catch (error) {
 
     console.error(
-      "Error ejecutando OCR:",
+      `[${docId}] Error ejecutando OCR:`,
       error
     );
 
+    t.log("ERROR_OCR");
     throw error;
 
   }
@@ -192,7 +200,7 @@ console.log("========== TEXTO EXTRAÍDO ==========");
 console.log(textoDocumento);
 console.log("====================================");
 
-console.time("openai_llamada")
+t.start("OpenAI");
 const response = await openai.responses.create({
   model: process.env.OPENAI_MODEL || "gpt-5-mini",
   input: `
@@ -205,7 +213,7 @@ EL NOMBRE DEL ARCHIVO ES: ${nombreArchivo}
 ${textoDocumento}
 `,
 });
-console.timeEnd("openai_llamada")
+t.end("OpenAI");
 
 
       const resultado = parsearJson(
@@ -263,6 +271,7 @@ if (autoParsed && tipo === "factura") {
 
 resultado.hashArchivo = hashArchivo;
 
+t.log("OK");
 return resultado;
 
     } catch (error: any) {

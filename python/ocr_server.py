@@ -122,7 +122,7 @@ async def health():
 
 @app.post("/ocr")
 async def ocr_endpoint(request: Request):
-    doc_id = f"OCR-{next(doc_id_counter):06d}"
+    doc_id = request.headers.get("x-document-id") or f"OCR-{next(doc_id_counter):06d}"
 
     content_type = request.headers.get("content-type", "")
     if "application/pdf" not in content_type:
@@ -157,14 +157,21 @@ async def ocr_endpoint(request: Request):
         return {"ok": False, "error": "OCR Service no disponible"}
 
     try:
-        texto = await ocr_queue.enqueue(content, doc_id)
+        result = await ocr_queue.enqueue(content, doc_id)
 
         logger.info(
             f"[{doc_id}] Documento procesado exitosamente | "
-            f"Caracteres: {len(texto)}"
+            f"Caracteres: {len(result.texto)} | "
+            f"Cola: {result.queue_wait_ms}ms | "
+            f"OCR: {result.ocr_ms}ms"
         )
 
-        return {"ok": True, "texto": texto}
+        return {
+            "ok": True,
+            "texto": result.texto,
+            "queue_wait_ms": result.queue_wait_ms,
+            "ocr_ms": result.ocr_ms,
+        }
 
     except asyncio.QueueFull:
         logger.warning(f"[{doc_id}] Cola llena, rechazando documento")
