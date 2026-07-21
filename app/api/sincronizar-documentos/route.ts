@@ -834,6 +834,8 @@ nuevasCxp++;
       archivo.name,
       error
     );
+    console.error("===== STACK ARCHIVO =====");
+    console.error(error?.stack);
 
   }
 

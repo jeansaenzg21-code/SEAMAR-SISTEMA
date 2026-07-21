@@ -16,12 +16,14 @@ function parsearJson(
   texto: string
 ) {
 
+  console.log("[parsearJson] texto=", texto, "| type=", typeof texto);
   const limpio =
     texto
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
 
+  console.log("[parsearJson] limpio=", limpio, "| type=", typeof limpio);
   return JSON.parse(limpio);
 
 }
@@ -152,6 +154,8 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
       `[${docId}] Error ejecutando OCR:`,
       error
     );
+    console.error("===== STACK OCR =====");
+    console.error(error?.stack);
 
     t.log("ERROR_OCR");
     throw error;
@@ -216,9 +220,37 @@ ${textoDocumento}
 t.end("OpenAI");
 
 
+      console.log("===== OPENAI RESPONSE =====");
+      console.dir(response, { depth: null });
+      console.log("===== OUTPUT_TEXT =====");
+      console.log("type:", typeof response.output_text);
+      console.log("length:", typeof response.output_text === "string" ? response.output_text.length : "N/A");
+      console.log("first 500 chars:", typeof response.output_text === "string" ? response.output_text.substring(0, 500) : response.output_text);
+
+      console.log("===== ANTES PARSE =====");
+      console.log("output_text raw:", response.output_text);
+      console.log("output_text typeof:", typeof response.output_text);
+
       const resultado = parsearJson(
   response.output_text ?? "{}"
 );
+
+      console.log("===== JSON PARSEADO =====");
+      console.dir(resultado, { depth: null });
+      console.log("numeroFactura:", resultado.numeroFactura);
+      console.log("serie:", resultado.serie);
+      console.log("correlativo:", resultado.correlativo);
+      console.log("rucEmisor:", resultado.rucEmisor);
+      console.log("rucCliente:", resultado.rucCliente);
+      console.log("tipoDocumento:", (resultado as any).tipoDocumento);
+      console.log("montoTotal:", resultado.montoTotal);
+      console.log("moneda:", resultado.moneda);
+      console.log("fechaEmision:", resultado.fechaEmision);
+      console.log("fechaVencimiento:", resultado.fechaVencimiento);
+      console.log("empresaEmisora:", resultado.empresaEmisora);
+      console.log("empresaCliente:", resultado.empresaCliente);
+      console.log("entidadPrincipal:", resultado.entidadPrincipal);
+      console.log("destino:", resultado.destino);
 
 // ===============================
 // VALIDACIÓN DEL DESTINO
@@ -281,6 +313,10 @@ return resultado;
       console.log(
   `OpenAI intento ${intento} falló`
 );
+
+      console.error("===== ERROR COMPLETO =====");
+      console.error(error);
+      console.error(error?.stack);
 
       if (error?.status === 429) {
   throw error;
