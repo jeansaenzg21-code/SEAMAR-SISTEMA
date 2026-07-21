@@ -1,0 +1,9 @@
+# OCR
+PyMuPDF==1.26.3
+opencv-python==4.12.0.88
+numpy==2.2.6
+Pillow==11.3.0
+
+# PaddleOCR (Versiones compatibles con el proyecto)
+paddlepaddle==2.6.2
+paddleocr==2.8.1
