@@ -279,7 +279,9 @@ Detracción 10% .......... S/ 1,254.70
 
 "detraccion": 1254.70
 
-Si el documento solamente indica el porcentaje (por ejemplo 10%) y también existe el monto total de la factura, calcula el monto de la detracción.
+Si existe un campo "Monto detracción", "Importe detracción" o "Monto a depositar", utiliza siempre ese valor.
+
+Solo si no existe un monto de detracción explícito y únicamente aparece el porcentaje de detracción, calcula el monto utilizando el porcentaje y el monto total de la factura.
 
 Ejemplo:
 
@@ -310,6 +312,35 @@ Antes de responder verifica:
 Si cualquiera de esos elementos aparece, revisa nuevamente el documento antes de devolver "detraccion": null.
 
 Solo devolver null cuando realmente no exista ninguna evidencia de detracción.
+
+REGLA OBLIGATORIA PARA EL MONTO DE DETRACCIÓN
+
+Si el documento contiene cualquiera de los siguientes textos:
+
+- Monto detracción
+- Importe detracción
+- Monto a depositar
+- Depósito de detracción
+
+el valor numérico que aparece inmediatamente después o junto a ese texto debe devolverse obligatoriamente en el campo:
+
+"detraccion"
+
+Esta regla tiene prioridad absoluta.
+
+Nunca confundas el monto de detracción con:
+
+- Importe Total
+- Total
+- Subtotal
+- Valor de Venta
+- IGV
+- Saldo pendiente
+- Monto neto pendiente de pago
+
+Si existe un campo llamado "Monto detracción", utiliza ese valor exactamente como aparece en el documento.
+
+Solo calcula la detracción usando el porcentaje cuando el monto de detracción no esté impreso explícitamente.
 
 B) FORMA DE PAGO
 
@@ -467,4 +498,23 @@ Ejemplo de respuesta válida:
   "proyecto": "MANTENIMIENTO DE TERMINALES MARITIMOS MULTIBOYAS Y MONOBOYAS",
   "descripcionServicio": "..."
 }
+
+VALIDACIÓN FINAL OBLIGATORIA
+
+Antes de devolver el JSON realiza una última revisión completa del documento.
+
+Verifica obligatoriamente que:
+
+- empresaEmisora no sea null si existe una razón social visible del emisor.
+- rucEmisor no sea null si existe un RUC del emisor.
+- empresaCliente no sea null si existe una razón social del cliente.
+- rucCliente no sea null si existe un RUC del cliente.
+- numeroFactura no sea null si existe un código serie-correlativo.
+- montoTotal no sea null si existe un importe total.
+- moneda sea consistente con los símbolos monetarios del documento.
+- detraccion no sea null cuando exista un monto de detracción claramente identificado.
+
+Si durante esta revisión encuentras información que permita completar algún campo, corrígelo antes de generar el JSON.
+
+No devuelvas el JSON hasta terminar esta validación.
 `;

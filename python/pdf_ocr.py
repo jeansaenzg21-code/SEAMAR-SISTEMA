@@ -12,6 +12,7 @@ ocr = PaddleOCR(
     lang="es"
 )
 
+
 def extraer_texto(pdf_path):
     documento = fitz.open(pdf_path)
 
@@ -19,7 +20,8 @@ def extraer_texto(pdf_path):
 
     for pagina in documento:
 
-        pix = pagina.get_pixmap(matrix=fitz.Matrix(4, 4))
+        # Antes era 4x. 2.5x consume mucha menos RAM y mantiene buena calidad.
+        pix = pagina.get_pixmap(matrix=fitz.Matrix(2.5, 2.5))
 
         imagen = np.frombuffer(
             pix.samples,
@@ -30,13 +32,28 @@ def extraer_texto(pdf_path):
             pix.n
         )
 
-        imagen = cv2.rotate(
+        # Convertir a escala de grises
+        if pix.n == 4:
+            imagen = cv2.cvtColor(imagen, cv2.COLOR_RGBA2GRAY)
+        else:
+            imagen = cv2.cvtColor(imagen, cv2.COLOR_RGB2GRAY)
+
+        # Reducir ruido
+        imagen = cv2.GaussianBlur(imagen, (3, 3), 0)
+
+        # Mejorar contraste
+        imagen = cv2.adaptiveThreshold(
             imagen,
-            cv2.ROTATE_90_CLOCKWISE
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            15
         )
 
         try:
             resultado = ocr.ocr(imagen)
+
         except Exception as e:
             texto.append(f"[Error OCR página: {e}]")
             continue
@@ -48,7 +65,9 @@ def extraer_texto(pdf_path):
             bloques = []
 
             for linea in resultado[0]:
+
                 try:
+
                     caja = linea[0]
                     datos = linea[1]
 
@@ -66,7 +85,14 @@ def extraer_texto(pdf_path):
                     if not xs or not ys:
                         continue
 
-                    bloques.append((min(ys), min(xs), texto_detectado))
+                    bloques.append(
+                        (
+                            min(ys),
+                            min(xs),
+                            texto_detectado
+                        )
+                    )
+
                 except Exception:
                     continue
 
@@ -82,22 +108,27 @@ def extraer_texto(pdf_path):
 
 
 def main():
+
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
     if len(sys.argv) < 2:
+
         print(json.dumps({
             "ok": False,
             "error": "No se recibió el PDF"
         }))
+
         return
 
     archivo = sys.argv[1]
 
     if not os.path.exists(archivo):
+
         print(json.dumps({
             "ok": False,
             "error": "Archivo no encontrado"
         }))
+
         return
 
     try:

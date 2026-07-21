@@ -190,6 +190,24 @@ console.timeEnd("openai_llamada")
   response.output_text ?? "{}"
 );
 
+// ===============================
+// VALIDACIÓN DEL DESTINO
+// ===============================
+
+const RUC_EMPRESA = "20611842458";
+
+if (tipo === "factura") {
+
+  if (resultado.rucCliente === RUC_EMPRESA) {
+    resultado.destino = "PAGAR";
+  }
+
+  if (resultado.rucEmisor === RUC_EMPRESA) {
+    resultado.destino = "COBRAR";
+  }
+
+}
+
 console.log("==================================");
 console.log("JSON DEVUELTO POR OPENAI");
 console.log(JSON.stringify(resultado, null, 2));

@@ -120,14 +120,29 @@ function DetraccionBadge({
 
 // Helper: obtiene año/mes/día locales a partir de fecha_emision
 function partesFecha(fecha: string) {
-  if (!fecha) return null
-  const d = new Date(fecha)
-  if (isNaN(d.getTime())) return null
+  if (!fecha) return null;
+
+  const soloFecha = fecha.substring(0, 10);
+
+  const [year, month, day] = soloFecha
+    .split("-")
+    .map(Number);
+
   return {
-    year: d.getFullYear(),
-    month: d.getMonth(), // 0-11
-    day: d.getDate(),
-  }
+    year,
+    month: month - 1,
+    day,
+  };
+}
+
+function formatearFecha(fecha?: string | null) {
+  if (!fecha) return "-";
+
+  const soloFecha = fecha.substring(0, 10);
+
+  const [y, m, d] = soloFecha.split("-");
+
+  return `${d}/${m}/${y}`;
 }
 
 export function AccountsPayableContent() {
@@ -991,15 +1006,11 @@ const modalExportar = (
                       </td>
 
                       <td className="px-4 py-3">
-                        {item.fecha_emision
-                          ? new Date(item.fecha_emision).toLocaleDateString("es-PE")
-                          : "-"}
+                        {formatearFecha(item.fecha_emision)}
                       </td>
 
                       <td className="px-4 py-3">
-                        {item.fecha_vencimiento
-                          ? new Date(item.fecha_vencimiento).toLocaleDateString("es-PE")
-                          : "-"}
+                        {formatearFecha(item.fecha_vencimiento)}
                       </td>
 
                       <td className="px-4 py-3">

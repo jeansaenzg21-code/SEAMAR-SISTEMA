@@ -14,7 +14,7 @@ import { enviarCorreo } from "@/lib/outlook";
 import { registrarActividad } from "@/lib/actividad";
 import { obtenerSesion } from "@/lib/session";
 
-const TAMANO_LOTE = 10;
+const TAMANO_LOTE = 2;
 
 export async function POST(
   request: NextRequest

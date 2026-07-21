@@ -19,7 +19,7 @@ export async function crearSesion(usuario: {
     {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       path: "/",
       maxAge: Number(process.env.SESSION_MAX_AGE_SECONDS) || 28800,
     }

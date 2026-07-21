@@ -15,43 +15,51 @@ export async function leerPdfConOCR(
 
   try {
     const texto = await new Promise<string>((resolve, reject) => {
+      const pythonExecutable =
+        process.env.PYTHON_EXECUTABLE ||
+        (process.platform === "win32" ? "py" : "python3");
+
+      console.log("Python ejecutable:", pythonExecutable);
+
       execFile(
-        process.env.PYTHON_EXECUTABLE || "py",
+        pythonExecutable,
         ["python/pdf_ocr.py", archivoTemporal],
         {
           maxBuffer: 1024 * 1024 * 100,
         },
         (error, stdout, stderr) => {
           if (error) {
-    console.log("ERROR PYTHON:", error);
-    console.log("STDERR:", stderr);
-    console.log("STDOUT:", stdout);
+            console.log("ERROR PYTHON:", error);
+            console.log("STDERR:", stderr);
+            console.log("STDOUT:", stdout);
 
-    reject(stderr || stdout || error.message || String(error));
-    return;
-}
+            reject(stderr || stdout || error.message || String(error));
+            return;
+          }
 
           try {
-  const inicio = stdout.indexOf('{"ok"');
+            const inicio = stdout.indexOf('{"ok"');
 
-  if (inicio === -1) {
-    reject(stdout);
-    return;
-  }
+            if (inicio === -1) {
+              reject(stdout);
+              return;
+            }
 
-  const json = stdout.substring(inicio);
+            const json = stdout.substring(inicio);
+            const resultado = JSON.parse(json);
 
-  const resultado = JSON.parse(json);
+            if (!resultado.ok) {
+              reject(resultado.error);
+              return;
+            }
 
-  if (!resultado.ok) {
-    reject(resultado.error);
-    return;
-  }
+            resolve(resultado.texto ?? "");
+          } catch (err) {
+            console.log("ERROR PARSEANDO RESPUESTA OCR:", err);
+            console.log("STDOUT COMPLETO:", stdout);
 
-  resolve(resultado.texto ?? "");
-} catch {
-  reject(stdout);
-}
+            reject(stdout);
+          }
         }
       );
     });
