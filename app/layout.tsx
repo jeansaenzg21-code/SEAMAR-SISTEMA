@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/lib/theme-provider"
 import { RoleProvider } from "@/lib/role-context"
 import { obtenerSesion } from "@/lib/session"
@@ -36,8 +35,6 @@ export default async function RootLayout({
           </RoleProvider>
 
           <Toaster richColors position="top-right" />
-
-          {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
       </body>
     </html>
