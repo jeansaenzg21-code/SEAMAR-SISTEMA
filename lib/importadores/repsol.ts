@@ -36,6 +36,8 @@ export const repsolImportador: Importador = {
     seleccion: string[],
     creadoPor?: string
   ) {
+
+    console.log("========== ENTRÉ A REPSOL.IMPORTAR ==========");
     const todas = await leerValorizacionesExcel(buffer, {
       nombre: nombreArchivo,
     })
