@@ -270,15 +270,21 @@ export async function leerValorizacionesExcel(
 ) {
   const workbook = new ExcelJS.Workbook();
 
-  await workbook.xlsx.load(buffer as any);
+console.time("load_excel");
+await workbook.xlsx.load(buffer as any);
+console.timeEnd("load_excel");
 
-  const valorizaciones: any[] = [];
+console.log("TOTAL HOJAS:", workbook.worksheets.length);
+
+const valorizaciones: any[] = [];
 
     const hojasValor =
   workbook.worksheets.filter((sheet) =>
     /^valor\s*\d+/i.test(sheet.name.trim())
   );
   
+  console.log("HOJAS VALOR:", hojasValor.length);
+console.log("NOMBRES:", hojasValor.map(h => h.name));
 
 hojasValor.sort((a, b) => {
   const numA = Number(a.name.replace(/\D/g, ""));
@@ -287,15 +293,15 @@ hojasValor.sort((a, b) => {
   return numA - numB;
 });
 
+console.time("procesar_hojas");
+
   for (const sheet of hojasValor) {
+    console.log("Procesando hoja:", sheet.name);
     const otTexto = valorComoTexto(
       sheet.getCell("B1").value
     );
 
-    console.log(
-  "Hojas Valor detectadas:",
-  hojasValor.map((h) => h.name)
-);
+    
 
     const numeroOT =
       otTexto
@@ -403,6 +409,6 @@ const codigoValorizacion =
       hojaExcel: sheet.name,
     });
   }
-
+console.timeEnd("procesar_hojas");
   return valorizaciones;
 } 
