@@ -913,148 +913,249 @@ const modalExportar = (
           {tituloSeleccion ? ` · ${tituloSeleccion}` : ""}
         </p>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b bg-secondary">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">Código</th>
-                    <th className="px-4 py-3 text-left font-medium">Proveedor</th>
-                    <th className="px-4 py-3 text-left font-medium">Servicio</th>
-                    <th className="px-4 py-3 text-left font-medium">N° Documento</th>
-                    <th className="px-4 py-3 text-left font-medium">Detracción</th>
-                    <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
-                    <th className="px-4 py-3 text-left font-medium">Categorización</th>
-                    <th className="px-4 py-3 text-right font-medium">Monto</th>
-                    <th className="px-4 py-3 text-right font-medium">Saldo</th>
-                    <th className="px-4 py-3 text-left font-medium">Estado</th>
-                    <th className="px-4 py-3 text-left font-medium">Emisión</th>
-                    <th className="px-4 py-3 text-left font-medium">Vencimiento</th>
-                    <th className="px-4 py-3 text-left font-medium">Acciones</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredAccounts.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-border transition-colors hover:bg-secondary/40"
-                    >
-
-  <td className="px-4 py-3 text-xs text-muted-foreground">
-
-    <div className="flex items-center gap-2">
-
-      {nuevosIds.includes(
-        Number(item.id)
-      ) && (
-
-        <div
-          className="w-2 h-2 rounded-full bg-blue-500"
-        />
-
-      )}
-
-      {item.codigo}
-
-    </div>
-
-  </td>
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {item.proveedor}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <ServicioBadge servicio={item.servicio} />
-                      </td>
-
-                      <td className="px-4 py-3 font-mono text-xs">
-                        {item.numero_documento || "-"}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <DetraccionBadge detraccion={item.detraccion} />
-                      </td>
-
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {item.forma_pago || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {item.categorizacion || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 text-right tabular-nums">
-  {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-  {Number(item.monto).toLocaleString("es-PE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}
-</td>
-
-                      <td className="px-4 py-3 text-right tabular-nums">
-  {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-  {Number(item.saldo).toLocaleString("es-PE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}
-</td>
-
-                      <td className="px-4 py-3">
-                        <StatusBadge status={item.estado} />
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {formatearFecha(item.fecha_emision)}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {formatearFecha(item.fecha_vencimiento)}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => {
-                              if (item.archivo_url) {
-                                window.open(item.archivo_url, "_blank")
-                              }
-                            }}
-                          >
-  
-  <Eye className="h-4 w-4" />
-</Button>
-
-<Button
-  size="icon"
-  variant="outline"
-  onClick={() => descargarExcel(item)}
->
-  <Download className="h-4 w-4" />
-</Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {filteredAccounts.length === 0 && (
+        <div className="hidden lg:block">
+          <Card className="bg-card border-border">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-secondary">
                     <tr>
-                      <td
-                        colSpan={13}
-                        className="px-4 py-8 text-center text-muted-foreground"
-                      >
-                        No hay cuentas por pagar registradas para esta selección.
-                      </td>
+                      <th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">Código</th>
+                      <th className="px-4 py-3 text-left font-medium">Proveedor</th>
+                      <th className="px-4 py-3 text-left font-medium">Servicio</th>
+                      <th className="px-4 py-3 text-left font-medium">N° Documento</th>
+                      <th className="px-4 py-3 text-left font-medium">Detracción</th>
+                      <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
+                      <th className="px-4 py-3 text-left font-medium">Categorización</th>
+                      <th className="px-4 py-3 text-right font-medium">Monto</th>
+                      <th className="px-4 py-3 text-right font-medium">Saldo</th>
+                      <th className="px-4 py-3 text-left font-medium">Estado</th>
+                      <th className="px-4 py-3 text-left font-medium">Emisión</th>
+                      <th className="px-4 py-3 text-left font-medium">Vencimiento</th>
+                      <th className="px-4 py-3 text-left font-medium">Acciones</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  </thead>
+
+                  <tbody>
+                    {filteredAccounts.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="border-b border-border transition-colors hover:bg-secondary/40"
+                      >
+
+    <td className="px-4 py-3 text-xs text-muted-foreground">
+
+      <div className="flex items-center gap-2">
+
+        {nuevosIds.includes(
+          Number(item.id)
+        ) && (
+
+          <div
+            className="w-2 h-2 rounded-full bg-blue-500"
+          />
+
+        )}
+
+        {item.codigo}
+
+      </div>
+
+    </td>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {item.proveedor}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <ServicioBadge servicio={item.servicio} />
+                        </td>
+
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {item.numero_documento || "-"}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <DetraccionBadge detraccion={item.detraccion} />
+                        </td>
+
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {item.forma_pago || "-"}
+                        </td>
+
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {item.categorizacion || "-"}
+                        </td>
+
+                        <td className="px-4 py-3 text-right tabular-nums">
+    {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+    {Number(item.monto).toLocaleString("es-PE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}
+  </td>
+
+                        <td className="px-4 py-3 text-right tabular-nums">
+    {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+    {Number(item.saldo).toLocaleString("es-PE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}
+  </td>
+
+                        <td className="px-4 py-3">
+                          <StatusBadge status={item.estado} />
+                        </td>
+
+                        <td className="px-4 py-3">
+                          {formatearFecha(item.fecha_emision)}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          {formatearFecha(item.fecha_vencimiento)}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => {
+                                if (item.archivo_url) {
+                                  window.open(item.archivo_url, "_blank")
+                                }
+                              }}
+                            >
+    
+    <Eye className="h-4 w-4" />
+  </Button>
+
+  <Button
+    size="icon"
+    variant="outline"
+    onClick={() => descargarExcel(item)}
+  >
+    <Download className="h-4 w-4" />
+  </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredAccounts.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={13}
+                          className="px-4 py-8 text-center text-muted-foreground"
+                        >
+                          No hay cuentas por pagar registradas para esta selección.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ---- Mobile: tarjetas ---- */}
+        <div className="block lg:hidden space-y-3">
+          {filteredAccounts.map((item) => (
+            <Card key={item.id} className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-sm">{item.codigo}</span>
+                  <StatusBadge status={item.estado} />
+                </div>
+
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex justify-between">
+                    <span>Proveedor:</span>
+                    <span className="text-right font-medium text-foreground">{item.proveedor}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Servicio:</span>
+                    <span className="text-right font-medium text-foreground">
+                      <ServicioBadge servicio={item.servicio} />
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>N° Documento:</span>
+                    <span className="text-right font-medium text-foreground">{item.numero_documento || "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Detracción:</span>
+                    <span className="text-right font-medium text-foreground">
+                      <DetraccionBadge detraccion={item.detraccion} />
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Forma de pago:</span>
+                    <span className="text-right font-medium text-foreground">{item.forma_pago || "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Categorización:</span>
+                    <span className="text-right font-medium text-foreground">{item.categorizacion || "-"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Monto:</span>
+                    <span className="text-right font-medium text-foreground">
+                      {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+                      {Number(item.monto).toLocaleString("es-PE", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Saldo:</span>
+                    <span className="text-right font-medium text-foreground">
+                      {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
+                      {Number(item.saldo).toLocaleString("es-PE", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Emisión:</span>
+                    <span className="text-right font-medium text-foreground">
+                      {formatearFecha(item.fecha_emision)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Vencimiento:</span>
+                    <span className="text-right font-medium text-foreground">
+                      {formatearFecha(item.fecha_vencimiento)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 min-h-[44px]"
+                    onClick={() => {
+                      if (item.archivo_url) {
+                        window.open(item.archivo_url, "_blank")
+                      }
+                    }}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {filteredAccounts.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No hay cuentas por pagar registradas para esta selección.
+            </p>
+          )}
+        </div>
       </div>
         </div>
   </>
