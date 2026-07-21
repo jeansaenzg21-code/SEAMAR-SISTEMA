@@ -186,20 +186,96 @@ B) IDENTIFICAR numeroFactura
 
 Prioridad absoluta sobre cualquier otro número. La regla decisiva es el PATRÓN, no una lista de series — nunca devuelvas null solo porque la serie no aparece en los ejemplos de abajo.
 
-NORMALIZACIÓN PREVIA (texto proveniente de OCR): antes de evaluar el patrón, trata como equivalentes a un único guion "-" cualquier variante de separador entre serie y correlativo: guion simple "-", guion largo "–", guion em "—", o el guion con espacios alrededor en cualquier combinación ("FP01 - 6041", "FP01 -6041", "FP01- 6041", "FP01–6041"). Estas variantes son errores típicos de OCR y no cambian la naturaleza del código.
+NORMALIZACIÓN PREVIA (texto proveniente de OCR o de extracción directa de PDF): antes de evaluar el patrón, trata como equivalentes a un único guion "-" cualquier variante de separador entre serie y correlativo: guion simple "-", guion largo "–", guion em "—", o el guion con espacios alrededor en cualquier combinación ("FP01 - 6041", "FP01 -6041", "FP01- 6041", "FP01–6041"). Estas variantes son errores típicos de OCR y no cambian la naturaleza del código.
+
+RECONSTRUCCIÓN DEL TEXTO
+
+Antes de identificar numeroFactura debes reconstruir los códigos que hayan sido divididos por el extractor del PDF.
+
+Si una serie y un correlativo aparecen en líneas consecutivas, separados únicamente por espacios, tabulaciones o saltos de línea, debes tratarlos como un único código.
+
+Ejemplos válidos:
+
+E001
+1
+
+↓
+
+E001-1
+
+
+F001
+
+25
+
+↓
+
+F001-25
+
+
+FE64
+
+515373
+
+↓
+
+FE64-515373
+
+
+También aplica cuando el guion aparece en una línea distinta.
+
+E001
+-
+1
+
+↓
+
+E001-1
 
 REGLA DEL PATRÓN (criterio único y suficiente): numeroFactura es cualquier código que, una vez normalizado, cumpla las tres condiciones siguientes, junto con evidencia de comprobante de pago (encabezado de factura/boleta, RUC de emisor, montos con IGV/subtotal/total, u origen bancario reconocido):
    1. Un único separador (guion u variante normalizada) en todo el código.
    2. El bloque ANTES del separador ("serie") es alfanumérico (combina letras y dígitos, cualquier longitud) — o, si es puramente alfabético, corresponde a una serie real confirmada.
-   3. El bloque DESPUÉS del separador ("correlativo") es puramente numérico, de 3 a 10 dígitos.
+   3. El bloque DESPUÉS del separador ("correlativo") es puramente numérico, de 1 a 10 dígitos.
+
+   IMPORTANTE: si la serie y el correlativo aparecen separados únicamente por espacios o saltos de línea debido al formato del PDF o a la extracción de texto (por ejemplo: "E001 1", "E001\n1", "F001 25", "FE64 515373"), deben interpretarse como un único código serie-correlativo y normalizarse utilizando un único guion.
+
+Ejemplos:
+
+E001 1  → E001-1
+E001 2  → E001-2
+F001 25 → F001-25
+FE64 515373 → FE64-515373
+
+La separación por espacios o saltos de línea NO invalida el número del comprobante.
 
 Si el código cumple las tres condiciones, ES numeroFactura — sin importar si la serie específica aparece o no en la lista de ejemplos.
 
-SALIDA NORMALIZADA: el valor de numeroFactura siempre se devuelve sin espacios y con un único guion simple "-", independientemente de cómo aparezca en el documento original. Ejemplo: "FP01 - 6041", "FP01–6041" o "FP01- 6041" en el texto fuente → { "numeroFactura": "FP01-6041" }.
+SALIDA NORMALIZADA: el valor de numeroFactura siempre se devuelve sin espacios y con un único guion simple "-", independientemente de cómo aparezca en el documento original.
+
+Normaliza automáticamente cualquiera de estos formatos:
+
+FP01 - 6041 → FP01-6041
+FP01–6041 → FP01-6041
+FP01—6041 → FP01-6041
+FP01 6041 → FP01-6041
+E001 1 → E001-1
+E001 2 → E001-2
+F001 25 → F001-25
+
+Si la única diferencia es el separador (espacio, salto de línea o cualquier variante de guion), el código sigue siendo un numeroFactura válido y debe devolverse normalizado.
 
 EXCLUSIÓN (se mantiene): nunca tomes como numeroFactura un código cuya serie sea "CT", "CTR", "OS", "OC", "REQ", "ORD", "COT" o "PED" — son números de contrato, orden de servicio/compra, requerimiento, cotización o pedido interno, no comprobantes.
 
 Ejemplos ilustrativos (lista NO exhaustiva, NO cerrada — solo referencia): F001-12345, E001-12345, FE64-515373, FC03-06518006, FTVI-234371, FP01-6041. Cualquier otra serie alfanumérica que cumpla el patrón cuenta igual, aunque no esté en esta lista.
+
+VALIDACIÓN FINAL DE numeroFactura
+
+Si numeroFactura quedó null:
+
+1. Revisa nuevamente todo el documento.
+2. Busca cualquier combinación de serie alfanumérica seguida de un correlativo numérico.
+3. Une automáticamente las partes separadas por espacios o saltos de línea.
+4. Solo devuelve null cuando realmente no exista ningún código de comprobante.
 
 C) REGLA ANTI-CONFUSIÓN (causa más común de error)
 
