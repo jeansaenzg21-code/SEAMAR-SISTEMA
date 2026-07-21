@@ -902,8 +902,9 @@ function ValorizacionesTableComponent({
               ))}
             </tbody>
           </table>
+        </div>
 
-          <div className="block lg:hidden space-y-3 mt-4">
+        <div className="block lg:hidden space-y-3 mt-4">
             {valuations.map((item) => (
               <Card key={item.id} className="bg-card border-border">
                 <CardContent className="p-4">
@@ -936,7 +937,6 @@ function ValorizacionesTableComponent({
               </Card>
             ))}
           </div>
-        </div>
       </CardContent>
     </Card>
   )
