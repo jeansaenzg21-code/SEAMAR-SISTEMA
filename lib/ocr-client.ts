@@ -4,7 +4,10 @@
 const OCR_SERVICE_URL =
   process.env.OCR_SERVICE_URL || "http://127.0.0.1:8000";
 
-const OCR_TIMEOUT_MS = 5 * 60 * 1000;
+const OCR_TIMEOUT_MS = parseInt(
+  process.env.OCR_TIMEOUT_MS || String(10 * 60 * 1000),
+  10
+);
 
 interface OcrResponse {
   ok: boolean;
@@ -39,7 +42,10 @@ export async function leerPdfConOCR(buffer: Buffer): Promise<string> {
     return data.texto ?? "";
   } catch (error: any) {
     if (error.name === "AbortError") {
-      throw new Error("Timeout del OCR Service - no respondió en 5 minutos");
+      const timeoutSec = OCR_TIMEOUT_MS / 1000;
+      throw new Error(
+        `Timeout del OCR Service - no respondió en ${timeoutSec} segundos`
+      );
     }
 
     if (error.cause?.code === "ECONNREFUSED" || error.message?.includes("fetch failed")) {

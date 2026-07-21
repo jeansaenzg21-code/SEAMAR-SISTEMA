@@ -35,6 +35,7 @@ def es_error_reintentable(error: Exception) -> bool:
         "cannot open",
         "file not found",
         "syntax error",
+        "timeout",
     ]
     return not any(kw in msg for kw in no_reintentar)
 
@@ -46,12 +47,14 @@ class OcrQueue:
         ocr,
         metrics: OcrMetrics,
         max_queue_size: int = 500,
+        worker_timeout: int = 300,
     ):
         self.queue = asyncio.Queue(maxsize=max_queue_size)
         self.ocr = ocr
         self.metrics = metrics
         self.num_workers = num_workers
         self.max_queue_size = max_queue_size
+        self.worker_timeout = worker_timeout
         self.workers: list[asyncio.Task] = []
         self._id_counter = itertools.count(1)
 
@@ -162,8 +165,9 @@ class OcrQueue:
 
                 self.metrics.record_ocr_start()
                 ocr_start = time.monotonic()
-                texto = await asyncio.to_thread(
-                    extraer_texto, temp_path, self.ocr
+                texto = await asyncio.wait_for(
+                    asyncio.to_thread(extraer_texto, temp_path, self.ocr),
+                    timeout=self.worker_timeout,
                 )
                 elapsed_ms = int(
                     (time.monotonic() - ocr_start) * 1000

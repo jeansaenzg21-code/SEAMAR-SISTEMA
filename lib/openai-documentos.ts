@@ -146,6 +146,8 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
       error
     );
 
+    throw error;
+
   }
 
   }

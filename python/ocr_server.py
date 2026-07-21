@@ -20,6 +20,7 @@ CONFIG = {
     "max_workers": int(os.getenv("OCR_MAX_WORKERS", "1")),
     "max_queue_size": int(os.getenv("OCR_MAX_QUEUE_SIZE", "500")),
     "max_file_size_mb": int(os.getenv("OCR_MAX_FILE_SIZE_MB", "50")),
+    "worker_timeout": int(os.getenv("OCR_WORKER_TIMEOUT", "300")),
     "version": "1.0.0",
 }
 
@@ -67,6 +68,7 @@ async def lifespan(app: FastAPI):
         ocr=ocr,
         metrics=metrics,
         max_queue_size=CONFIG["max_queue_size"],
+        worker_timeout=CONFIG["worker_timeout"],
     )
     await ocr_queue.start()
 
@@ -76,6 +78,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Workers: {CONFIG['max_workers']}")
     logger.info(f"Cola máxima: {CONFIG['max_queue_size']}")
     logger.info(f"Tamaño máximo PDF: {CONFIG['max_file_size_mb']}MB")
+    logger.info(f"Worker timeout: {CONFIG['worker_timeout']}s")
     logger.info(f"Puerto: {CONFIG['port']}")
     logger.info("=" * 50)
 
