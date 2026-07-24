@@ -1,3 +1,7 @@
+# OCR Service
+fastapi==0.116.1
+uvicorn==0.35.0
+
 # OCR
 PyMuPDF==1.26.3
 opencv-python==4.12.0.88
