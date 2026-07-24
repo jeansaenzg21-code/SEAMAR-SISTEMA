@@ -36,7 +36,6 @@ export type Moneda = "PEN" | "USD";
 export type EstadoMovimiento =
   | "conciliado"
   | "observacion"
-  | "diferencia"
   | "pendiente";
 
 export type TipoMovimiento = "credito" | "debito";
@@ -1542,6 +1541,7 @@ const seleccionarCoincidencia = async (
       pendiente:   movimientos.filter((m) => m.estado === "pendiente"),
     }),
     [movimientos]
+    
   );
 
   const totalFor = (list: MovimientoBancario[]) => list.reduce((s, m) => s + m.monto, 0);

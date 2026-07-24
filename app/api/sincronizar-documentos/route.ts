@@ -31,6 +31,8 @@ const sesionDocs =
 const data =
   await listarDocumentos();
 
+console.log(`[SYNC] 1. OneDrive devolvió ${data.value?.length ?? 0} archivos`);
+
 const archivos =
   data.value || [];
 
@@ -78,11 +80,13 @@ for (const archivo of archivos) {
     !yaExisteComoCxp
   ) {
     archivosNuevos.push(archivo);
+  } else {
+    console.log(`[SYNC] 2. Descartado: "${archivo.name}" | id=${archivo.id} | yaCxc=${yaExisteComoCxc} yaCxp=${yaExisteComoCxp}`);
   }
 
 }
 
-  
+console.log(`[SYNC] 3. archivosNuevos = ${archivosNuevos.length} documentos por procesar`);
 
 let nuevos = 0;
 let clientesNoEncontrados = 0;
@@ -157,6 +161,8 @@ const UPDATE_CADA_N_DOCUMENTOS = 25;
 const procesarArchivo = async (archivo: any) => {
   const docId = `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const timing = new DocTiming(docId);
+
+  console.log(`[FILE] 6. >>> INICIO "${archivo.name}" | docId=${docId} | id=${archivo.id} | ${new Date().toISOString()}`);
 
   try {
 
@@ -825,16 +831,16 @@ nuevasCxp++;
 }
 
   timing.end("Inserción BD");
+
+  console.log(`[FILE] 7. <<< OK "${archivo.name}" | docId=${docId} | destino=${json.destino} | ${new Date().toISOString()}`);
+
   timing.log("OK");
 
-  } catch (error) {
+  } catch (error: any) {
 
-    console.error(
-      "[ERROR ARCHIVO]",
-      archivo.name,
-      error
-    );
+    console.log(`[FILE] 8. <<< ERROR "${archivo.name}" | docId=${docId} | ${new Date().toISOString()}`);
     console.error("===== STACK ARCHIVO =====");
+    console.error(error);
     console.error(error?.stack);
 
   }
@@ -847,9 +853,14 @@ for (let i = 0; i < archivosNuevos.length; i += TAMANO_LOTE) {
   const lote =
     archivosNuevos.slice(i, i + TAMANO_LOTE);
 
+  console.log(`[BATCH] 4. >>> INICIO lote ${Math.floor(i / TAMANO_LOTE) + 1} | índice ${i} | ${new Date().toISOString()}`);
+  console.log(`[BATCH] 5. Archivos: ${lote.map((a: any) => `"${a.name}"`).join(", ")}`);
+
   await Promise.all(
     lote.map((archivo) => procesarArchivo(archivo))
   );
+
+  console.log(`[BATCH] 9/10. <<< FIN lote ${Math.floor(i / TAMANO_LOTE) + 1} (${lote.length} archivos) | ${new Date().toISOString()}`);
 
 }
 
