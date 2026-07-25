@@ -176,6 +176,8 @@ if (tipo === "factura" && textoDocumento.trim().length >= 50) {
   autoParsed = extraerCampos(textoDocumento);
   console.timeEnd("extraccion_automatica")
   console.log("===== DESPUES extraerCampos =====");
+  console.log("AUTO PARSED:");
+  console.dir(autoParsed, { depth: null });
 
   const camposEncontrados = (Object.entries(autoParsed) as [string, unknown][])
     .filter(([_, v]) => v !== null && v !== undefined)
@@ -245,6 +247,8 @@ console.log("===== DESPUES OPENAI =====");
   response.output_text ?? "{}"
 );
 
+      console.log("OPENAI RAW:");
+      console.dir(resultado, { depth: null });
       console.log("===== JSON PARSEADO =====");
       console.dir(resultado, { depth: null });
       console.log("numeroFactura:", resultado.numeroFactura);
@@ -268,6 +272,11 @@ console.log("===== DESPUES OPENAI =====");
 
 const RUC_EMPRESA = "20611842458";
 
+console.log("VALIDACION DESTINO");
+console.log("rucEmisor :", resultado.rucEmisor);
+console.log("rucCliente:", resultado.rucCliente);
+console.log("destino IA :", resultado.destino);
+
 if (tipo === "factura") {
 
   if (resultado.rucCliente === RUC_EMPRESA) {
@@ -280,14 +289,26 @@ if (tipo === "factura") {
 
 }
 
+console.log("DESTINO FINAL:", resultado.destino);
+if (resultado.destino == null) {
+  console.log("RUC_EMPRESA:", RUC_EMPRESA);
+  console.log("Comparacion cliente:", resultado.rucCliente === RUC_EMPRESA);
+  console.log("Comparacion emisor :", resultado.rucEmisor === RUC_EMPRESA);
+}
+
 console.log("==================================");
 console.log("JSON DEVUELTO POR OPENAI");
 console.log(JSON.stringify(resultado, null, 2));
 console.log("==================================");
 
 if (autoParsed && tipo === "factura") {
+  console.log("ANTES MERGE");
+  console.log("OpenAI:", resultado);
+  console.log("Auto:", autoParsed);
   const antes = { ...resultado };
   const resultadoFinal = mergeResultados(resultado, autoParsed);
+  console.log("DESPUES MERGE");
+  console.dir(resultadoFinal, { depth: null });
 
   const camposCompletados = Object.keys(resultadoFinal)
     .filter((k) => {
