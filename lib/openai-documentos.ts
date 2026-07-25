@@ -171,9 +171,11 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
 let autoParsed = null;
 
 if (tipo === "factura" && textoDocumento.trim().length >= 50) {
+  console.log("===== ANTES extraerCampos =====");
   console.time("extraccion_automatica")
   autoParsed = extraerCampos(textoDocumento);
   console.timeEnd("extraccion_automatica")
+  console.log("===== DESPUES extraerCampos =====");
 
   const camposEncontrados = (Object.entries(autoParsed) as [string, unknown][])
     .filter(([_, v]) => v !== null && v !== undefined)
@@ -197,7 +199,9 @@ if (tipo === "factura" && textoDocumento.trim().length >= 50) {
 
     try {
 
+      console.log("===== ANTES obtenerPrompt =====");
       const prompt = promptPersonalizado ?? obtenerPrompt(tipo);
+      console.log("===== DESPUES obtenerPrompt =====");
 
       console.log("================================");
 console.log("LONGITUD DEL TEXTO:", textoDocumento.length);
@@ -208,6 +212,7 @@ console.log("========== TEXTO EXTRAÍDO ==========");
 console.log(textoDocumento);
 console.log("====================================");
 
+console.log("===== ANTES OPENAI =====");
 t.start("OpenAI");
 const response = await openai.responses.create({
   model: process.env.OPENAI_MODEL || "gpt-5-mini",
@@ -222,6 +227,7 @@ ${textoDocumento}
 `,
 });
 t.end("OpenAI");
+console.log("===== DESPUES OPENAI =====");
 
 
       console.log("===== OPENAI RESPONSE =====");
