@@ -19,7 +19,7 @@ const FECHA_RE =
   /\b(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/(\d{4})\b/g;
 
 const MONTO_TOTAL_RE =
-  /(?:total|importe\s*total|monto\s*total|pagar|a\s*pagar|saldo)[:\s]*s\/?\s*([\d,]+\.\d{2})/gi;
+  /(?:total|importe\s*total|monto\s*total|pagar|a\s*pagar|saldo)[:\s]*s\/?\s*([\d,]+\.\d{2})/i;
 
 const MONEDA_SOLES_RE =
   /s\/|soles|moneda[:\s]*soles|pen/i;
@@ -28,18 +28,12 @@ const MONEDA_DOLARES_RE =
   /\$|us\$|usd|d[óo]lares?|moneda[:\s]*usd/i;
 
 const DETRACCION_RE =
-  /(?:detracci[óo]n|monto\s*detracci[óo]n|importe\s*detracci[óo]n|monto\s*a\s*depositar)[:\s]*s\/?\s*([\d,]+\.\d{2})/gi;
+  /(?:detracci[óo]n|monto\s*detracci[óo]n|importe\s*detracci[óo]n|monto\s*a\s*depositar)[:\s]*s\/?\s*([\d,]+\.\d{2})/i;
 
 const DETRACCION_PORCENTAJE_RE =
   /detracci[óo]n[:\s]*(\d{1,3})\s*%/gi;
 
 function limpiarNumero(valor: string): number {
-  console.log("ANTES replace en limpiarNumero");
-  console.log("variable:", valor);
-  console.log("typeof:", typeof valor);
-  console.log("isUndefined:", valor === undefined);
-  console.log("isNull:", valor === null);
-  console.log(new Error().stack);
   return parseFloat(valor.replace(/[,]/g, ""));
 }
 
@@ -107,11 +101,6 @@ function extraerFecha(texto: string): string | null {
 function extraerMontoTotal(texto: string): number | null {
   const match = texto.match(MONTO_TOTAL_RE);
   if (!match) return null;
-  console.log("ANTES limpiarNumero (montoTotal)");
-  console.log("match:", match);
-  console.log("match[0]:", match[0]);
-  console.log("match[1]:", match[1]);
-  console.log("typeof match[1]:", typeof match[1]);
   return limpiarNumero(match[1]);
 }
 
@@ -124,11 +113,6 @@ function extraerMoneda(texto: string): string | null {
 function extraerDetraccion(texto: string): number | null {
   const match = texto.match(DETRACCION_RE);
   if (match) {
-    console.log("ANTES limpiarNumero (detraccion)");
-    console.log("match:", match);
-    console.log("match[0]:", match[0]);
-    console.log("match[1]:", match[1]);
-    console.log("typeof match[1]:", typeof match[1]);
     return limpiarNumero(match[1]);
   }
 
