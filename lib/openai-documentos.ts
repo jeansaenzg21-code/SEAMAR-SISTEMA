@@ -17,11 +17,15 @@ function parsearJson(
 ) {
 
   console.log("[parsearJson] texto=", texto, "| type=", typeof texto);
-  const limpio =
-    texto
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+
+  let limpio = texto;
+  console.log("ANTES REPLACE 1 | typeof=", typeof limpio, "| valor=", limpio);
+  console.log("STACK REPLACE 1:", new Error().stack);
+  limpio = limpio.replace(/```json/g, "");
+  console.log("ANTES REPLACE 2 | typeof=", typeof limpio, "| valor=", limpio);
+  console.log("STACK REPLACE 2:", new Error().stack);
+  limpio = limpio.replace(/```/g, "");
+  limpio = limpio.trim();
 
   console.log("[parsearJson] limpio=", limpio, "| type=", typeof limpio);
   return JSON.parse(limpio);
@@ -148,7 +152,7 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
       `Cola: ${ocrResult.timing.queue_wait_ms}ms | OCR: ${ocrResult.timing.ocr_ms}ms`
     );
 
-  } catch (error) {
+  } catch (error: any) {
 
     console.error(
       `[${docId}] Error ejecutando OCR:`,
