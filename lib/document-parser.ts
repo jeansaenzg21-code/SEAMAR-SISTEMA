@@ -34,6 +34,12 @@ const DETRACCION_PORCENTAJE_RE =
   /detracci[óo]n[:\s]*(\d{1,3})\s*%/gi;
 
 function limpiarNumero(valor: string): number {
+  console.log("ANTES replace en limpiarNumero");
+  console.log("variable:", valor);
+  console.log("typeof:", typeof valor);
+  console.log("isUndefined:", valor === undefined);
+  console.log("isNull:", valor === null);
+  console.log(new Error().stack);
   return parseFloat(valor.replace(/[,]/g, ""));
 }
 
@@ -101,6 +107,11 @@ function extraerFecha(texto: string): string | null {
 function extraerMontoTotal(texto: string): number | null {
   const match = texto.match(MONTO_TOTAL_RE);
   if (!match) return null;
+  console.log("ANTES limpiarNumero (montoTotal)");
+  console.log("match:", match);
+  console.log("match[0]:", match[0]);
+  console.log("match[1]:", match[1]);
+  console.log("typeof match[1]:", typeof match[1]);
   return limpiarNumero(match[1]);
 }
 
@@ -113,6 +124,11 @@ function extraerMoneda(texto: string): string | null {
 function extraerDetraccion(texto: string): number | null {
   const match = texto.match(DETRACCION_RE);
   if (match) {
+    console.log("ANTES limpiarNumero (detraccion)");
+    console.log("match:", match);
+    console.log("match[0]:", match[0]);
+    console.log("match[1]:", match[1]);
+    console.log("typeof match[1]:", typeof match[1]);
     return limpiarNumero(match[1]);
   }
 
