@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { obtenerEventosSincronizacion } from "@/lib/sync-events";
 
 export async function GET(
   request: NextRequest,
@@ -33,8 +34,14 @@ export async function GET(
 
   }
 
-  return NextResponse.json(
-    rows[0]
-  );
+  const eventos =
+    obtenerEventosSincronizacion(
+      Number(id)
+    );
+
+  return NextResponse.json({
+    ...rows[0],
+    eventos
+  });
 
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   listarDocumentos,
-  descargarArchivo
+  descargarArchivo,
+  eliminarArchivo
 } from "@/lib/onedrive";
 
 import pool from "@/lib/mysql";
@@ -15,6 +16,8 @@ import { validarClasificacionPorRuc } from "@/lib/validacion-ruc";
 
 import { registrarActividad } from "@/lib/actividad";
 import { obtenerSesion } from "@/lib/session";
+import { registrarEventoSincronizacion } from "@/lib/sync-events";
+import { clasificarDocumentoDescartado } from "@/lib/documentos-descartables";
 
 const TAMANO_LOTE = 2;
 
@@ -95,6 +98,9 @@ let proyectosNoEncontrados = 0;
 let proveedoresNoEncontrados = 0;
 let nuevasCxc = 0;
 let nuevasCxp = 0;
+let facturasDuplicadas = 0;
+let documentosDescartados = 0;
+let erroresProcesamiento = 0;
 
 let procesados = 0;
 
@@ -165,6 +171,8 @@ const procesarArchivo = async (archivo: any) => {
 
   console.log(`[FILE] 6. >>> INICIO "${archivo.name}" | docId=${docId} | id=${archivo.id} | ${new Date().toISOString()}`);
 
+  let numeroDocumento = archivo.name;
+
   try {
 
   timing.start("Descarga");
@@ -184,6 +192,9 @@ const procesarArchivo = async (archivo: any) => {
     timing
   );
   timing.end("OpenAI+OCR");
+
+  numeroDocumento =
+    String(json.numeroFactura || archivo.name);
 
   const RUC_SEAMAR =
   process.env.SEAMAR_RUC || "20611842458";
@@ -357,6 +368,79 @@ if (!esFactura) {
     }
   );
 
+  const clasificacion =
+    clasificarDocumentoDescartado(json);
+
+  if (clasificacion) {
+
+    const esFemenino =
+      /NOTA|GUIA|GUÍA/.test(clasificacion.motivo);
+
+    const tipoDescripcion =
+      clasificacion.motivo.replace(/\.$/, "");
+
+    let mensaje =
+      `${tipoDescripcion} ${numeroDocumento} ${esFemenino ? "detectada" : "detectado"}.\n` +
+      `No corresponde a una factura.\n`;
+
+    let eliminado = false;
+
+    try {
+
+      await eliminarArchivo(
+        archivo.id
+      );
+
+      eliminado = true;
+
+      console.log(
+        "[ELIMINADO DE ONEDRIVE]",
+        archivo.name
+      );
+
+    } catch (errorEliminacion: any) {
+
+      console.error(
+        `[ELIMINAR] Error eliminando "${archivo.name}":`,
+        errorEliminacion
+      );
+
+    }
+
+    mensaje += eliminado
+      ? "Documento eliminado de OneDrive."
+      : "No se pudo eliminar el documento de OneDrive.";
+
+    registrarEventoSincronizacion(
+      Number(sincronizacionId),
+      {
+        nivel: "info",
+        tipo: "descartado",
+        mensaje,
+        numeroDocumento,
+        motivo: clasificacion.motivo
+      }
+    );
+
+    documentosDescartados++;
+
+  } else {
+
+    registrarEventoSincronizacion(
+      Number(sincronizacionId),
+      {
+        nivel: "info",
+        tipo: "info",
+        mensaje:
+          `Documento ${archivo.name} no corresponde a una factura.\n` +
+          `No se eliminó porque el tipo de documento no pudo determinarse.`,
+        numeroDocumento: archivo.name,
+        motivo: null
+      }
+    );
+
+  }
+
 }
 
 if (esFactura) {
@@ -383,6 +467,20 @@ console.log(
   "[DUPLICADA]",
   json.numeroFactura
 );
+
+registrarEventoSincronizacion(
+  Number(sincronizacionId),
+  {
+    nivel: "warning",
+    tipo: "duplicada",
+    mensaje:
+      `Factura ${json.numeroFactura} omitida porque ya existe otro documento con el mismo número.`,
+    numeroDocumento: json.numeroFactura,
+    motivo: null
+  }
+);
+
+facturasDuplicadas++;
 
 return;
 }
@@ -570,6 +668,18 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     json.numeroFactura
   );
 
+  registrarEventoSincronizacion(
+    Number(sincronizacionId),
+    {
+      nivel: "success",
+      tipo: "registrada",
+      mensaje:
+        `Factura ${json.numeroFactura} registrada correctamente.`,
+      numeroDocumento: json.numeroFactura,
+      motivo: null
+    }
+  );
+
   nuevos++;
 
   nuevasCxc++;
@@ -597,6 +707,20 @@ console.log(
   "[DUPLICADA]",
   json.numeroFactura
 );
+
+registrarEventoSincronizacion(
+  Number(sincronizacionId),
+  {
+    nivel: "warning",
+    tipo: "duplicada",
+    mensaje:
+      `Factura ${json.numeroFactura} omitida porque ya existe otro documento con el mismo número.`,
+    numeroDocumento: json.numeroFactura,
+    motivo: null
+  }
+);
+
+facturasDuplicadas++;
 
 return;
 }
@@ -864,6 +988,18 @@ console.log(
   json.numeroFactura
 );
 
+registrarEventoSincronizacion(
+  Number(sincronizacionId),
+  {
+    nivel: "success",
+    tipo: "registrada",
+    mensaje:
+      `Factura ${json.numeroFactura} registrada correctamente.`,
+    numeroDocumento: json.numeroFactura,
+    motivo: null
+  }
+);
+
 nuevos++;
 
 nuevasCxp++;
@@ -884,6 +1020,21 @@ nuevasCxp++;
     console.error("===== STACK ARCHIVO =====");
     console.error(error);
     console.error(error?.stack);
+
+    registrarEventoSincronizacion(
+      Number(sincronizacionId),
+      {
+        nivel: "error",
+        tipo: "error",
+        mensaje:
+          `Error procesando ${numeroDocumento}.\n` +
+          `No fue posible leer el documento.`,
+        numeroDocumento,
+        motivo: null
+      }
+    );
+
+    erroresProcesamiento++;
 
   }
 
@@ -999,6 +1150,15 @@ return NextResponse.json({
   cuentasPorCobrarGeneradas: nuevasCxc,
 
   cuentasPorPagarGeneradas: nuevasCxp,
+
+  facturasRegistradas:
+    nuevasCxc + nuevasCxp,
+
+  facturasDuplicadas,
+
+  documentosDescartados,
+
+  errores: erroresProcesamiento,
 
   clientesNoEncontrados,
 

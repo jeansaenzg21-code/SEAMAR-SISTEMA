@@ -282,6 +282,28 @@ export async function subirDocumentoRespaldoAOneDrive(
   );
 }
 
+export async function eliminarArchivo(itemId: string) {
+  const token = await getAccessToken();
+
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${itemId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error(
+      `Error al eliminar archivo de OneDrive: status=${response.status}`
+    );
+  }
+
+  return true;
+}
+
 export async function generarEnlacePreview(itemId: string): Promise<string> {
   const token = await getAccessToken();
 

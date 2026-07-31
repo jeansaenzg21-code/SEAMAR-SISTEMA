@@ -21,6 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  SincronizacionDialog,
+  type EventoSincronizacion,
+} from "@/components/sincronizacion-dialog"
 
 type Status =
   | "PENDIENTE"
@@ -140,11 +144,8 @@ const [resultadoSync, setResultadoSync] =
 const [sincronizando, setSincronizando] =
   useState(false);
 
-const [progreso, setProgreso] =
-  useState(0);
-
-const [mensajeProgreso, setMensajeProgreso] =
-  useState("");
+const [eventos, setEventos] =
+  useState<EventoSincronizacion[]>([]);
 
 const [documentosDetectados, setDocumentosDetectados] =
   useState(0);
@@ -212,11 +213,9 @@ const [monedaExportar, setMonedaExportar] =
 
   setDocumentosDetectados(0);
 
-  setProgreso(0);
+  setEventos([]);
 
-  setMensajeProgreso(
-    "Buscando documentos nuevos en OneDrive..."
-  );
+  setMostrarResumen(false);
 
   try {
 
@@ -230,6 +229,19 @@ const [monedaExportar, setMonedaExportar] =
 
     const data =
       await inicio.json();
+
+    if (!data.sincronizacionId) {
+
+      setSincronizando(false);
+
+      alert(
+        data.error ||
+          "No fue posible iniciar la sincronización"
+      );
+
+      return;
+
+    }
 
     const sincronizacionId =
       data.sincronizacionId;
@@ -256,6 +268,8 @@ const [monedaExportar, setMonedaExportar] =
       setInterval(
         async () => {
 
+          try {
+
           const r =
             await fetch(
               `/api/sincronizaciones/${sincronizacionId}`
@@ -264,23 +278,11 @@ const [monedaExportar, setMonedaExportar] =
           const sync =
             await r.json();
 
-          const porcentaje =
-            sync.total_documentos > 0
-              ? Math.round(
-                  (
-                    sync.procesados /
-                    sync.total_documentos
-                  ) * 100
-                )
-              : 100;
-
-          setProgreso(
-            porcentaje
-          );
-
-          setMensajeProgreso(
-            sync.mensaje
-          );
+          if (
+            Array.isArray(sync.eventos)
+          ) {
+            setEventos(sync.eventos);
+          }
 
           if (
             sync.estado ===
@@ -307,13 +309,21 @@ setResultadoSync(sync);
 
           }
 
+          } catch (errorPolling) {
+
+            console.error(errorPolling);
+
+          }
+
         },
-        3000
+        1500
       );
 
   } catch (error) {
 
     console.error(error);
+
+    setSincronizando(false);
 
     alert(
       "Error al sincronizar"
@@ -335,127 +345,20 @@ const exportarMesExcel = () => {
 
   setMostrarExportar(false);
 };
-const modalProgreso = (
-  sincronizando && (
-
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-
-      <div className="bg-card border rounded-xl p-6 w-[34.375rem]">
-
-        <div className="flex items-center gap-3 mb-4">
-
-  <RefreshCw
-    className="h-6 w-6 text-blue-500 animate-spin"
+const dialogSincronizacion = (
+  <SincronizacionDialog
+    sincronizando={sincronizando}
+    documentosDetectados={documentosDetectados}
+    eventos={eventos}
+    mostrarResumen={mostrarResumen}
+    resumen={resultadoSync}
+    otraSeccion={
+      resultadoSync?.cuentas_pagar > 0
+        ? { titulo: "Ver cuentas por pagar", href: "/accounts-payable" }
+        : null
+    }
+    onCerrarResumen={() => setMostrarResumen(false)}
   />
-
-  <h2 className="text-xl font-bold">
-    Sincronizando documentos
-  </h2>
-
-</div>
-
-        <p className="mb-2">
-          Se detectaron {documentosDetectados} documentos nuevos
-        </p>
-
-        <p className="text-xs text-muted-foreground mb-3">
-  Analizando documentos y generando movimientos financieros...
-</p>
-
-        <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-
-  <RefreshCw
-    className="h-4 w-4 animate-spin"
-  />
-
-  <span>
-    {mensajeProgreso}
-  </span>
-
-</div>
-
-        <div className="w-full bg-secondary rounded-full h-4 overflow-hidden">
-
-          <div
-            className="bg-blue-500 h-4 transition-all"
-            style={{
-              width: `${progreso}%`
-            }}
-          />
-
-        </div>
-
-        <p className="text-center mt-3 font-medium">
-          {progreso}%
-        </p>
-
-      </div>
-
-    </div>
-
-  )
-);
-
-const modalResumen = (
-  mostrarResumen &&
-  resultadoSync && (
-
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-
-      <div className="bg-card border rounded-xl p-6 w-[31.25rem]">
-
-        <h2 className="text-xl font-bold mb-4">
-          Sincronización completada
-        </h2>
-
-        <p>
-          Documentos procesados:
-          {resultadoSync.total_documentos}
-        </p>
-
-        <p>
-          CxC generadas:
-          {resultadoSync.cuentas_cobrar}
-        </p>
-
-        {resultadoSync.cuentas_pagar > 0 && (
-          <p>
-            CxP generadas:
-            {resultadoSync.cuentas_pagar}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2 mt-6">
-
-          {resultadoSync.cuentas_pagar > 0 && (
-
-            <Button
-              variant="outline"
-              onClick={() =>
-                window.location.href =
-                "/accounts-payable"
-              }
-            >
-              Ver cuentas por pagar
-            </Button>
-
-          )}
-
-          <Button
-            onClick={() =>
-              setMostrarResumen(false)
-            }
-          >
-            Aceptar
-          </Button>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  )
 );
 
 const modalExportar = (
@@ -707,8 +610,7 @@ const modalExportar = (
 
   return (
   <>
-    {modalProgreso}
-    {modalResumen}
+    {dialogSincronizacion}
     {modalExportar}
 
     <div className="min-h-screen">
