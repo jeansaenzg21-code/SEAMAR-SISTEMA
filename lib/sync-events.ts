@@ -21,6 +21,8 @@ export type TipoEventoSincronizacion =
   | "registrada"
   | "duplicada"
   | "descartado"
+  | "pendiente"
+  | "conservado"
   | "error"
   | "info";
 
@@ -31,6 +33,9 @@ export interface EventoSincronizacion {
   mensaje: string;
   numeroDocumento: string | null;
   motivo: string | null;
+  archivoId: string | null;
+  estado: "pendiente" | "resuelto" | null;
+  webUrl?: string | null;
   fecha: string;
 }
 
@@ -81,4 +86,33 @@ export function registrarEventoSincronizacion(
     id: ++estado.contador,
     fecha: new Date().toISOString(),
   });
+}
+
+/**
+ * Marca como resuelto el evento pendiente asociado a un archivo de OneDrive.
+ * Devuelve true si encontró y resolvió el evento, false en caso contrario.
+ * La resolución se mantiene solo en memoria (no se toca la base de datos).
+ */
+export function resolverEventoPendiente(
+  sincronizacionId: number,
+  archivoId: string
+): boolean {
+  const estado = registro.get(sincronizacionId);
+
+  if (!estado) {
+    return false;
+  }
+
+  for (const evento of estado.eventos) {
+    if (
+      evento.tipo === "pendiente" &&
+      evento.archivoId === archivoId &&
+      evento.estado === "pendiente"
+    ) {
+      evento.estado = "resuelto";
+      return true;
+    }
+  }
+
+  return false;
 }

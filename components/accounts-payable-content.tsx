@@ -173,6 +173,9 @@ const [eventos, setEventos] =
 const [documentosDetectados, setDocumentosDetectados] =
   useState(0);
 
+const [sincronizacionId, setSincronizacionId] =
+  useState<number | null>(null);
+
 const [mostrarExportar, setMostrarExportar] =
   useState(false);
 
@@ -269,6 +272,10 @@ const [monedaExportar, setMonedaExportar] =
     const sincronizacionId =
       data.sincronizacionId;
 
+    setSincronizacionId(
+      Number(sincronizacionId)
+    );
+
     fetch(
       "/api/sincronizar-documentos",
       {
@@ -355,6 +362,45 @@ setResultadoSync(sync);
   }
 
 }
+const decidirDescarte = useCallback(
+  async (
+    evento: EventoSincronizacion,
+    decision: "descartar" | "conservar"
+  ) => {
+    if (sincronizacionId === null) return;
+
+    try {
+      await fetch(
+        `/api/sincronizaciones/${sincronizacionId}/decidir-descarte`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            archivoId: evento.archivoId,
+            decision,
+            numeroDocumento: evento.numeroDocumento,
+            motivo: evento.motivo,
+          }),
+        }
+      );
+
+      const r = await fetch(
+        `/api/sincronizaciones/${sincronizacionId}`
+      );
+      const sync = await r.json();
+
+      if (Array.isArray(sync.eventos)) {
+        setEventos(sync.eventos);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  },
+  [sincronizacionId]
+);
+
 const exportarMesExcel = () => {
   if (selectedYear === null || selectedMonth === null) {
     alert("Seleccione un año y un mes");
@@ -381,6 +427,7 @@ const dialogSincronizacion = (
         : null
     }
     onCerrarResumen={() => setMostrarResumen(false)}
+    onDecidirPendiente={decidirDescarte}
   />
 );
 

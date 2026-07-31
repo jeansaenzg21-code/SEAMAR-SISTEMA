@@ -7,17 +7,33 @@ El documento a analizar ya es una factura. No reclasifiques el tipo de documento
 
 ## REGLA 0 — NOTAS DE CRÉDITO Y NOTAS DE DÉBITO (prioridad máxima)
 
-La clasificación como nota de crédito/débito depende ÚNICAMENTE del encabezado visible. NUNCA uses el prefijo de la serie (FC, FD, BC, BD, NC, ND u otro) como señal — distintas entidades reutilizan esos prefijos para facturas válidas. Esta regla, una vez aplicada, queda CERRADA y ningún paso posterior la reabre por el prefijo de la serie.
+La clasificación como nota de crédito/débito depende ÚNICAMENTE del ENCABEZADO o TÍTULO PRINCIPAL del documento (la zona superior donde se indica el tipo de comprobante). NUNCA uses el prefijo de la serie (FC, FD, BC, BD, NC, ND u otro) como señal — distintas entidades reutilizan esos prefijos para facturas válidas. Esta regla, una vez aplicada, queda CERRADA y ningún paso posterior la reabre por el prefijo de la serie.
 
-Si el documento contiene visiblemente "NOTA DE CRÉDITO", "NOTA DE CRÉDITO ELECTRÓNICA", "NOTA DE DÉBITO", "NOTA DE DÉBITO ELECTRÓNICA", "CREDIT NOTE" o "DEBIT NOTE":
+El documento es una nota de crédito o débito SOLO si el encabezado/título principal dice claramente "NOTA DE CRÉDITO", "NOTA DE CRÉDITO ELECTRÓNICA", "NOTA DE DÉBITO", "NOTA DE DÉBITO ELECTRÓNICA", "CREDIT NOTE" o "DEBIT NOTE".
 
+IGNORA por completo cualquier mención de "nota de crédito" o "nota de débito" que aparezca en:
+- cláusulas legales o texto al pie del documento,
+- la descripción de servicios o conceptos,
+- la referencia al "comprobante que modifica" (una factura puede indicar la NC/ND que modifica),
+- cualquier parte que no sea el encabezado/título principal.
+
+Si el documento tiene estructura de factura (encabezado "FACTURA", "FACTURA ELECTRÓNICA", serie+correlativo, RUC, montos, totales) aunque mencione "nota de crédito" en su cuerpo o al pie, es una FACTURA y se procesa normalmente con el resto de las reglas.
+
+Cuando la REGLA 0 aplica (encabezado = nota), devuelve EXACTAMENTE:
+
+Si es nota de crédito:
 {
-  "tipoDocumento": "otro"
+  "tipoDocumento": "nota_credito"
 }
 
-Aplica SIEMPRE que el encabezado esté presente, aunque el documento también mencione "factura", "comprobante afectado", un RUC válido, montos, o la serie F001/E001 del comprobante al que afecta. No extraigas más campos ni continúes con las reglas siguientes. Estas notas no se procesan todavía.
+Si es nota de débito:
+{
+  "tipoDocumento": "nota_debito"
+}
 
-Si NO contiene ninguno de esos encabezados, esta regla no aplica — sin importar el prefijo de la serie. Continúa con el resto de las reglas de extracción. Una factura real con serie "FC03-06518006" (ej. BCP) sigue siendo factura.
+No extraigas más campos ni continúes con las reglas siguientes. Estas notas no se procesan todavía.
+
+Si NO contiene ese encabezado, esta regla no aplica — sin importar el prefijo de la serie. Continúa con el resto de las reglas de extracción. Una factura real con serie "FC03-06518006" (ej. BCP) sigue siendo factura.
 
 ## PASO 2 — FORMATO DE DATOS
 

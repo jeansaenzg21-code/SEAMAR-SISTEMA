@@ -100,6 +100,7 @@ let nuevasCxc = 0;
 let nuevasCxp = 0;
 let facturasDuplicadas = 0;
 let documentosDescartados = 0;
+let pendientesRevision = 0;
 let erroresProcesamiento = 0;
 
 let procesados = 0;
@@ -371,7 +372,10 @@ if (!esFactura) {
   const clasificacion =
     clasificarDocumentoDescartado(json);
 
-  if (clasificacion) {
+  if (
+    clasificacion &&
+    clasificacion.certeza === "confirmado"
+  ) {
 
     const esFemenino =
       /NOTA|GUIA|GUÍA/.test(clasificacion.motivo);
@@ -418,7 +422,9 @@ if (!esFactura) {
         tipo: "descartado",
         mensaje,
         numeroDocumento,
-        motivo: clasificacion.motivo
+        motivo: clasificacion.motivo,
+        archivoId: archivo.id,
+        estado: null
       }
     );
 
@@ -426,18 +432,38 @@ if (!esFactura) {
 
   } else {
 
+    const motivoDuda =
+      clasificacion?.motivo ?? null;
+
+    const mensajePendiente = motivoDuda
+      ? `${motivoDuda.replace(/\.$/, "")} ${numeroDocumento} identificado con dudas.\n` +
+        `No se registró como factura.\n` +
+        `Quedó pendiente de revisión al finalizar.`
+      : `El documento ${numeroDocumento} no pudo clasificarse.\n` +
+        `No se registró como factura.\n` +
+        `Quedó pendiente de revisión al finalizar.`;
+
+    console.log(
+      "[PENDIENTE DE REVISIÓN]",
+      archivo.name,
+      { motivo: motivoDuda, archivoId: archivo.id }
+    );
+
     registrarEventoSincronizacion(
       Number(sincronizacionId),
       {
-        nivel: "info",
-        tipo: "info",
-        mensaje:
-          `Documento ${archivo.name} no corresponde a una factura.\n` +
-          `No se eliminó porque el tipo de documento no pudo determinarse.`,
-        numeroDocumento: archivo.name,
-        motivo: null
+        nivel: "warning",
+        tipo: "pendiente",
+        mensaje: mensajePendiente,
+        numeroDocumento,
+        motivo: motivoDuda,
+        archivoId: archivo.id,
+        estado: "pendiente",
+        webUrl: archivo.webUrl
       }
     );
+
+    pendientesRevision++;
 
   }
 
@@ -476,7 +502,9 @@ registrarEventoSincronizacion(
     mensaje:
       `Factura ${json.numeroFactura} omitida porque ya existe otro documento con el mismo número.`,
     numeroDocumento: json.numeroFactura,
-    motivo: null
+    motivo: null,
+    archivoId: archivo.id,
+    estado: null
   }
 );
 
@@ -676,7 +704,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       mensaje:
         `Factura ${json.numeroFactura} registrada correctamente.`,
       numeroDocumento: json.numeroFactura,
-      motivo: null
+      motivo: null,
+      archivoId: archivo.id,
+      estado: null
     }
   );
 
@@ -716,7 +746,9 @@ registrarEventoSincronizacion(
     mensaje:
       `Factura ${json.numeroFactura} omitida porque ya existe otro documento con el mismo número.`,
     numeroDocumento: json.numeroFactura,
-    motivo: null
+    motivo: null,
+    archivoId: archivo.id,
+    estado: null
   }
 );
 
@@ -996,7 +1028,9 @@ registrarEventoSincronizacion(
     mensaje:
       `Factura ${json.numeroFactura} registrada correctamente.`,
     numeroDocumento: json.numeroFactura,
-    motivo: null
+    motivo: null,
+    archivoId: archivo.id,
+    estado: null
   }
 );
 
@@ -1030,7 +1064,9 @@ nuevasCxp++;
           `Error procesando ${numeroDocumento}.\n` +
           `No fue posible leer el documento.`,
         numeroDocumento,
-        motivo: null
+        motivo: null,
+        archivoId: archivo.id,
+        estado: null
       }
     );
 
@@ -1157,6 +1193,8 @@ return NextResponse.json({
   facturasDuplicadas,
 
   documentosDescartados,
+
+  pendientesRevision,
 
   errores: erroresProcesamiento,
 

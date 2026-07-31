@@ -23,6 +23,9 @@ export type EventoSincronizacion = {
   mensaje: string
   numeroDocumento: string | null
   motivo: string | null
+  archivoId: string | null
+  estado: "pendiente" | "resuelto" | null
+  webUrl?: string | null
   fecha: string
 }
 
@@ -30,6 +33,8 @@ type OtraSeccion = {
   titulo: string
   href: string
 }
+
+type DecisionDescarte = "descartar" | "conservar"
 
 type Props = {
   sincronizando: boolean
@@ -39,6 +44,10 @@ type Props = {
   resumen: any
   otraSeccion?: OtraSeccion | null
   onCerrarResumen: () => void
+  onDecidirPendiente?: (
+    evento: EventoSincronizacion,
+    decision: DecisionDescarte
+  ) => void
 }
 
 const ICONOS_EVENTO = {
@@ -125,13 +134,14 @@ function TarjetaResumen({
 }: {
   titulo: string
   valor: number
-  color: "green" | "yellow" | "blue" | "red"
+  color: "green" | "yellow" | "blue" | "red" | "orange"
 }) {
   const estilos = {
     green: "border-green-500/20 bg-green-500/10 text-green-500",
     yellow: "border-yellow-500/20 bg-yellow-500/10 text-yellow-500",
     blue: "border-blue-500/20 bg-blue-500/10 text-blue-500",
     red: "border-red-500/20 bg-red-500/10 text-red-500",
+    orange: "border-orange-500/20 bg-orange-500/10 text-orange-500",
   }
 
   return (
@@ -147,20 +157,28 @@ function ModalResumen({
   resumen,
   otraSeccion,
   onCerrarResumen,
+  onDecidirPendiente,
 }: {
   eventos: EventoSincronizacion[]
   resumen: any
   otraSeccion?: OtraSeccion | null
   onCerrarResumen: () => void
+  onDecidirPendiente?: (
+    evento: EventoSincronizacion,
+    decision: DecisionDescarte
+  ) => void
 }) {
   const duplicadas = eventos.filter((e) => e.tipo === "duplicada")
   const descartados = eventos.filter((e) => e.tipo === "descartado")
   const errores = eventos.filter((e) => e.tipo === "error")
   const registradas = eventos.filter((e) => e.tipo === "registrada")
+  const pendientes = eventos.filter(
+    (e) => e.tipo === "pendiente" && e.estado === "pendiente"
+  )
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card border rounded-xl p-6 w-[34rem] max-w-full">
+      <div className="bg-card border rounded-xl p-6 w-[34rem] max-w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">
           Sincronización finalizada
         </h2>
@@ -185,6 +203,11 @@ function ModalResumen({
             titulo="Errores"
             valor={errores.length}
             color="red"
+          />
+          <TarjetaResumen
+            titulo="Pendientes de revisión"
+            valor={pendientes.length}
+            color="orange"
           />
         </div>
 
@@ -225,6 +248,67 @@ function ModalResumen({
           </div>
         )}
 
+        {pendientes.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2">
+              Documentos pendientes de revisión
+            </h3>
+
+            <div className="space-y-3">
+              {pendientes.map((evento, index) => (
+                <div
+                  key={evento.id}
+                  className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-3"
+                >
+                  <p className="text-sm font-mono">
+                    {index + 1}. {evento.numeroDocumento}
+                  </p>
+
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Motivo:{" "}
+                    {evento.motivo ||
+                      "No fue posible determinar con certeza el tipo de documento."}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {evento.webUrl && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          window.open(evento.webUrl!, "_blank")
+                        }
+                      >
+                        Revisar
+                      </Button>
+                    )}
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        onDecidirPendiente?.(evento, "conservar")
+                      }
+                    >
+                      Conservar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() =>
+                        onDecidirPendiente?.(evento, "descartar")
+                      }
+                    >
+                      Descartar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 mt-6">
           {otraSeccion && (
             <Button
@@ -254,8 +338,13 @@ export function SincronizacionDialog({
   resumen,
   otraSeccion,
   onCerrarResumen,
+  onDecidirPendiente,
 }: Props) {
   if (sincronizando) {
+    const pendientesCount = eventos.filter(
+      (e) => e.tipo === "pendiente" && e.estado === "pendiente"
+    ).length
+
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-card border rounded-xl p-6 w-[40rem] max-w-full">
@@ -270,6 +359,17 @@ export function SincronizacionDialog({
             Se detectaron {documentosDetectados} documentos nuevos
           </p>
 
+          {pendientesCount > 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 mb-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-orange-500" />
+              <p className="text-sm font-medium text-orange-500">
+                {pendientesCount} documento
+                {pendientesCount !== 1 ? "s" : ""} requieren revisión al
+                finalizar
+              </p>
+            </div>
+          )}
+
           <ListaEventos eventos={eventos} />
         </div>
       </div>
@@ -283,6 +383,7 @@ export function SincronizacionDialog({
         resumen={resumen}
         otraSeccion={otraSeccion}
         onCerrarResumen={onCerrarResumen}
+        onDecidirPendiente={onDecidirPendiente}
       />
     )
   }
