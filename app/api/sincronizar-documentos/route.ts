@@ -11,6 +11,7 @@ import {
 } from "@/lib/openai-documentos";
 import { DocTiming } from "@/lib/instrumentation";
 import { enviarCorreo } from "@/lib/outlook";
+import { validarClasificacionPorRuc } from "@/lib/validacion-ruc";
 
 import { registrarActividad } from "@/lib/actividad";
 import { obtenerSesion } from "@/lib/session";
@@ -260,6 +261,47 @@ else if (
 ) {
 
   json.destino = "COBRAR";
+
+}
+
+// ===============================
+// VALIDACIÓN DE RESPALDO POR RUC
+// ===============================
+// Solo actúa cuando existe una inconsistencia o baja confianza en la
+// identificación de emisor/cliente. En ese caso el RUC extraído de la
+// factura pasa a ser la fuente de verdad (COBRAR si el emisor es la
+// empresa, PAGAR si el cliente es la empresa). No afecta las facturas
+// que ya se clasifican correctamente.
+
+const validacionRuc = validarClasificacionPorRuc({
+  rucEmisor,
+  rucCliente,
+  empresaEmisora,
+  empresaCliente,
+  destino: json.destino,
+  entidadPrincipal,
+});
+
+if (validacionRuc.inconsistenciaDetectada) {
+
+  if (validacionRuc.aplicada) {
+
+    json.destino = validacionRuc.destino;
+    json.empresaEmisora = validacionRuc.empresaEmisora;
+    json.empresaCliente = validacionRuc.empresaCliente;
+    json.entidadPrincipal = validacionRuc.entidadPrincipal;
+
+    console.log(
+      `[VALIDACION-RUC] Aplicada "${archivo.name}" | destino=${json.destino} | ${validacionRuc.observacion}`
+    );
+
+  } else {
+
+    console.log(
+      `[VALIDACION-RUC] Observación "${archivo.name}" | ${validacionRuc.observacion}`
+    );
+
+  }
 
 }
 
