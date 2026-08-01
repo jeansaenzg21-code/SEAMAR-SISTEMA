@@ -17,7 +17,7 @@ import { validarClasificacionPorRuc } from "@/lib/validacion-ruc";
 import { registrarActividad } from "@/lib/actividad";
 import { obtenerSesion } from "@/lib/session";
 import { registrarEventoSincronizacion } from "@/lib/sync-events";
-import { clasificarDocumentoDescartado } from "@/lib/documentos-descartables";
+import { clasificarDocumentoDescartado, formatearNombreDocumento } from "@/lib/documentos-descartables";
 
 const TAMANO_LOTE = 2;
 
@@ -195,7 +195,7 @@ const procesarArchivo = async (archivo: any) => {
   timing.end("OpenAI+OCR");
 
   numeroDocumento =
-    String(json.numeroFactura || archivo.name);
+    formatearNombreDocumento(json.numeroFactura, archivo.name);
 
   const RUC_SEAMAR =
   process.env.SEAMAR_RUC || "20611842458";
@@ -378,14 +378,13 @@ if (!esFactura) {
   ) {
 
     const esFemenino =
-      /NOTA|GUIA|GUÍA/.test(clasificacion.motivo);
+      /NOTA|GUIA|GUÍA|LIQUIDACI|PROFORMA|COTIZACI|ORDEN/.test(clasificacion.motivo);
 
     const tipoDescripcion =
       clasificacion.motivo.replace(/\.$/, "");
 
     let mensaje =
-      `${tipoDescripcion} ${numeroDocumento} ${esFemenino ? "detectada" : "detectado"}.\n` +
-      `No corresponde a una factura.\n`;
+      `${tipoDescripcion} ${numeroDocumento} ${esFemenino ? "detectada" : "detectado"}.\n`;
 
     let eliminado = false;
 
@@ -413,7 +412,7 @@ if (!esFactura) {
 
     mensaje += eliminado
       ? "Documento eliminado de OneDrive."
-      : "No se pudo eliminar el documento de OneDrive.";
+      : "No se pudo eliminar el documento de OneDrive.\nEl archivo permanecerá en OneDrive.";
 
     registrarEventoSincronizacion(
       Number(sincronizacionId),
@@ -435,13 +434,9 @@ if (!esFactura) {
     const motivoDuda =
       clasificacion?.motivo ?? null;
 
-    const mensajePendiente = motivoDuda
-      ? `${motivoDuda.replace(/\.$/, "")} ${numeroDocumento} identificado con dudas.\n` +
-        `No se registró como factura.\n` +
-        `Quedó pendiente de revisión al finalizar.`
-      : `El documento ${numeroDocumento} no pudo clasificarse.\n` +
-        `No se registró como factura.\n` +
-        `Quedó pendiente de revisión al finalizar.`;
+    const mensajePendiente =
+      `No fue posible determinar con certeza el tipo de documento.\n` +
+      `El archivo permanecerá en OneDrive para futuras sincronizaciones.`;
 
     console.log(
       "[PENDIENTE DE REVISIÓN]",

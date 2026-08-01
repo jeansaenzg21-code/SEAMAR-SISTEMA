@@ -50,6 +50,16 @@ type Props = {
   ) => void
 }
 
+const VALORES_INVALIDOS_DISPLAY = new Set(["undefined", "null", "nan"])
+
+function nombreMostrado(evento: EventoSincronizacion): string {
+  const valor = evento.numeroDocumento?.trim()
+  if (valor && !VALORES_INVALIDOS_DISPLAY.has(valor.toLowerCase())) {
+    return valor
+  }
+  return "Documento sin identificar"
+}
+
 const ICONOS_EVENTO = {
   success: {
     Icon: CheckCircle2,
@@ -220,7 +230,7 @@ function ModalResumen({
             <div className="space-y-1">
               {duplicadas.map((evento) => (
                 <p key={evento.id} className="text-sm font-mono">
-                  {evento.numeroDocumento}
+                  {nombreMostrado(evento)}
                 </p>
               ))}
             </div>
@@ -237,7 +247,7 @@ function ModalResumen({
               {descartados.map((evento) => (
                 <div key={evento.id}>
                   <p className="text-sm font-mono">
-                    {evento.numeroDocumento}
+                    {nombreMostrado(evento)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {evento.motivo}
@@ -261,7 +271,7 @@ function ModalResumen({
                   className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-3"
                 >
                   <p className="text-sm font-mono">
-                    {index + 1}. {evento.numeroDocumento}
+                    {index + 1}. {nombreMostrado(evento)}
                   </p>
 
                   <p className="text-xs text-muted-foreground mt-1">

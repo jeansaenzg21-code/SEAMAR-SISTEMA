@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eliminarArchivo } from "@/lib/onedrive";
 import { registrarEventoSincronizacion, resolverEventoPendiente } from "@/lib/sync-events";
+import { formatearNombreDocumento } from "@/lib/documentos-descartables";
 
 export async function POST(
   request: NextRequest,
@@ -14,7 +15,10 @@ export async function POST(
 
     const archivoId = String(body?.archivoId || "");
     const decision = String(body?.decision || "");
-    const numeroDocumento = String(body?.numeroDocumento || archivoId);
+    const numeroDocumento = formatearNombreDocumento(
+      body?.numeroDocumento,
+      body?.nombreArchivo
+    );
     const motivo = body?.motivo ? String(body.motivo) : null;
 
     if (!archivoId || (decision !== "descartar" && decision !== "conservar")) {

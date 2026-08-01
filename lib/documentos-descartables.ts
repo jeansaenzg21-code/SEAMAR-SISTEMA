@@ -4,17 +4,21 @@
 // Determina si un documento que NO cumple los criterios de factura (esFactura)
 // debe ser descartado (eliminado de OneDrive) o quedar pendiente de decisión.
 //
-// MEDIDAS DE SEGURIDAD:
-// - Solo se descarta automáticamente (certeza = "confirmado") cuando el tipo
-//   de documento se puede determinar con confianza. En cualquier otro caso se
-//   devuelve certeza = "duda" (o null) y el archivo NO se elimina: pasa a una
-//   revisión interactiva (SÍ / NO) y puede volver a evaluarse en la próxima
-//   sincronización.
+// REGLAS DE ELIMINACIÓN AUTOMÁTICA (SOLO con certeza):
+// - El tipo de documento debe estar declarado EXPLÍCITAMENTE en el encabezado /
+//   título principal del documento: NOTA DE CRÉDITO ELECTRÓNICA, NOTA DE DÉBITO
+//   ELECTRÓNICA, GUÍA DE REMISIÓN ELECTRÓNICA, LIQUIDACIÓN DE COMPRA, PROFORMA,
+//   COTIZACIÓN u otro tipo explícitamente no soportado por el sistema.
+// - NUNCA se usa como evidencia: descripción, observaciones, pie de página,
+//   cláusulas legales o referencias a comprobantes que el documento modifica.
 // - El texto que aparece SOLO en descripciones, cláusulas legales o datos del
-//   cliente NO se usa como evidencia de nota de crédito/débito/guía (evita
-//   falsos positivos de facturas que mencionan esos términos en su cuerpo).
-// - Si hay un error de OCR, error de IA o error del sistema, el flujo nunca
-//   llega a esta función (el error se captura antes).
+//   cliente NUNCA produce una eliminación: a lo sumo genera "duda".
+// - NUNCA se elimina automáticamente cuando: tipo desconocido, OCR/IA con
+//   dudas, campos faltantes, undefined/null, encabezado no identificable o
+//   cualquier incertidumbre. En esos casos se devuelve "duda"/null y el archivo
+//   vuelve a evaluarse en futuras sincronizaciones.
+// - Una factura válida NUNCA se elimina aunque falte número, RUC, destino o
+//   falle parte de la IA: la ausencia de información jamás justifica eliminar.
 // - Esta función NO modifica la clasificación CxC/CxP ni la validación por RUC.
 // =============================================================================
 
@@ -25,12 +29,61 @@ export interface ClasificacionDescartable {
   certeza: CertezaClasificacion;
 }
 
+// -----------------------------------------------------------------------------
+// Utilidades de texto seguro (evitan que "undefined"/"null"/vacíos se muestren)
+// -----------------------------------------------------------------------------
+
+const VALORES_INVALIDOS = new Set(["undefined", "null", "nan", "[object object]", "{}"]);
+
+function limpiarTexto(valor: unknown): string | null {
+  if (valor === null || valor === undefined) return null;
+  const t = String(valor).trim();
+  if (t === "") return null;
+  if (VALORES_INVALIDOS.has(t.toLowerCase())) return null;
+  return t;
+}
+
+// Nombre mostrado para un documento, por prioridad:
+//   1) número del documento extraído (serie-correlativo) y válido;
+//   2) nombre original del archivo en OneDrive;
+//   3) "Documento sin identificar".
+// Jamás devuelve undefined/null/vacío ni concatenaciones serie-correlativo
+// cuando uno de los campos es undefined (evita el "undefined-undefined").
+export function formatearNombreDocumento(
+  numeroFactura: unknown,
+  nombreArchivo: unknown
+): string {
+  const numero = limpiarTexto(numeroFactura);
+  if (numero) return numero;
+
+  const nombre = limpiarTexto(nombreArchivo);
+  if (nombre) return nombre;
+
+  return "Documento sin identificar";
+}
+
+export function textoValido(valor: unknown): string | null {
+  return limpiarTexto(valor);
+}
+
+// -----------------------------------------------------------------------------
+// Expresiones de cabecera (evidencia de tipo en el TÍTULO principal)
+// -----------------------------------------------------------------------------
+
 const NOTA_CREDITO_RE =
   /NOTA\s+DE\s+CR[ÉE]DITO|CREDIT\s*NOTE|CRÉDITO\s+ELECTRÓNICA|CREDITO\s+ELECTRONICA/;
 const NOTA_DEBITO_RE =
   /NOTA\s+DE\s+D[ÉE]BITO|DEBIT\s*NOTE|DÉBITO\s+ELECTRÓNICA|DEBITO\s+ELECTRONICA/;
 const GUIA_REMISION_RE =
-  /GUIA\s+DE\s+REMISION|GUÍA\s+DE\s+REMISIÓN|GUIA\s+REMISION|GUÍA\s+REMISIÓN/;
+  /GUIA\s+DE\s+REMISION|GUÍA\s+DE\s+REMISIÓN|GUIA\s+REMISION|GUÍA\s+REMISIÓN|GUÍA\s+DE\s+REMISIÓN\s+ELECTRÓNICA|GUIA\s+DE\s+REMISION\s+ELECTRONICA/;
+const LIQUIDACION_COMPRA_RE =
+  /LIQUIDACI[ÓO]N\s+DE\s+COMPRA|LIQUIDACI[ÓO]N\s+COMPRA|LIQUIDATION\s+OF\s+PURCHASE/;
+const PROFORMA_RE = /FACTURA\s+PROFORMA|\bPROFORMA\b|PRO\s*FORMA/;
+const COTIZACION_RE = /COTIZACI[ÓO]N(\s+ELECTR[ÓO]NICA)?|QUOTATION/;
+const RETENCION_RE = /COMPROBANTE\s+DE\s+RETENCI[ÓO]N|RETENCI[ÓO]N\s+ELECTR[ÓO]NICA|RETENCION\s+ELECTRONICA/;
+const ORDEN_COMPRA_RE = /ORDEN\s+DE\s+COMPRA|PURCHASE\s+ORDER/;
+const ORDEN_SERVICIO_RE = /ORDEN\s+DE\s+SERVICIO|SERVICE\s+ORDER/;
+const CONTRATO_RE = /\bCONTRATO\b|\bCONTRACT\b/;
 
 const BANCOS = [
   "BANCO DE CREDITO",
@@ -57,7 +110,11 @@ export function esTextoBancario(texto: string): boolean {
   return BANCOS.some((banco) => t.includes(banco));
 }
 
+// -----------------------------------------------------------------------------
 // Tipos explícitos devueltos por el modelo de IA (REGLAS de los prompts).
+// Sólo estos tipos (declarados en la cabecera) permiten eliminación automática.
+// -----------------------------------------------------------------------------
+
 const TIPOS_NOTA_CREDITO = new Set([
   "nota de credito",
   "nota de crédito",
@@ -85,10 +142,34 @@ const TIPOS_GUIA_REMISION = new Set([
   "guia de remision",
   "guía de remisión",
   "guia_remision",
-  "guia",
-  "guía",
   "guia de remision electronica",
   "guía de remisión electrónica",
+  "guia",
+  "guía",
+]);
+
+const TIPOS_LIQUIDACION_COMPRA = new Set([
+  "liquidacion de compra",
+  "liquidación de compra",
+  "liquidacion_compra",
+  "liquidacion de compra electronica",
+  "liquidación de compra electrónica",
+]);
+
+const TIPOS_PROFORMA = new Set([
+  "proforma",
+  "factura proforma",
+  "factura_proforma",
+  "pro forma",
+  "proforma electronica",
+]);
+
+const TIPOS_COTIZACION = new Set([
+  "cotizacion",
+  "cotización",
+  "cotizacion electronica",
+  "cotización electrónica",
+  "cotizacion_electronica",
 ]);
 
 const TIPOS_BANCARIOS = new Set([
@@ -102,8 +183,37 @@ const TIPOS_BANCARIOS = new Set([
   "estado de cuenta electronico",
 ]);
 
-// Tipos genéricos / poco informativos: indican que el modelo NO identificó un
-// tipo soportado con certeza. NUNCA deben provocar una eliminación automática.
+// Otros tipos explícitamente no soportados por el sistema: declarados por la IA
+// como un tipo concreto que no es factura ni un documento que se pueda registrar.
+// (Solo estos admiten eliminación automática.)
+const TIPOS_NO_SOPORTADOS = new Set([
+  "comprobante de retencion",
+  "comprobante de retención",
+  "comprobante_de_retencion",
+  "retencion",
+  "retención",
+]);
+
+// Tipos dudosos / potencialmente útiles: nunca se eliminan automáticamente,
+// quedan pendientes de revisión (p. ej. órdenes, contratos y comprobantes tipo
+// boleta/nota de venta que podrían ser documentos válidos).
+const TIPOS_DUDOSOS = new Set([
+  "orden de compra",
+  "orden_de_compra",
+  "orden de servicio",
+  "orden_de_servicio",
+  "contrato",
+  "nota de venta",
+  "nota_de_venta",
+  "boleta de venta",
+  "boleta_de_venta",
+  "recibo",
+  "recibo por honorarios",
+  "recibo_por_honorarios",
+]);
+
+// Tipos genéricos / poco informativos: el modelo NO identificó un tipo
+// soportado con certeza. NUNCA provocan eliminación automática.
 const TIPOS_GENERICOS = new Set([
   "otro",
   "otros",
@@ -137,7 +247,8 @@ export function clasificarDocumentoDescartado(
     .join(" ")
     .toUpperCase();
 
-  // ---- 1) Tipo explícito devuelto por la IA: certeza máxima ----
+  // ---- 1) Tipo explícito declarado por la IA: certeza máxima (solo tipos
+  //         no soportados / no factura llegan aquí porque esFactura=false) ----
   if (TIPOS_NOTA_CREDITO.has(tipo)) {
     return { motivo: "Nota de Crédito.", certeza: "confirmado" };
   }
@@ -150,11 +261,32 @@ export function clasificarDocumentoDescartado(
     return { motivo: "Guía de Remisión.", certeza: "confirmado" };
   }
 
+  if (TIPOS_LIQUIDACION_COMPRA.has(tipo)) {
+    return { motivo: "Liquidación de Compra.", certeza: "confirmado" };
+  }
+
+  if (TIPOS_PROFORMA.has(tipo)) {
+    return { motivo: "Proforma.", certeza: "confirmado" };
+  }
+
+  if (TIPOS_COTIZACION.has(tipo)) {
+    return { motivo: "Cotización.", certeza: "confirmado" };
+  }
+
   if (TIPOS_BANCARIOS.has(tipo)) {
     return { motivo: "Documento bancario.", certeza: "confirmado" };
   }
 
-  // ---- 2) Evidencia en la cabecera del documento ----
+  if (TIPOS_NO_SOPORTADOS.has(tipo)) {
+    return { motivo: "Documento no soportado.", certeza: "confirmado" };
+  }
+
+  // ---- 1b) Tipos dudosos declarados por la IA: NO eliminar, queda pendiente ----
+  if (TIPOS_DUDOSOS.has(tipo)) {
+    return { motivo: "Documento no soportado.", certeza: "duda" };
+  }
+
+  // ---- 2) Evidencia en el encabezado / título principal del documento ----
   if (NOTA_CREDITO_RE.test(headerTexto)) {
     return { motivo: "Nota de Crédito.", certeza: "confirmado" };
   }
@@ -165,6 +297,35 @@ export function clasificarDocumentoDescartado(
 
   if (GUIA_REMISION_RE.test(headerTexto)) {
     return { motivo: "Guía de Remisión.", certeza: "confirmado" };
+  }
+
+  if (LIQUIDACION_COMPRA_RE.test(headerTexto)) {
+    return { motivo: "Liquidación de Compra.", certeza: "confirmado" };
+  }
+
+  if (PROFORMA_RE.test(headerTexto)) {
+    return { motivo: "Proforma.", certeza: "confirmado" };
+  }
+
+  if (COTIZACION_RE.test(headerTexto)) {
+    return { motivo: "Cotización.", certeza: "confirmado" };
+  }
+
+  if (RETENCION_RE.test(headerTexto)) {
+    return { motivo: "Comprobante de Retención.", certeza: "confirmado" };
+  }
+
+  // Evidencia de cabecera de tipos dudosos: NO eliminar, queda pendiente
+  if (ORDEN_COMPRA_RE.test(headerTexto)) {
+    return { motivo: "Orden de Compra.", certeza: "duda" };
+  }
+
+  if (ORDEN_SERVICIO_RE.test(headerTexto)) {
+    return { motivo: "Orden de Servicio.", certeza: "duda" };
+  }
+
+  if (CONTRATO_RE.test(headerTexto)) {
+    return { motivo: "Contrato.", certeza: "duda" };
   }
 
   // ---- 3) Tipo genérico / no soportado: NO eliminar, queda pendiente ----
@@ -180,7 +341,7 @@ export function clasificarDocumentoDescartado(
     return { motivo: "Documento bancario.", certeza: "duda" };
   }
 
-  // ---- 5) Mención de nota/guía solo en cliente o descripción: es ambiguo
+  // ---- 5) Mención de nota/guía SOLO en cliente o descripción: ambiguo
   //         (suele ser texto legal o pie de página), NO eliminar ----
   const textoClienteDescripcion = [
     String(json?.empresaCliente || ""),
