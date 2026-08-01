@@ -33,19 +33,62 @@ export async function listarValorizaciones() {
 
   return response.json();
 }
+// Registros de diagnóstico de paginación SOLO en modo desarrollo.
+// Para desactivarlos: cambiar esta constante a false (o el entorno de
+// producción la deja apagada porque NODE_ENV !== "development").
+const LOG_PAGINACION_ONEDRIVE =
+  process.env.NODE_ENV === "development";
+
 export async function listarDocumentos() {
   const token = await getAccessToken();
 
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.DOCUMENTOS}/children`,
-    {
+  const urlBase = `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${ONEDRIVE_FOLDERS.DOCUMENTOS}/children`;
+
+  // Microsoft Graph pagina los resultados de /children (200 ítems por página).
+  // Se recorre @odata.nextLink hasta la última página y se acumulan TODOS los
+  // archivos en una única colección antes de devolverlos.
+  const todosLosItems: any[] = [];
+  let siguienteUrl: string | null = urlBase;
+  let pagina = 0;
+
+  while (siguienteUrl) {
+    pagina++;
+
+    const response: Response = await fetch(siguienteUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
-  );
+    });
 
-  return response.json();
+    if (!response.ok) {
+      const detalle = await response.text();
+      throw new Error(
+        `Error al listar documentos de OneDrive (página ${pagina}): ` +
+          `status=${response.status} ${detalle.slice(0, 300)}`
+      );
+    }
+
+    const data: any = await response.json();
+    const items = data.value || [];
+
+    todosLosItems.push(...items);
+
+    if (LOG_PAGINACION_ONEDRIVE) {
+      console.log(
+        `[ONEDRIVE-PAGINACIÓN] Página ${pagina}: ${items.length} archivos`
+      );
+    }
+
+    siguienteUrl = data["@odata.nextLink"] ?? null;
+  }
+
+  if (LOG_PAGINACION_ONEDRIVE) {
+    console.log(
+      `[ONEDRIVE-PAGINACIÓN] Total obtenido desde Graph: ${todosLosItems.length} archivos (${pagina} página(s))`
+    );
+  }
+
+  return { value: todosLosItems };
 }
 
 export async function buscarOSPorNumero(numeroOS: string) {
