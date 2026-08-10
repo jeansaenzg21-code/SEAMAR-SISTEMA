@@ -35,6 +35,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   AreaChart,
   Area,
@@ -90,6 +91,7 @@ const typeIcons: Record<string, string> = {
 }
 
 export function ProjectDetailContent({ projectId }: ProjectDetailProps) {
+  const router = useRouter()
   const [project, setProject] =
   useState<any>(defaultProject)
 
@@ -198,11 +200,13 @@ setValorizaciones(data)
     <div className="space-y-6">
       {/* Back Button & Header */}
       <div className="flex items-center gap-4">
-        <Link href="/projects">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
+        <Button
+  variant="ghost"
+  size="icon"
+  onClick={() => router.back()}
+>
+  <ArrowLeft className="h-5 w-5" />
+</Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <div className={cn("h-2 w-2 rounded-full", project.clientColor)} />

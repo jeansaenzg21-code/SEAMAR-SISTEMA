@@ -356,11 +356,6 @@ async function guardarValorizacionApi(editingId: string | null, formData: FormDa
   return res.json()
 }
 
-async function sincronizarOneDriveApi(): Promise<{ nuevos?: number; [key: string]: unknown }> {
-  const res = await fetch("/api/sincronizar-valorizaciones", { method: "POST" })
-  return res.json()
-}
-
 /* ============================================================================
  * 5) HOOKS
  * ==========================================================================*/
@@ -418,7 +413,6 @@ function useValorizaciones() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
-const [sincronizando, setSincronizando] = useState(false)
   const cargarValorizaciones = useCallback(async () => {
     try {
       const data = await fetchValorizacionesApi()
@@ -495,21 +489,6 @@ const [sincronizando, setSincronizando] = useState(false)
   }, [currentPage, totalPages])
 
   const vistaCliente = useMemo(() => getVistaCliente(clientFilter), [clientFilter])
-
-  const sincronizarOneDrive = useCallback(async () => {
-    try {
-    setSincronizando(true)
-
-      const data = await sincronizarOneDriveApi()
-      await cargarValorizaciones()
-      alert(`Sincronización completada.\nNuevos archivos: ${data.nuevos}`)
-    } catch (error) {
-      console.error(error)
-      alert("Error al sincronizar")
-    }finally {
-  setSincronizando(false)
-}
-  }, [cargarValorizaciones])
 
   const enviarRevision = useCallback(
     async (item: Valuation) => {
@@ -721,8 +700,6 @@ const [sincronizando, setSincronizando] = useState(false)
 
     // acciones
     reload: cargarValorizaciones,
-    sincronizando,
-    sincronizarOneDrive,
     enviarRevision,
     enviarAObservado,
     fetchDocumentos,
@@ -1466,12 +1443,10 @@ export function ValuationsContent() {
     vistaCliente,
     statusFilter,
     setStatusFilter,
-    sincronizando,
     clientFilter,
     setClientFilter,
     selectedPeriod,
     setSelectedPeriod,
-    sincronizarOneDrive,
     enviarRevision,
     enviarAObservado,
     fetchDocumentos,
@@ -1498,19 +1473,11 @@ const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<s
 
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [selectedValuation, setSelectedValuation] = useState<Valuation | null>(null)
-  const [mostrarCompilacion, setMostrarCompilacion] = useState(false)
-  const [pasoCompilacion, setPasoCompilacion] = useState(0)
 
   const { rol: rolUsuario } = useRol()
   const sesionUsuario = useUser()
   const nombreUsuario = sesionUsuario?.nombre || "Usuario"
 
-const pasosCompilacion = [
-  "Conectando con OneDrive...",
-  "Buscando valorizaciones...",
-  "Analizando documentos con IA...",
-  "Guardando valorizaciones..."
-]
   const abrirCreacion = useCallback(() => {
     setEditingValuation(null)
     setIsFormOpen(true)
@@ -1580,36 +1547,6 @@ const pasosCompilacion = [
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Button
-  variant="ghost"
-  className="w-full lg:w-auto"
-  onClick={async () => {
-  setMostrarCompilacion(true)
-  setPasoCompilacion(0)
-
-  const intervalo = setInterval(() => {
-    setPasoCompilacion((prev) => (prev < 4 ? prev + 1 : prev))
-  }, 1500)
-
-  try {
-    await sincronizarOneDrive()
-  } finally {
-    clearInterval(intervalo)
-    setMostrarCompilacion(false)
-  }
-}}
-  disabled={sincronizando}
-  title={sincronizando ? "Compilando valorizaciones..." : "Sincronizar OneDrive"}
->
-  {sincronizando ? (
-    <>
-      <RefreshCw className="mr-2 h-4 w-4 animate-spin text-blue-500" />
-      Compilando valorizaciones...
-    </>
-  ) : (
-    <RefreshCw className="h-4 w-4 text-blue-500" />
-  )}
-</Button>
 
             <Button variant="outline" className="border-border w-full lg:w-auto" onClick={() => setMostrarExportador(true)}>
               <FileText />
@@ -1702,64 +1639,6 @@ const pasosCompilacion = [
   nombreUsuario={nombreUsuario}
   rolUsuario={rolUsuario}
 />
-{mostrarCompilacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80">
-          <div className="w-[30rem] rounded-xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-white">
-                  Compilando valorizaciones
-                </h2>
-                <p className="text-sm text-slate-300">
-  {pasosCompilacion[pasoCompilacion]}
-</p>
-              </div>
-            </div>
-
-            <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-700">
-              <div
-  className="h-full rounded-full bg-blue-600 transition-all duration-700"
-  style={{
-    width: `${((pasoCompilacion + 1) / pasosCompilacion.length) * 100}%`,
-  }}
-/>
-            </div>
-            <div className="mt-6 space-y-2">
-  {pasosCompilacion.map((paso, index) => (
-    <div
-      key={paso}
-      className="flex items-center gap-3 text-sm"
-    >
-      {index < pasoCompilacion ? (
-        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">
-          ✓
-        </div>
-      ) : index === pasoCompilacion ? (
-        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-      ) : (
-        <div className="h-4 w-4 rounded-full border border-slate-500" />
-      )}
-
-      <span
-        className={
-          index <= pasoCompilacion
-            ? "text-white"
-            : "text-slate-500"
-        }
-      >
-        {paso}
-      </span>
-    </div>
-  ))}
-</div>
-
-            <p className="mt-4 text-sm text-slate-300">
-  Paso {pasoCompilacion + 1} de {pasosCompilacion.length}
-</p>
-          </div>
-        </div>
-      )}
 <Dialog
   open={mostrarImportador}
   onOpenChange={(next) => {
