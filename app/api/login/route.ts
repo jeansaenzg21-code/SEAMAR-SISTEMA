@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
 import bcrypt from "bcryptjs";
 import { crearSesion } from "@/lib/session";
+import { esUsuarioOscar } from "@/lib/oscar/oscar";
 
 export async function POST(req: Request) {
   try {
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
+      oscar: esUsuarioOscar({ usuario: user.usuario }),
       usuario: {
         id: user.id,
         nombre: user.nombre,

@@ -125,29 +125,43 @@ async def ocr_endpoint(request: Request):
     doc_id = request.headers.get("x-document-id") or f"OCR-{next(doc_id_counter):06d}"
 
     content_type = request.headers.get("content-type", "")
-    if "application/pdf" not in content_type:
+
+    tipos_validos = [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+    ]
+
+    if content_type not in tipos_validos:
         logger.warning(f"[{doc_id}] Content-Type inválido: {content_type}")
-        return {"ok": False, "error": "Content-Type debe ser application/pdf"}
+        return {
+            "ok": False,
+            "error": (
+                "Content-Type debe ser application/pdf, "
+                "image/jpeg o image/png"
+            ),
+        }
 
     try:
         content = await request.body()
     except Exception as e:
         logger.error(f"[{doc_id}] Error leyendo body: {e}")
-        return {"ok": False, "error": "Error leyendo el PDF"}
+        return {"ok": False, "error": "Error leyendo el documento"}
 
     if not content:
-        logger.warning(f"[{doc_id}] PDF vacío")
-        return {"ok": False, "error": "El PDF está vacío"}
+        logger.warning(f"[{doc_id}] Documento vacío")
+        return {"ok": False, "error": "El documento está vacío"}
 
     if len(content) > MAX_FILE_SIZE_BYTES:
         logger.warning(
-            f"[{doc_id}] PDF demasiado grande: "
+            f"[{doc_id}] Documento demasiado grande: "
             f"{len(content)} bytes (máx: {MAX_FILE_SIZE_BYTES})"
         )
         return {
             "ok": False,
             "error": (
-                f"El PDF excede el tamaño máximo de "
+                f"El documento excede el tamaño máximo de "
                 f"{CONFIG['max_file_size_mb']}MB"
             ),
         }
@@ -157,7 +171,7 @@ async def ocr_endpoint(request: Request):
         return {"ok": False, "error": "OCR Service no disponible"}
 
     try:
-        result = await ocr_queue.enqueue(content, doc_id)
+        result = await ocr_queue.enqueue(content, doc_id, content_type)
 
         logger.info(
             f"[{doc_id}] Documento procesado exitosamente | "

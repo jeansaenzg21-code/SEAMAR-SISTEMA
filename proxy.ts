@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { tieneAccesoPagina, tieneAccesoApi } from "@/lib/authorization";
+import { esUsuarioOscar, esRutaOscar } from "@/lib/oscar/oscar";
 
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || "app_session";
 
@@ -21,14 +22,20 @@ function esApiPublica(pathname: string) {
   );
 }
 
-function obtenerRol(request: NextRequest): string | null {
+function obtenerSesionCookie(request: NextRequest): {
+  rol: string | null;
+  usuario: string | null;
+} {
   try {
     const cookie = request.cookies.get(COOKIE_NAME);
-    if (!cookie?.value) return null;
+    if (!cookie?.value) return { rol: null, usuario: null };
     const sesion = JSON.parse(cookie.value);
-    return sesion.rol || null;
+    return {
+      rol: sesion.rol || null,
+      usuario: sesion.usuario || null,
+    };
   } catch {
-    return null;
+    return { rol: null, usuario: null };
   }
 }
 
@@ -39,7 +46,9 @@ const modulosDeshabilitados = [
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const rol = obtenerRol(request);
+  const { rol, usuario } = obtenerSesionCookie(request);
+  const esOscar = esUsuarioOscar({ usuario: usuario ?? undefined });
+  const esOscarRuta = esRutaOscar(pathname);
 
   // Módulos deshabilitados — 404
   if (modulosDeshabilitados.some(
@@ -53,9 +62,34 @@ export function proxy(request: NextRequest) {
 
   // --- API routes ---
   if (pathname.startsWith("/api/")) {
+    if (esOscarRuta) {
+      if (!rol) {
+        return NextResponse.json(
+          { error: "No autenticado" },
+          { status: 401 }
+        );
+      }
+      if (!esOscar) {
+        return NextResponse.json(
+          { error: "Acceso denegado" },
+          { status: 403 }
+        );
+      }
+      return NextResponse.next();
+    }
+
     if (esApiPublica(pathname)) {
       return NextResponse.next();
     }
+
+    if (esOscar) {
+      // Oscar NO tiene acceso al resto de APIs del sistema
+      return NextResponse.json(
+        { error: "Acceso denegado" },
+        { status: 403 }
+      );
+    }
+
     if (!rol) {
       return NextResponse.json(
         { error: "No autenticado" },
@@ -72,6 +106,28 @@ export function proxy(request: NextRequest) {
   }
 
   // --- Page routes ---
+  // Oscar tiene su propio espacio: cualquier ruta del sistema lo devuelve a /oscar
+  if (esOscar) {
+    if (pathname === "/login") {
+      return NextResponse.redirect(new URL("/oscar", request.url));
+    }
+    if (!esOscarRuta && pathname !== "/") {
+      return NextResponse.redirect(new URL("/oscar", request.url));
+    }
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/oscar", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Un usuario normal jamás ingresa al espacio de Oscar
+  if (esOscarRuta) {
+    if (!rol) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   if (rol && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

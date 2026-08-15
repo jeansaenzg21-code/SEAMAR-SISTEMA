@@ -325,6 +325,103 @@ export async function subirDocumentoRespaldoAOneDrive(
   );
 }
 
+const NOMBRE_CARPETA_FACTURAS_OSCAR = "Repositorio";
+const NOMBRE_CARPETA_PADRE_FACTURAS_OSCAR = "SistemaSeamar";
+let carpetaFacturasOscarCache: string | null = null;
+
+async function obtenerTokenGraph() {
+  return getAccessToken();
+}
+
+async function buscarOCrearCarpeta(
+  token: string,
+  parentId: string,
+  nombre: string
+): Promise<string> {
+  const buscar = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${parentId}/children`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (buscar.ok) {
+    const data: any = await buscar.json();
+    const existente = (data.value || []).find(
+      (item: any) => item.name === nombre && item.folder
+    );
+    if (existente) {
+      return existente.id;
+    }
+  }
+
+  const crear = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${parentId}/children`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: nombre,
+        folder: {},
+        "@microsoft.graph.conflictBehavior": "fail",
+      }),
+    }
+  );
+
+  if (!crear.ok) {
+    throw new Error(
+      `No se pudo crear la carpeta "${nombre}" en OneDrive: status=${crear.status}`
+    );
+  }
+
+  const data: any = await crear.json();
+  return data.id;
+}
+
+export async function asegurarCarpetaFacturasOscar(): Promise<string> {
+  if (ONEDRIVE_FOLDERS.FACTURAS_OSCAR) {
+    return ONEDRIVE_FOLDERS.FACTURAS_OSCAR;
+  }
+
+  if (carpetaFacturasOscarCache) {
+    return carpetaFacturasOscarCache;
+  }
+
+  const token = await obtenerTokenGraph();
+
+  const padre = await buscarOCrearCarpeta(
+    token,
+    "root",
+    NOMBRE_CARPETA_PADRE_FACTURAS_OSCAR
+  );
+  const repositorio = await buscarOCrearCarpeta(
+    token,
+    padre,
+    NOMBRE_CARPETA_FACTURAS_OSCAR
+  );
+
+  carpetaFacturasOscarCache = repositorio;
+  return repositorio;
+}
+
+export async function subirFacturaOscarAOneDrive(
+  nombreArchivo: string,
+  buffer: Buffer
+) {
+  const token = await obtenerTokenGraph();
+  const folderId = await asegurarCarpetaFacturasOscar();
+  return subirArchivoAOneDrive(nombreArchivo, buffer, folderId, token);
+}
+
+export async function descargarArchivoPorItemId(itemId: string) {
+  return descargarArchivo(itemId);
+}
+
 export async function eliminarArchivo(itemId: string) {
   const token = await getAccessToken();
 

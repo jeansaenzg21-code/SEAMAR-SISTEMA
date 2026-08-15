@@ -68,7 +68,7 @@ export default function LoginPage() {
       setTheme(data.tema === "CLARO" ? "light" : "dark")
     }
 
-    router.push("/dashboard");
+    router.push(data.oscar ? "/oscar" : "/dashboard");
     router.refresh();
   } finally {
     setIsLoading(false);

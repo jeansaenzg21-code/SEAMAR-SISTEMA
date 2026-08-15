@@ -6,13 +6,17 @@ import asyncio
 import itertools
 from dataclasses import dataclass, field
 
-from ocr_core import extraer_texto
+from ocr_core import extraer_texto, extraer_texto_imagen
 from ocr_metrics import OcrMetrics
 
 logger = logging.getLogger("ocr-service")
 
 MAX_RETRIES = 2
 RETRY_BACKOFF_SECONDS = [2, 4]
+
+
+def es_imagen(content_type: str) -> bool:
+    return "image/" in (content_type or "").lower()
 
 
 @dataclass
@@ -26,6 +30,7 @@ class OcrResult:
 class OcrJob:
     pdf_bytes: bytes
     document_id: str
+    content_type: str = "application/pdf"
     future: asyncio.Future = field(default=None, compare=False)
     enqueued_at: float = 0.0
     dequeued_at: float = 0.0
@@ -108,10 +113,16 @@ class OcrQueue:
 
         logger.info("Cola OCR detenida")
 
-    async def enqueue(self, pdf_bytes: bytes, document_id: str) -> OcrResult:
+    async def enqueue(
+        self,
+        pdf_bytes: bytes,
+        document_id: str,
+        content_type: str = "application/pdf",
+    ) -> OcrResult:
         job = OcrJob(
             pdf_bytes=pdf_bytes,
             document_id=document_id,
+            content_type=content_type,
         )
         job.enqueued_at = time.monotonic()
         position = self.queue.qsize() + 1
@@ -175,19 +186,37 @@ class OcrQueue:
 
         for intento in range(1, MAX_RETRIES + 2):
             try:
-                fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+                ext = (
+                    ".jpg"
+                    if "jpeg" in (job.content_type or "").lower()
+                    else ".png"
+                    if "png" in (job.content_type or "").lower()
+                    else ".pdf"
+                )
+                fd, temp_path = tempfile.mkstemp(suffix=ext)
                 with os.fdopen(fd, "wb") as f:
                     f.write(job.pdf_bytes)
 
                 logger.info(
                     f"[{job.document_id}] Worker {worker_id} | "
-                    f"Intento {intento} | Inicio OCR: {temp_path}"
+                    f"Intento {intento} | Inicio OCR: {temp_path} "
+                    f"| content_type: {job.content_type}"
                 )
 
                 self.metrics.record_ocr_start()
                 ocr_start = time.monotonic()
+
+                if es_imagen(job.content_type):
+                    proceso = asyncio.to_thread(
+                        extraer_texto_imagen, temp_path, self.ocr
+                    )
+                else:
+                    proceso = asyncio.to_thread(
+                        extraer_texto, temp_path, self.ocr
+                    )
+
                 texto = await asyncio.wait_for(
-                    asyncio.to_thread(extraer_texto, temp_path, self.ocr),
+                    proceso,
                     timeout=self.worker_timeout,
                 )
                 elapsed_ms = int(

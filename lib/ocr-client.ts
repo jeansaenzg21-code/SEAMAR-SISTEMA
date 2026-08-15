@@ -22,16 +22,29 @@ interface OcrResponse {
   ocr_ms?: number;
 }
 
+const CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+};
+
+export function contentTypeParaArchivo(nombreArchivo: string): string | null {
+  const ext = nombreArchivo.split(".").pop()?.toLowerCase() || "";
+  return CONTENT_TYPES[ext] ?? null;
+}
+
 export async function leerPdfConOCR(
   buffer: Buffer,
-  docId?: string
+  docId?: string,
+  contentType: string = "application/pdf"
 ): Promise<{ texto: string; timing: OcrTiming }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OCR_TIMEOUT_MS);
 
   try {
     const headers: Record<string, string> = {
-      "Content-Type": "application/pdf",
+      "Content-Type": contentType,
     };
     if (docId) headers["X-Document-Id"] = docId;
 
