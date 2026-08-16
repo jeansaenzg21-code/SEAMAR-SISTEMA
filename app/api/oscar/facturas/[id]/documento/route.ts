@@ -52,8 +52,16 @@ export async function GET(
         "Cache-Control": "private, max-age=300",
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[OSCAR] Error descargando documento:", error);
+
+    if (error?.message?.includes("No se encontró el archivo")) {
+      return NextResponse.json(
+        { error: "El archivo ya no existe en el repositorio (OneDrive)." },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Error al obtener el documento." },
       { status: 500 }

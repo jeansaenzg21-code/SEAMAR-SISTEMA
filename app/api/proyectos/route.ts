@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
-import { subirContratoAOneDrive } from "@/lib/onedrive"
 
 export async function GET() {
   try {
@@ -85,35 +84,8 @@ export async function POST(
       contrato &&
       contrato.size > 0
     ) {
-      const buffer =
-        Buffer.from(
-          await contrato.arrayBuffer()
-        )
-
-      try {
-        const archivo =
-          await subirContratoAOneDrive(
-            contrato.name,
-            buffer
-          )
-
-        contrato_nombre =
-          archivo.nombre
-
-        contrato_onedrive_id =
-          archivo.itemId
-
-        contrato_url =
-          archivo.webUrl
-      } catch (error) {
-        console.error(
-          "No se pudo subir contrato a OneDrive:",
-          error
-        )
-
-        contrato_nombre =
-          contrato.name
-      }
+      contrato_nombre =
+        contrato.name
     }
 
     const [result]: any =

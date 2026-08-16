@@ -115,10 +115,37 @@ export async function descargarArchivo(itemId: string) {
     }
   );
 
+  if (!response.ok) {
+    throw new Error(
+      `No se encontró el archivo en OneDrive (status=${response.status}).`
+    );
+  }
+
   const archivo = await response.json();
 
-  const descarga = await fetch(archivo["@microsoft.graph.downloadUrl"]);
-  const buffer = Buffer.from(await descarga.arrayBuffer());
+  let buffer: Buffer;
+
+  if (archivo["@microsoft.graph.downloadUrl"]) {
+    const descarga = await fetch(archivo["@microsoft.graph.downloadUrl"]);
+    buffer = Buffer.from(await descarga.arrayBuffer());
+  } else {
+    const contenido = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${itemId}/content`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!contenido.ok) {
+      throw new Error(
+        `No se pudo descargar el contenido del archivo (status=${contenido.status}).`
+      );
+    }
+
+    buffer = Buffer.from(await contenido.arrayBuffer());
+  }
 
   return {
     nombre: archivo.name,

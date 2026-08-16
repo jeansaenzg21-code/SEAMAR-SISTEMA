@@ -284,9 +284,21 @@ export async function insertarFactura(
       );
 
       if (primerId === 0) primerId = result.insertId;
+
+      console.log(
+        `[DB] INSERT facturas_oscar | linea id=${result.insertId} | ` +
+          `numero_documento=${input.cabecera.numeroDocumento || "NULL"} | ` +
+          `codigo=${linea?.codigo ?? "NULL"} | cantidad=${linea?.cantidad ?? "NULL"} | ` +
+          `unidad=${linea?.unidad ?? "NULL"} | descripcion=${linea?.descripcion ?? "NULL"} | ` +
+          `valor_unitario=${linea?.valorUnitario ?? "NULL"} | descuento=${linea?.descuento ?? "NULL"} | ` +
+          `valor_venta=${linea?.valorVenta ?? "NULL"}`
+      );
     }
 
     await connection.commit();
+    console.log(
+      `[DB] INSERT facturas_oscar OK | grupo id=${primerId} | lineas insertadas=${filas.length}`
+    );
     return primerId;
   } catch (error) {
     await connection.rollback();

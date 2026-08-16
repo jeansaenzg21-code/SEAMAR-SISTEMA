@@ -11,7 +11,7 @@ import { obtenerSesion } from "@/lib/session";
 export async function GET() {
   console.log("API VALORIZACIONES FUNCIONANDO");
   try {
-    const [rows] = await pool.query(
+    const [rows] = await pool.query<any>(
       `
       SELECT
        CASE

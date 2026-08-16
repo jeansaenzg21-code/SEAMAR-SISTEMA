@@ -78,6 +78,17 @@ Reglas de detalle:
 5. No incluyas filas de subtotales, "TOTAL OPERACIONES GRAVADAS", "TOTAL DESCUENTOS", "IGV (18%)" como lineas de detalle.
 6. Mantener el orden de las lineas tal como aparecen en el documento.
 
+## FACTURAS DE SERVICIOS
+
+La factura puede ser de PRODUCTOS o de SERVICIOS. No asumas que todos los campos existen en todas las facturas.
+
+En facturas de SERVICIOS es comun que solo existan las columnas: CANTIDAD, DESCRIPCION, P.UNITARIO e IMPORTE.
+
+- P.UNITARIO / PRECIO UNITARIO es equivalente a valorUnitario.
+- IMPORTE es equivalente a valorVenta.
+- Si el documento NO contiene columna de codigo, unidad o descuento, deja esos campos null (no los inventes).
+- Solo agrega codigo, unidad o descuento si aparecen de forma explicita en la factura.
+
 ## ESTRUCTURA DE SALIDA EXACTA
 
 {

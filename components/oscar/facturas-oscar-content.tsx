@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -1009,7 +1010,7 @@ function RevisarFacturaDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:max-w-[min(72rem,100dvw-2rem)] sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1032,7 +1033,7 @@ function RevisarFacturaDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[65vh] space-y-6 overflow-y-auto pr-1">
+          <div className="max-h-[40vh] space-y-6 overflow-y-auto pr-1 sm:max-h-[65vh]">
             {/* Datos generales */}
             <div className="rounded-2xl border border-border bg-card p-4">
               <div className="mb-4 flex items-center gap-2">
@@ -1165,7 +1166,7 @@ function RevisarFacturaDialog({
 
             {/* Detalle */}
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Layers className="h-4 w-4" />
@@ -1174,23 +1175,95 @@ function RevisarFacturaDialog({
                     Detalle de productos
                   </h3>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={agregarLinea}>
+                <Button type="button" variant="outline" size="sm" onClick={agregarLinea} className="h-8">
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Agregar línea
                 </Button>
               </div>
 
-              <div className="overflow-x-auto">
-                <Table>
+              {/* Líneas en móvil: tarjetas apiladas (sin scroll horizontal) */}
+              <div className="space-y-3 md:hidden">
+                {lineas.map((linea, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border border-border bg-muted/20 p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Línea {i + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => quitarLinea(i)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <CampoNum
+                        label="Código"
+                        valor={linea.codigo}
+                        onChange={(v) => actualizarLinea(i, "codigo", v)}
+                      />
+                      <CampoNum
+                        label="Cant."
+                        valor={linea.cantidad}
+                        onChange={(v) => actualizarLinea(i, "cantidad", v)}
+                      />
+                      <div>
+                        <Label className="text-xs">Unid.</Label>
+                        <Input
+                          className="mt-1"
+                          value={linea.unidad}
+                          onChange={(e) => actualizarLinea(i, "unidad", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <Label className="text-xs">Descripción</Label>
+                      <Textarea
+                        rows={2}
+                        className="mt-1 resize-none"
+                        value={linea.descripcion}
+                        onChange={(e) => actualizarLinea(i, "descripcion", e.target.value)}
+                      />
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <CampoNum
+                        label="V. Unit."
+                        valor={linea.valorUnitario}
+                        onChange={(v) => actualizarLinea(i, "valorUnitario", v)}
+                      />
+                      <CampoNum
+                        label="Dscto."
+                        valor={linea.descuento}
+                        onChange={(v) => actualizarLinea(i, "descuento", v)}
+                      />
+                      <CampoNum
+                        label="V. Venta"
+                        valor={linea.valorVenta}
+                        onChange={(v) => actualizarLinea(i, "valorVenta", v)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Líneas en escritorio: tabla */}
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="border-collapse [&_th]:border [&_th]:border-border/70 [&_td]:border [&_td]:border-border/70">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-28">CÓDIGO</TableHead>
-                      <TableHead className="min-w-20 text-right">CANT.</TableHead>
-                      <TableHead className="min-w-16">UNID.</TableHead>
-                      <TableHead className="min-w-56">DESCRIPCIÓN</TableHead>
-                      <TableHead className="min-w-28 text-right">V. UNIT.</TableHead>
-                      <TableHead className="min-w-24 text-right">DSCTO.</TableHead>
-                      <TableHead className="min-w-28 text-right">V. VENTA</TableHead>
+                      <TableHead className="min-w-24">CÓDIGO</TableHead>
+                      <TableHead className="text-center">CANT.</TableHead>
+                      <TableHead className="min-w-12">UNID.</TableHead>
+                      <TableHead className="w-[35%] min-w-56">DESCRIPCIÓN</TableHead>
+                      <TableHead className="text-center">V. UNIT.</TableHead>
+                      <TableHead className="text-center">DSCTO.</TableHead>
+                      <TableHead className="text-center">V. VENTA</TableHead>
                       <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1207,7 +1280,7 @@ function RevisarFacturaDialog({
                           <Input
                             type="number"
                             step="any"
-                            className="text-right"
+                            className="w-20 text-center"
                             value={linea.cantidad}
                             onChange={(e) => actualizarLinea(i, "cantidad", e.target.value)}
                           />
@@ -1219,7 +1292,9 @@ function RevisarFacturaDialog({
                           />
                         </TableCell>
                         <TableCell>
-                          <Input
+                          <Textarea
+                            rows={2}
+                            className="min-w-48 resize-none"
                             value={linea.descripcion}
                             onChange={(e) => actualizarLinea(i, "descripcion", e.target.value)}
                           />
@@ -1228,7 +1303,7 @@ function RevisarFacturaDialog({
                           <Input
                             type="number"
                             step="any"
-                            className="text-right"
+                            className="w-24 text-center"
                             value={linea.valorUnitario}
                             onChange={(e) => actualizarLinea(i, "valorUnitario", e.target.value)}
                           />
@@ -1237,7 +1312,7 @@ function RevisarFacturaDialog({
                           <Input
                             type="number"
                             step="any"
-                            className="text-right"
+                            className="w-20 text-center"
                             value={linea.descuento}
                             onChange={(e) => actualizarLinea(i, "descuento", e.target.value)}
                           />
@@ -1246,7 +1321,7 @@ function RevisarFacturaDialog({
                           <Input
                             type="number"
                             step="any"
-                            className="text-right"
+                            className="w-28 text-center"
                             value={linea.valorVenta}
                             onChange={(e) => actualizarLinea(i, "valorVenta", e.target.value)}
                           />
@@ -1269,18 +1344,19 @@ function RevisarFacturaDialog({
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={guardando}>
+          <DialogFooter className="gap-2 sm:flex-wrap">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={guardando} className="w-full sm:w-auto">
               Cancelar
             </Button>
             <Button
               variant="secondary"
               onClick={() => guardar("PENDIENTE")}
               disabled={guardando}
+              className="w-full sm:w-auto"
             >
               Guardar borrador
             </Button>
-            <Button onClick={() => guardar("REVISADO")} disabled={guardando}>
+            <Button onClick={() => guardar("REVISADO")} disabled={guardando} className="w-full sm:w-auto">
               {guardando ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1340,9 +1416,9 @@ function DetalleFacturaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:max-w-[min(72rem,100dvw-2rem)] sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </div>
@@ -1410,17 +1486,17 @@ function DetalleFacturaDialog({
           </div>
         </div>
 
-        <div className="max-h-[40vh] overflow-y-auto rounded-2xl border border-border bg-card">
-          <Table>
+        <div className="max-h-[40vh] overflow-auto rounded-2xl border border-border bg-card">
+          <Table className="border-collapse [&_th]:border [&_th]:border-border/70 [&_td]:border [&_td]:border-border/70">
             <TableHeader>
               <TableRow>
                 <TableHead>CÓDIGO</TableHead>
-                <TableHead className="text-right">CANT.</TableHead>
+                <TableHead className="text-center">CANT.</TableHead>
                 <TableHead>UNID.</TableHead>
                 <TableHead>DESCRIPCIÓN</TableHead>
-                <TableHead className="text-right">V. UNIT.</TableHead>
-                <TableHead className="text-right">DSCTO.</TableHead>
-                <TableHead className="text-right">V. VENTA</TableHead>
+                <TableHead className="text-center">V. UNIT.</TableHead>
+                <TableHead className="text-center">DSCTO.</TableHead>
+                <TableHead className="text-center">V. VENTA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1434,16 +1510,18 @@ function DetalleFacturaDialog({
                 factura.lineas.map((l, i) => (
                   <TableRow key={i}>
                     <TableCell>{l.codigo || "-"}</TableCell>
-                    <TableCell className="text-right">{formatoNumero(l.cantidad)}</TableCell>
+                    <TableCell className="text-center">{formatoNumero(l.cantidad)}</TableCell>
                     <TableCell>{l.unidad || "-"}</TableCell>
-                    <TableCell>{l.descripcion || "-"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="max-w-72 whitespace-normal break-words">
+                      {l.descripcion || "-"}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {formatoMoneda(l.valorUnitario, cab.moneda)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {formatoMoneda(l.descuento, cab.moneda)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {formatoMoneda(l.valorVenta, cab.moneda)}
                     </TableCell>
                   </TableRow>
@@ -1453,19 +1531,20 @@ function DetalleFacturaDialog({
           </Table>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 sm:flex-wrap">
           {factura.onedriveItemId && (
             <Button
               variant="outline"
               onClick={() =>
                 window.open(`/api/oscar/facturas/${factura.grupoId}/documento`, "_blank")
               }
+              className="w-full sm:w-auto"
             >
               <Eye className="mr-2 h-4 w-4" />
               Ver documento original
             </Button>
           )}
-          <Button onClick={() => onEditar(factura)}>
+          <Button onClick={() => onEditar(factura)} className="w-full sm:w-auto">
             <Pencil className="mr-2 h-4 w-4" />
             Editar
           </Button>

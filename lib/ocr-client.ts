@@ -34,11 +34,29 @@ export function contentTypeParaArchivo(nombreArchivo: string): string | null {
   return CONTENT_TYPES[ext] ?? null;
 }
 
-export async function leerPdfConOCR(
+export type TipoDocumentoDetectado = "PDF_TEXTO" | "PDF_ESCANEADO" | "IMAGEN";
+
+export interface DeteccionDocumento {
+  tipo: TipoDocumentoDetectado;
+  texto: string;
+  timing: OcrTiming;
+}
+
+interface DeteccionResponse {
+  ok: boolean;
+  tipo?: TipoDocumentoDetectado;
+  texto?: string;
+  error?: string;
+  queue_wait_ms?: number;
+  ocr_ms?: number;
+}
+
+async function peticionOCR(
   buffer: Buffer,
-  docId?: string,
-  contentType: string = "application/pdf"
-): Promise<{ texto: string; timing: OcrTiming }> {
+  docId: string | undefined,
+  contentType: string,
+  ruta: string
+): Promise<{ ok: boolean; json: any }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OCR_TIMEOUT_MS);
 
@@ -48,7 +66,7 @@ export async function leerPdfConOCR(
     };
     if (docId) headers["X-Document-Id"] = docId;
 
-    const response = await fetch(`${OCR_SERVICE_URL}/ocr`, {
+    const response = await fetch(`${OCR_SERVICE_URL}${ruta}`, {
       method: "POST",
       headers,
       body: new Uint8Array(buffer),
@@ -56,24 +74,14 @@ export async function leerPdfConOCR(
     });
 
     if (!response.ok) {
-      throw new Error(
+      const error = new Error(
         `OCR Service respondió con status ${response.status}`
       );
+      (error as any).status = response.status;
+      throw error;
     }
 
-    const data: OcrResponse = await response.json();
-
-    if (!data.ok) {
-      throw new Error(data.error || "Error desconocido del OCR Service");
-    }
-
-    return {
-      texto: data.texto ?? "",
-      timing: {
-        queue_wait_ms: data.queue_wait_ms ?? 0,
-        ocr_ms: data.ocr_ms ?? 0,
-      },
-    };
+    return { ok: true, json: await response.json() };
   } catch (error: any) {
     if (error.name === "AbortError") {
       const timeoutSec = OCR_TIMEOUT_MS / 1000;
@@ -92,4 +100,54 @@ export async function leerPdfConOCR(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function leerPdfConOCR(
+  buffer: Buffer,
+  docId?: string,
+  contentType: string = "application/pdf"
+): Promise<{ texto: string; timing: OcrTiming }> {
+  const { json } = await peticionOCR(buffer, docId, contentType, "/ocr");
+
+  const data: OcrResponse = json;
+
+  if (!data.ok) {
+    throw new Error(data.error || "Error desconocido del OCR Service");
+  }
+
+  return {
+    texto: data.texto ?? "",
+    timing: {
+      queue_wait_ms: data.queue_wait_ms ?? 0,
+      ocr_ms: data.ocr_ms ?? 0,
+    },
+  };
+}
+
+export async function procesarDocumento(
+  buffer: Buffer,
+  docId?: string,
+  contentType: string = "application/pdf"
+): Promise<DeteccionDocumento> {
+  const { json } = await peticionOCR(
+    buffer,
+    docId,
+    contentType,
+    "/procesar-documento"
+  );
+
+  const data: DeteccionResponse = json;
+
+  if (!data.ok || !data.tipo) {
+    throw new Error(data.error || "Error desconocido del OCR Service");
+  }
+
+  return {
+    tipo: data.tipo,
+    texto: data.texto ?? "",
+    timing: {
+      queue_wait_ms: data.queue_wait_ms ?? 0,
+      ocr_ms: data.ocr_ms ?? 0,
+    },
+  };
 }

@@ -75,6 +75,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("[EXTRACCION] resultado estructurado antes del INSERT:");
+    console.log(JSON.stringify(input, null, 2));
+
     const primerId = await insertarFactura(auth.sesion.id, input);
 
     registrarActividad({

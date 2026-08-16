@@ -2,14 +2,16 @@ import os
 import logging
 import asyncio
 import itertools
+import tempfile
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
 
 from paddleocr import PaddleOCR
-from ocr_queue import OcrQueue
+from ocr_queue import OcrQueue, es_imagen
 from ocr_metrics import OcrMetrics
+from ocr_detect import detectar_tipo_documento, extraer_texto_plano
 
 # =========================
 # CONFIGURACIÓN
@@ -202,6 +204,140 @@ async def ocr_endpoint(request: Request):
             f"[{doc_id}] Error procesando OCR: {e}"
         )
         return {"ok": False, "error": "Error procesando OCR"}
+
+
+@app.post("/procesar-documento")
+async def procesar_documento_endpoint(request: Request):
+    doc_id = request.headers.get("x-document-id") or f"OCR-{next(doc_id_counter):06d}"
+
+    content_type = request.headers.get("content-type", "")
+
+    tipos_validos = [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+    ]
+
+    if content_type not in tipos_validos:
+        logger.warning(f"[{doc_id}] Content-Type inválido: {content_type}")
+        return {
+            "ok": False,
+            "error": (
+                "Content-Type debe ser application/pdf, "
+                "image/jpeg o image/png"
+            ),
+        }
+
+    try:
+        content = await request.body()
+    except Exception as e:
+        logger.error(f"[{doc_id}] Error leyendo body: {e}")
+        return {"ok": False, "error": "Error leyendo el documento"}
+
+    if not content:
+        logger.warning(f"[{doc_id}] Documento vacío")
+        return {"ok": False, "error": "El documento está vacío"}
+
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        logger.warning(
+            f"[{doc_id}] Documento demasiado grande: "
+            f"{len(content)} bytes (máx: {MAX_FILE_SIZE_BYTES})"
+        )
+        return {
+            "ok": False,
+            "error": (
+                f"El documento excede el tamaño máximo de "
+                f"{CONFIG['max_file_size_mb']}MB"
+            ),
+        }
+
+    if ocr_queue is None or ocr is None:
+        logger.error(f"[{doc_id}] OCR Service no disponible")
+        return {"ok": False, "error": "OCR Service no disponible"}
+
+    try:
+        # IMAGEN: se clasifica automáticamente y se ejecuta OCR directo.
+        if es_imagen(content_type):
+            result = await ocr_queue.enqueue(content, doc_id, content_type)
+
+            logger.info(
+                f"[{doc_id}] [DOCUMENTO] tipo detectado: IMAGEN | "
+                f"Caracteres OCR: {len(result.texto)}"
+            )
+
+            return {
+                "ok": True,
+                "tipo": "IMAGEN",
+                "texto": result.texto,
+                "queue_wait_ms": result.queue_wait_ms,
+                "ocr_ms": result.ocr_ms,
+            }
+
+        # PDF: extraer capa de texto con PyMuPDF y detectar el tipo.
+        fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(content)
+
+            tipo = await asyncio.to_thread(
+                detectar_tipo_documento, temp_path
+            )
+
+            if tipo == "PDF_TEXTO":
+                texto = await asyncio.to_thread(
+                    extraer_texto_plano, temp_path
+                )
+
+                logger.info(
+                    f"[{doc_id}] [DOCUMENTO] tipo detectado: PDF_TEXTO | "
+                    f"Caracteres: {len(texto)}"
+                )
+
+                return {
+                    "ok": True,
+                    "tipo": "PDF_TEXTO",
+                    "texto": texto,
+                    "queue_wait_ms": 0,
+                    "ocr_ms": 0,
+                }
+
+            logger.info(
+                f"[{doc_id}] [DOCUMENTO] tipo detectado: PDF_ESCANEADO | "
+                "[OCR] activado porque el PDF no contiene texto suficiente."
+            )
+
+            result = await ocr_queue.enqueue(
+                content, doc_id, "application/pdf"
+            )
+
+            return {
+                "ok": True,
+                "tipo": "PDF_ESCANEADO",
+                "texto": result.texto,
+                "queue_wait_ms": result.queue_wait_ms,
+                "ocr_ms": result.ocr_ms,
+            }
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+
+    except asyncio.QueueFull:
+        logger.warning(f"[{doc_id}] Cola llena, rechazando documento")
+        return {
+            "ok": False,
+            "error": (
+                "El servicio OCR está saturado, "
+                "intente nuevamente en unos momentos"
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"[{doc_id}] Error procesando documento: {e}")
+        return {"ok": False, "error": "Error procesando el documento"}
 
 
 if __name__ == "__main__":

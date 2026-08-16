@@ -1,9 +1,8 @@
 import OpenAI from "openai";
 import crypto from "crypto";
-import { leerPdf } from "@/lib/pdf-reader";
-import { leerPdfConOCR, contentTypeParaArchivo } from "@/lib/ocr-client";
 import { extraerCampos } from "@/lib/document-parser";
 import { OSCAR_FACTURA_PROMPT } from "@/lib/ai/oscar-factura-prompt";
+import { detectarTipoDocumento } from "./detectar-tipo";
 import type {
   CabeceraFactura,
   LineaFactura,
@@ -14,24 +13,12 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-const EXTENSIONES_VALIDAS = ["pdf", "jpg", "jpeg", "png"];
-
 export interface ResultadoExtraccion {
   origen: OrigenFactura;
   texto: string;
   hashArchivo: string;
   cabecera: CabeceraFactura;
   lineas: LineaFactura[];
-}
-
-function validarExtension(nombreArchivo: string): string {
-  const ext = nombreArchivo.split(".").pop()?.toLowerCase() || "";
-  if (!EXTENSIONES_VALIDAS.includes(ext)) {
-    throw new Error(
-      `Formato no permitido (${ext || "desconocido"}). Solo se aceptan PDF, JPG, JPEG y PNG.`
-    );
-  }
-  return ext;
 }
 
 function parsearJson(texto: string): any {
@@ -150,9 +137,6 @@ export async function extraerFacturaOscar(
   buffer: Buffer,
   nombreArchivo: string
 ): Promise<ResultadoExtraccion> {
-  const ext = validarExtension(nombreArchivo);
-  const esPdf = ext === "pdf";
-
   const docId = `OSCAR-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   const hashArchivo = crypto
@@ -160,28 +144,21 @@ export async function extraerFacturaOscar(
     .update(buffer)
     .digest("hex");
 
-  let textoDocumento = "";
-  let origen: OrigenFactura;
+  console.log("[DOCUMENTO] Iniciando detección automática de tipo de documento...");
 
-  if (esPdf) {
-    textoDocumento = await leerPdf(buffer);
+  const { tipo, texto: textoDocumento, ocrActivado } =
+    await detectarTipoDocumento(buffer, nombreArchivo, docId);
 
-    if (textoDocumento.trim().length < 100) {
-      const ocrResult = await leerPdfConOCR(buffer, docId, "application/pdf");
-      textoDocumento = ocrResult.texto;
-      origen = "PDF_ESCANEADO";
-    } else {
-      origen = "PDF_TEXTO";
-    }
-  } else {
-    const contentType = contentTypeParaArchivo(nombreArchivo);
-    if (!contentType) {
-      throw new Error("Formato de imagen no soportado.");
-    }
-    const ocrResult = await leerPdfConOCR(buffer, docId, contentType);
-    textoDocumento = ocrResult.texto;
-    origen = "IMAGEN";
+  const origen = tipo;
+
+  console.log(`[DOCUMENTO] tipo detectado: ${origen}`);
+  if (ocrActivado) {
+    console.log("[OCR] activado porque el PDF no contiene texto suficiente.");
   }
+
+  console.log(
+    `[DOCUMENTO] texto obtenido (${textoDocumento.length} caracteres):\n${textoDocumento.slice(0, 4000)}`
+  );
 
   if (textoDocumento.trim().length < 50) {
     throw new Error(
@@ -211,6 +188,15 @@ ${textoDocumento}
   } catch (error) {
     console.error("[OSCAR] Error con IA de extracción, usando fallback:", error);
   }
+
+  console.log("[EXTRACCION] resultado estructurado antes del INSERT:");
+  console.log(
+    JSON.stringify(
+      { origen, cabecera: resultado.cabecera, lineas: resultado.lineas },
+      null,
+      2
+    )
+  );
 
   return {
     origen,
