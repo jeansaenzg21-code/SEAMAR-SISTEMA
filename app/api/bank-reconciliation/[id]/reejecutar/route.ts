@@ -65,54 +65,33 @@ export async function POST(
 
     const connection = await pool.getConnection();
 
-    console.log("[REEJ] DIAG CONNECTION PARAMS:", JSON.stringify({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password_length: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0,
-    }));
-
-    const [dbInfo]: any = await connection.query("SELECT DATABASE() AS db, @@hostname AS host, @@port AS port");
-    console.log("[REEJ] DIAG MYSQL CONNECTION INFO:", JSON.stringify(dbInfo));
-
-    const [countsBefore]: any = await connection.query(`
-      SELECT
-        (SELECT COUNT(*) FROM conciliaciones_bancarias) AS conciliaciones,
-        (SELECT COUNT(*) FROM conciliacion_movimientos) AS movimientos,
-        (SELECT COUNT(*) FROM conciliacion_movimiento_coincidencias) AS coincidencias,
-        (SELECT COUNT(*) FROM conciliacion_observaciones) AS observaciones
-    `);
-    console.log("[REEJ] DIAG TABLE COUNTS BEFORE INSERT:", JSON.stringify(countsBefore));
-
-    console.log("[REEJ] BEGIN TRANSACTION");
+    console.log("[REEJ] Conexion obtenida, iniciando reejecucion...");
     await connection.beginTransaction();
 
     let lastQuery = "NONE";
     try {
       lastQuery = "DELETE coincidencias";
 
-      const [delCoinResult]: any = await connection.query(
+      await connection.query(
         `DELETE cmc FROM conciliacion_movimiento_coincidencias cmc
          JOIN conciliacion_movimientos cm ON cmc.movimiento_id = cm.id
          WHERE cm.conciliacion_id = ?`,
         [id]
       );
-      console.log("[REEJ] RESULT DELETE coincidencias: affectedRows=" + delCoinResult.affectedRows + " warningStatus=" + delCoinResult.warningStatus);
 
       lastQuery = "DELETE observaciones";
-      const [delObsResult]: any = await connection.query(
+      await connection.query(
         "DELETE FROM conciliacion_observaciones WHERE conciliacion_id = ?",
         [id]
       );
-      console.log("[REEJ] RESULT DELETE observaciones: affectedRows=" + delObsResult.affectedRows + " warningStatus=" + delObsResult.warningStatus);
 
       lastQuery = "DELETE movimientos";
-      const [delMovResult]: any = await connection.query(
+      await connection.query(
         "DELETE FROM conciliacion_movimientos WHERE conciliacion_id = ?",
         [id]
       );
-      console.log("[REEJ] RESULT DELETE movimientos: affectedRows=" + delMovResult.affectedRows + " warningStatus=" + delMovResult.warningStatus);
+
+      console.log("[REEJ] Datos anteriores eliminados");
 
       const movimientos = Array.isArray(json.movimientos) ? json.movimientos : [];
 
@@ -155,7 +134,6 @@ export async function POST(
           ]
         );
 
-        console.log("[REEJ] RESULT INSERT conciliacion_movimientos [" + i + "]: affectedRows=" + movResult.affectedRows + " insertId=" + movResult.insertId + " warningStatus=" + movResult.warningStatus);
         totalMovInsertados++;
 
         const movimientoId = movResult.insertId;
@@ -182,7 +160,6 @@ export async function POST(
             ]
           );
 
-          console.log("[REEJ] RESULT INSERT coincidencias [" + i + "][" + j + "]: affectedRows=" + coinResult.affectedRows + " insertId=" + coinResult.insertId + " warningStatus=" + coinResult.warningStatus);
           totalCoinInsertadas++;
         }
 
@@ -200,7 +177,6 @@ export async function POST(
             ]
           );
 
-          console.log("[REEJ] RESULT INSERT observaciones NO_ENCONTRADA [" + i + "]: affectedRows=" + obsResult.affectedRows + " insertId=" + obsResult.insertId + " warningStatus=" + obsResult.warningStatus);
           totalObsInsertadas++;
         } else if (movimiento.estado === "observacion") {
           lastQuery = "[REEJ] INSERT conciliacion_observaciones OBSERVACION (movimiento " + i + ")";
@@ -216,7 +192,6 @@ export async function POST(
             ]
           );
 
-          console.log("[REEJ] RESULT INSERT observaciones OBSERVACION [" + i + "]: affectedRows=" + obsResult.affectedRows + " insertId=" + obsResult.insertId + " warningStatus=" + obsResult.warningStatus);
           totalObsInsertadas++;
         }
 
@@ -270,8 +245,6 @@ export async function POST(
         ]
       );
 
-      console.log("[REEJ] RESULT UPDATE conciliaciones_bancarias: affectedRows=" + updateResult.affectedRows + " warningStatus=" + updateResult.warningStatus);
-
       lastQuery = "[REEJ] COMMIT";
       await connection.commit();
       console.log("[REEJ] COMMIT EJECUTADO");
@@ -281,10 +254,7 @@ export async function POST(
         [id]
       );
 
-      console.log("[REEJ] VERIFICACION POST-COMMIT:", JSON.stringify(postCommitRows));
-
       if (postCommitRows.length === 0) {
-        console.log("[REEJ] RESULTADO: El registro con id " + id + " NO EXISTE después del COMMIT.");
         return NextResponse.json(
           { success: false, error: "La conciliación no se guardó en la base de datos (0 filas post-commit)." },
           { status: 500 }

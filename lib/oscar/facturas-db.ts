@@ -210,13 +210,21 @@ export async function insertarFactura(
 ): Promise<number> {
   const filas = input.lineas.length > 0 ? input.lineas : [null];
 
+  console.log(`[DB-INSERT] Iniciando INSERT facturas_oscar | usuarioId=${usuarioId} | lineas=${filas.length}`);
+
   const connection = await pool.getConnection();
+  console.log("[DB-INSERT] Conexion obtenida del pool");
+
   try {
     await connection.beginTransaction();
+    console.log("[DB-INSERT] Transaction iniciada");
 
     let primerId = 0;
 
-    for (const linea of filas) {
+    for (let i = 0; i < filas.length; i++) {
+      const linea = filas[i];
+      console.log(`[DB-INSERT] Insertando linea ${i + 1}/${filas.length}...`);
+
       const [result] = await connection.query<ResultSetHeader>(
         `
         INSERT INTO facturas_oscar (
@@ -286,22 +294,27 @@ export async function insertarFactura(
       if (primerId === 0) primerId = result.insertId;
 
       console.log(
-        `[DB] INSERT facturas_oscar | linea id=${result.insertId} | ` +
+        `[DB-INSERT] Linea insertada | id=${result.insertId} | ` +
           `numero_documento=${input.cabecera.numeroDocumento || "NULL"} | ` +
           `codigo=${linea?.codigo ?? "NULL"} | cantidad=${linea?.cantidad ?? "NULL"} | ` +
-          `unidad=${linea?.unidad ?? "NULL"} | descripcion=${linea?.descripcion ?? "NULL"} | ` +
-          `valor_unitario=${linea?.valorUnitario ?? "NULL"} | descuento=${linea?.descuento ?? "NULL"} | ` +
           `valor_venta=${linea?.valorVenta ?? "NULL"}`
       );
     }
 
     await connection.commit();
     console.log(
-      `[DB] INSERT facturas_oscar OK | grupo id=${primerId} | lineas insertadas=${filas.length}`
+      `[DB-INSERT] OK | grupo id=${primerId} | lineas=${filas.length}`
     );
     return primerId;
-  } catch (error) {
-    await connection.rollback();
+  } catch (error: any) {
+    console.error("[DB-INSERT] ERROR en transaction:", error?.message || error);
+    console.error("[DB-INSERT] MYSQL CODE:", error?.code, "| ERRNO:", error?.errno);
+    try {
+      await connection.rollback();
+      console.log("[DB-INSERT] Rollback completado");
+    } catch (rbErr: any) {
+      console.error("[DB-INSERT] Error en rollback:", rbErr?.message);
+    }
     throw error;
   } finally {
     connection.release();
@@ -313,17 +326,17 @@ export async function actualizarFactura(
   lineaId: number,
   input: GuardarFacturaInput
 ): Promise<void> {
+  console.log(`[DB-UPDATE] Iniciando actualizarFactura | lineaId=${lineaId} | usuarioId=${usuarioId}`);
   const existente = await obtenerGrupoPorLinea(usuarioId, lineaId);
   if (!existente) {
     throw new Error("Factura no encontrada");
   }
 
-  const clave = `${existente.cabecera.rucEmisor || ""}||${existente.cabecera.numeroDocumento || ""}`;
-
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
 
+    console.log(`[DB-UPDATE] Eliminando grupo anterior: ruc=${existente.cabecera.rucEmisor} doc=${existente.cabecera.numeroDocumento}`);
     await connection.query(
       `
       DELETE FROM facturas_oscar
@@ -405,8 +418,15 @@ export async function actualizarFactura(
     }
 
     await connection.commit();
-  } catch (error) {
-    await connection.rollback();
+    console.log("[DB-UPDATE] OK - commit completado");
+  } catch (error: any) {
+    console.error("[DB-UPDATE] ERROR:", error?.message || error);
+    console.error("[DB-UPDATE] MYSQL CODE:", error?.code, "| ERRNO:", error?.errno);
+    try {
+      await connection.rollback();
+    } catch (rbErr: any) {
+      console.error("[DB-UPDATE] Error en rollback:", rbErr?.message);
+    }
     throw error;
   } finally {
     connection.release();

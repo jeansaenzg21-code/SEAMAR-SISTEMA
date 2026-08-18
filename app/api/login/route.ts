@@ -36,12 +36,8 @@ export async function POST(req: Request) {
     const user = rows[0];
 
     console.log("[LOGIN] Usuario encontrado:", user.usuario);
-    console.log("[LOGIN] Hash almacenado longitud:", user.password?.length || 0);
-    console.log("[LOGIN] Hash almacenado prefijo:", user.password?.substring(0, 7) || "vacio");
 
     const passwordValida = await bcrypt.compare(password, user.password);
-
-    console.log("[LOGIN] Resultado bcrypt.compare:", passwordValida);
 
     if (!passwordValida) {
       return NextResponse.json(

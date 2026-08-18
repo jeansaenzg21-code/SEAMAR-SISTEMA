@@ -173,13 +173,7 @@ export async function subirArchivoAOneDrive(
   const nombreLimpio = nombreArchivo.replace(/[<>:"/\\|?*]/g, "-");
 
   const debugId = `UPLOAD_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-  console.log(`[${debugId}] INICIO subirArchivoAOneDrive`);
-  console.log(`[${debugId}] nombreArchivo original:`, nombreArchivo);
-  console.log(`[${debugId}] nombreLimpio:`, nombreLimpio);
-  console.log(`[${debugId}] folderId:`, folderId);
-  console.log(`[${debugId}] buffer.length:`, buffer.length);
-  console.log(`[${debugId}] USER:`, USER);
-  console.log(`[${debugId}] token (primeros 20):`, token?.slice(0, 20) + "...");
+  console.log(`[${debugId}] INICIO subirArchivoAOneDrive | nombre=${nombreLimpio} | size=${buffer.length}`);
 
   let uploadUrl: string | null = null;
   let uploadCompleted = false;
@@ -199,7 +193,6 @@ export async function subirArchivoAOneDrive(
   try {
     // 1. Crear sesión de carga
     const createSessionUrl = `https://graph.microsoft.com/v1.0/users/${USER}/drive/items/${folderId}:/${encodeURIComponent(nombreEfectivo)}:/createUploadSession`;
-    console.log(`[${debugId}] createUploadSession URL:`, createSessionUrl);
 
     let sessionRes = await fetch(createSessionUrl, {
       method: "POST",
@@ -222,7 +215,7 @@ export async function subirArchivoAOneDrive(
     } catch {
       sessionBody = await sessionRes.clone().text();
     }
-    console.log(`[${debugId}] createUploadSession RESPONSE: status=${sessionStatus} body=${JSON.stringify(sessionBody)}`);
+    console.log(`[${debugId}] createUploadSession status=${sessionStatus}`);
 
     // Si el archivo ya tiene una upload session activa (409 nameAlreadyExists),
     // usar un nombre temporal para no bloquear la subida
@@ -250,7 +243,7 @@ export async function subirArchivoAOneDrive(
       } catch {
         sessionBody = await sessionRes.clone().text();
       }
-      console.log(`[${debugId}] retry createUploadSession RESPONSE: status=${sessionStatus} body=${JSON.stringify(sessionBody)}`);
+      console.log(`[${debugId}] retry createUploadSession status=${sessionStatus}`);
     }
 
     if (!sessionRes.ok) {
@@ -259,7 +252,7 @@ export async function subirArchivoAOneDrive(
 
     const { uploadUrl: url } = sessionBody;
     uploadUrl = url;
-    console.log(`[${debugId}] uploadUrl (primeros 80):`, uploadUrl?.slice(0, 80) + "...");
+    console.log(`[${debugId}] uploadUrl obtenida correctamente`);
 
     // 2. Subir en chunks (5 MB cada uno)
     const chunkSize = 5 * 1024 * 1024;
@@ -294,13 +287,13 @@ export async function subirArchivoAOneDrive(
       console.log(`[${debugId}] CHUNK ${chunkIndex} RESPONSE: status=${chunkStatus} ${res.statusText}`);
 
       if (chunkStatus !== 200 && chunkStatus !== 201 && chunkStatus !== 202) {
-        console.log(`[${debugId}] CHUNK ${chunkIndex} ERROR BODY:`, JSON.stringify(chunkBody, null, 2));
-        throw new Error(`Error subiendo chunk ${chunkIndex} a OneDrive: status=${chunkStatus} body=${JSON.stringify(chunkBody)}`);
+        console.error(`[${debugId}] CHUNK ${chunkIndex} ERROR: status=${chunkStatus}`);
+        throw new Error(`Error subiendo chunk ${chunkIndex} a OneDrive: status=${chunkStatus}`);
       }
 
       if (end === buffer.length) {
         archivoFinal = chunkBody;
-        console.log(`[${debugId}] CHUNK ${chunkIndex} (último):`, JSON.stringify(archivoFinal, null, 2));
+        console.log(`[${debugId}] CHUNK ${chunkIndex} (ultimo) completado`);
       }
     }
 

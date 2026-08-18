@@ -88,66 +88,52 @@ export async function detectarTipoDocumento(
 ): Promise<DeteccionResultado> {
   const ext = validarExtension(nombreArchivo);
 
-  if (ext === "pdf") {
-    try {
-      const resultado = await procesarDocumento(
-        buffer,
-        docId,
-        "application/pdf"
-      );
-      return {
-        tipo: resultado.tipo,
-        texto: resultado.texto,
-        ocrActivado: resultado.tipo === "PDF_ESCANEADO",
-      };
-    } catch (error: any) {
-      // El servicio OCR aún no tiene /procesar-documento (versión antigua):
-      // se degrada al flujo previo sin romper la subida.
-      if (!esServicioAntiguo(error)) throw error;
-
-      console.log(
-        "[DOCUMENTO] Servicio OCR sin /procesar-documento, usando detección de respaldo..."
-      );
-
-      const texto = await leerPdf(buffer);
-
-      if (!textoEsSuficiente(texto)) {
-        const ocrResult = await leerPdfConOCR(
-          buffer,
-          docId,
-          "application/pdf"
-        );
-        return {
-          tipo: "PDF_ESCANEADO",
-          texto: ocrResult.texto,
-          ocrActivado: true,
-        };
-      }
-
-      return { tipo: "PDF_TEXTO", texto, ocrActivado: false };
+  if (ext === "jpg" || ext === "jpeg" || ext === "png") {
+    const contentType = contentTypeParaArchivo(nombreArchivo);
+    if (!contentType) {
+      throw new Error("Formato de imagen no soportado.");
     }
-  }
-
-  const contentType = contentTypeParaArchivo(nombreArchivo);
-  if (!contentType) {
-    throw new Error("Formato de imagen no soportado.");
-  }
-
-  try {
-    const resultado = await procesarDocumento(buffer, docId, contentType);
-    return {
-      tipo: "IMAGEN",
-      texto: resultado.texto,
-      ocrActivado: true,
-    };
-  } catch (error: any) {
-    if (!esServicioAntiguo(error)) throw error;
-
     const ocrResult = await leerPdfConOCR(buffer, docId, contentType);
     return {
       tipo: "IMAGEN",
       texto: ocrResult.texto,
       ocrActivado: true,
     };
+  }
+
+  try {
+    const resultado = await procesarDocumento(
+      buffer,
+      docId,
+      "application/pdf"
+    );
+    return {
+      tipo: resultado.tipo,
+      texto: resultado.texto,
+      ocrActivado: resultado.tipo === "PDF_ESCANEADO",
+    };
+  } catch (error: any) {
+    if (!esServicioAntiguo(error)) throw error;
+
+    console.log(
+      "[DOCUMENTO] Servicio OCR sin /procesar-documento, usando detección de respaldo..."
+    );
+
+    const texto = await leerPdf(buffer);
+
+    if (!textoEsSuficiente(texto)) {
+      const ocrResult = await leerPdfConOCR(
+        buffer,
+        docId,
+        "application/pdf"
+      );
+      return {
+        tipo: "PDF_ESCANEADO",
+        texto: ocrResult.texto,
+        ocrActivado: true,
+      };
+    }
+
+    return { tipo: "PDF_TEXTO", texto, ocrActivado: false };
   }
 }

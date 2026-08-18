@@ -67,27 +67,7 @@ export async function POST(request: Request) {
 
     const connection = await pool.getConnection();
 
-    console.log("DIAG CONNECTION PARAMS:", JSON.stringify({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password_length: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0,
-    }));
-
-    const [dbInfo]: any = await connection.query("SELECT DATABASE() AS db, @@hostname AS host, @@port AS port");
-    console.log("DIAG MYSQL CONNECTION INFO:", JSON.stringify(dbInfo));
-
-    const [countsBefore]: any = await connection.query(`
-      SELECT
-        (SELECT COUNT(*) FROM conciliaciones_bancarias) AS conciliaciones,
-        (SELECT COUNT(*) FROM conciliacion_movimientos) AS movimientos,
-        (SELECT COUNT(*) FROM conciliacion_movimiento_coincidencias) AS coincidencias,
-        (SELECT COUNT(*) FROM conciliacion_observaciones) AS observaciones
-    `);
-    console.log("DIAG TABLE COUNTS BEFORE INSERT:", JSON.stringify(countsBefore));
-
-    console.log("BEGIN TRANSACTION");
+    console.log("[BANK-RECON] Conexion obtenida, iniciando transaction...");
     await connection.beginTransaction();
 
     let lastQuery = "NONE";
@@ -105,7 +85,7 @@ export async function POST(request: Request) {
         ]
       );
 
-      console.log("RESULT INSERT conciliaciones_bancarias:", JSON.stringify(headerResult));
+      console.log("[BANK-RECON] Cabecera insertada id=" + headerResult.insertId);
 
       const conciliacionId = headerResult.insertId;
 
@@ -118,8 +98,6 @@ export async function POST(request: Request) {
         "SELECT * FROM conciliaciones_bancarias WHERE id = ?",
         [conciliacionId]
       );
-
-      console.log("VERIFICACION conciliaciones_bancarias post-INSERT:", JSON.stringify(verifyHeader));
 
       if (verifyHeader.length !== 1) {
         throw new Error(
@@ -170,7 +148,6 @@ export async function POST(request: Request) {
            ]
         );
 
-        console.log("RESULT INSERT conciliacion_movimientos [" + i + "]: affectedRows=" + movResult.affectedRows + " insertId=" + movResult.insertId + " warningStatus=" + movResult.warningStatus);
         totalMovInsertados++;
 
         const movimientoId = movResult.insertId;
@@ -197,7 +174,6 @@ export async function POST(request: Request) {
             ]
           );
 
-          console.log("RESULT INSERT conciliacion_movimiento_coincidencias [" + i + "][" + j + "]: affectedRows=" + coinResult.affectedRows + " insertId=" + coinResult.insertId + " warningStatus=" + coinResult.warningStatus);
           totalCoinInsertadas++;
         }
 
@@ -215,7 +191,6 @@ export async function POST(request: Request) {
             ]
           );
 
-          console.log("RESULT INSERT conciliacion_observaciones NO_ENCONTRADA [" + i + "]: affectedRows=" + obsResult.affectedRows + " insertId=" + obsResult.insertId + " warningStatus=" + obsResult.warningStatus);
           totalObsInsertadas++;
         } else if (movimiento.estado === "observacion") {
           lastQuery = "INSERT conciliacion_observaciones OBSERVACION (movimiento " + i + ")";
@@ -231,7 +206,6 @@ export async function POST(request: Request) {
             ]
           );
 
-          console.log("RESULT INSERT conciliacion_observaciones OBSERVACION [" + i + "]: affectedRows=" + obsResult.affectedRows + " insertId=" + obsResult.insertId + " warningStatus=" + obsResult.warningStatus);
           totalObsInsertadas++;
         }
 
@@ -285,8 +259,6 @@ export async function POST(request: Request) {
         ]
       );
 
-      console.log("RESULT UPDATE conciliaciones_bancarias: affectedRows=" + updateResult.affectedRows + " warningStatus=" + updateResult.warningStatus);
-
       lastQuery = "Guardar archivo y UPDATE archivo_ruta";
 
       const dirUploads = join(process.cwd(), "uploads", "conciliaciones");
@@ -301,34 +273,10 @@ export async function POST(request: Request) {
         [rutaPerm, conciliacionId]
       );
 
-      console.log("RESULT UPDATE archivo_ruta: affectedRows=" + rutaUpdateResult.affectedRows + " warningStatus=" + rutaUpdateResult.warningStatus);
-
       lastQuery = "COMMIT";
 
       await connection.commit();
       console.log("COMMIT EJECUTADO");
-
-      console.log("=== DIAG POST-COMMIT ===");
-      console.log(JSON.stringify(
-        (await pool.query("SELECT DATABASE() AS database_name, @@hostname AS hostname, @@port AS port"))[0]
-      ));
-      console.log(JSON.stringify(
-        (await pool.query("SHOW TABLE STATUS LIKE 'conciliaciones_bancarias'"))[0]
-      ));
-      console.log(JSON.stringify(
-        (await pool.query("SELECT id, archivo_nombre, moneda FROM conciliaciones_bancarias ORDER BY id DESC"))[0]
-      ));
-      console.log(JSON.stringify(
-        (await pool.query("SELECT id, conciliacion_id, estado, documento_id FROM conciliacion_movimientos ORDER BY id DESC LIMIT 10"))[0]
-      ));
-      console.log("=== CONNECTION CONFIG ===");
-      console.log(JSON.stringify({
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT,
-        database: process.env.DB_NAME,
-        user: process.env.DB_USER,
-      }));
-      console.log("=== END DIAG ===");
 
       return NextResponse.json({
         ...json,

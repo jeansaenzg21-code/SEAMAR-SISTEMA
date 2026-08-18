@@ -5,10 +5,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const moneda = searchParams.get("moneda") || "PEN";
-    console.log("=== DIAGNÓSTICO HISTORIAL ===");
-    console.log("moneda recibida en history:", JSON.stringify(moneda));
-    console.log("Consulta historial: SELECT id, archivo_nombre, banco, moneda, ... FROM conciliaciones_bancarias WHERE moneda = ? ORDER BY id DESC");
-    console.log("Params: moneda=%s", moneda);
 
     const [rows]: any = await pool.query(
       `SELECT
@@ -27,10 +23,6 @@ export async function GET(request: Request) {
       ORDER BY id DESC`,
       [moneda]
     );
-    console.log("Filas devueltas por historial:", rows.length);
-    if (rows.length > 0) {
-      console.log("Historial:", JSON.stringify(rows, null, 2));
-    }
 
     const historial = rows.map((row: any) => ({
   id: row.id,

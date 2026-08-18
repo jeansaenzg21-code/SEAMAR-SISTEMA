@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     console.log(`[${debugId}] buffer.length:`, buffer.length);
 
     const token = await getAccessToken()
-    console.log(`[${debugId}] token (primeros 20):`, token?.slice(0, 20) + "...");
+    console.log(`[${debugId}] Token Graph obtenido`);
 
     const nombreArchivo = `Observacion-${valorizacionId}-${file.name}`;
     console.log(`[${debugId}] nombreArchivo a subir:`, nombreArchivo);

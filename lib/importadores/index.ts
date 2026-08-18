@@ -35,9 +35,9 @@ export async function guardarValorizacionesConDocumentos(
     return { success: false, error: "No hay datos para importar" }
   }
 
-  console.log(`[${debugId}] Obteniendo token...`);
+  console.log(`[${debugId}] Obteniendo token Graph...`);
   const token = await getAccessToken()
-  console.log(`[${debugId}] Token obtenido (primeros 20):`, token?.slice(0, 20) + "...");
+  console.log(`[${debugId}] Token Graph obtenido`);
 
   console.log(`[${debugId}] INICIANDO subida a OneDrive (1 sola llamada)...`);
   console.time("onedrive_subida")
