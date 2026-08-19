@@ -46,7 +46,7 @@ export function OscarShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Overlay móvil */}
       {mobileMenuOpen && (
         <div
@@ -55,11 +55,15 @@ export function OscarShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
+      {/* Sidebar — fixed en móvil (overlay), static en desktop (flujo flex) */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-2xl transition-all duration-300 ease-in-out",
-          mobileMenuOpen ? "w-[80vw] max-w-sm" : sidebarCollapsed ? "w-20" : "w-64",
-          mobileMenuOpen ? "block" : "hidden lg:flex"
+          "flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-2xl transition-all duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 lg:static",
+          mobileMenuOpen
+            ? "w-[80vw] max-w-sm translate-x-0"
+            : "-translate-x-full lg:translate-x-0",
+          sidebarCollapsed ? "lg:w-20" : "lg:w-64"
         )}
       >
         <div className="relative flex h-16 items-center overflow-hidden border-b border-sidebar-border px-5">
@@ -176,13 +180,9 @@ export function OscarShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div
-        className={cn(
-          "flex flex-1 min-w-0 flex-col overflow-auto transition-all duration-300",
-          mobileMenuOpen ? "ml-64 lg:ml-64" : sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"
-        )}
-      >
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-background/70 px-4 backdrop-blur-xl md:px-8">
+      {/* Contenido principal — ocupa todo el espacio restante vía flex-1 */}
+      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 bg-background/70 px-4 backdrop-blur-xl md:px-8">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -205,7 +205,7 @@ export function OscarShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
       </div>
     </div>
   )

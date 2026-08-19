@@ -1678,7 +1678,7 @@ export function OscarFacturasContent() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[90rem] space-y-6">
+    <div className="w-full space-y-6">
       {/* Encabezado */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -1928,7 +1928,7 @@ export function OscarFacturasContent() {
                       <TableCell className="whitespace-nowrap font-medium">
                         {f.cabecera.numeroDocumento || "-"}
                       </TableCell>
-                      <TableCell className="max-w-56 truncate">
+                      <TableCell className="min-w-0 truncate">
                         {f.cabecera.razonSocialEmisor || "-"}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
