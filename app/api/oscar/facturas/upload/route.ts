@@ -59,10 +59,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const esImagen = ["jpg", "jpeg", "png"].includes(extension);
+
   try {
     const archivo = await subirFacturaOscarAOneDrive(file.name, buffer);
 
-    const extraccion = await extraerFacturaOscar(buffer, file.name);
+    const extraccion = await extraerFacturaOscar(buffer, file.name, esImagen);
 
     return NextResponse.json({
       ok: true,

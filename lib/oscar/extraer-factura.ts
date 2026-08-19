@@ -135,7 +135,8 @@ function construirFallback(texto: string): {
 
 export async function extraerFacturaOscar(
   buffer: Buffer,
-  nombreArchivo: string
+  nombreArchivo: string,
+  esImagen?: boolean
 ): Promise<ResultadoExtraccion> {
   const docId = `OSCAR-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -144,17 +145,33 @@ export async function extraerFacturaOscar(
     .update(buffer)
     .digest("hex");
 
-  console.log("[DOCUMENTO] Iniciando detección automática de tipo de documento...");
+  let tipo: string;
+  let textoDocumento: string;
+  let ocrActivado: boolean;
 
-  const { tipo, texto: textoDocumento, ocrActivado } =
-    await detectarTipoDocumento(buffer, nombreArchivo, docId);
+  if (esImagen) {
+    console.log("[DOCUMENTO] Archivo conocido como imagen, yendo directo a OCR...");
+    const { leerPdfConOCR, contentTypeParaArchivo } = await import("@/lib/ocr-client");
+    const contentType = contentTypeParaArchivo(nombreArchivo) || "image/jpeg";
+    const ocrResult = await leerPdfConOCR(buffer, docId, contentType);
+    tipo = "IMAGEN";
+    textoDocumento = ocrResult.texto;
+    ocrActivado = true;
+    console.log(`[DOCUMENTO] tipo: IMAGEN | OCR caracteres: ${textoDocumento.length}`);
+  } else {
+    console.log("[DOCUMENTO] Iniciando detección automática de tipo de documento...");
+    const resultado = await detectarTipoDocumento(buffer, nombreArchivo, docId);
+    tipo = resultado.tipo;
+    textoDocumento = resultado.texto;
+    ocrActivado = resultado.ocrActivado;
+    console.log(`[DOCUMENTO] tipo detectado: ${tipo}`);
+  }
 
-  const origen = tipo;
-
-  console.log(`[DOCUMENTO] tipo detectado: ${origen}`);
   if (ocrActivado) {
     console.log("[OCR] activado porque el PDF no contiene texto suficiente.");
   }
+
+  const origen = tipo;
 
   console.log(
     `[DOCUMENTO] texto obtenido (${textoDocumento.length} caracteres):\n${textoDocumento.slice(0, 4000)}`
