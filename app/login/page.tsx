@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Anchor, Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import type { EmpresaData } from "@/hooks/use-empresa"
 import { ForgotPasswordDialog } from "@/components/auth/forgot-password-dialog"
@@ -87,11 +88,14 @@ export default function LoginPage() {
         {/* Logo + Brand */}
         <div className="flex flex-col items-center mb-10">
           <div className="w-24 h-24 flex items-center justify-center mb-5">
-            {empresa?.logo ? (
-              <img src={empresa.logo} alt="Logo" className="w-full h-full object-contain" />
-            ) : (
-              <Anchor className="w-12 h-12 text-muted-foreground" />
-            )}
+            <Image
+              src={empresa?.logo || "/uploads/logos/logo-login.webp"}
+              alt="Logo"
+              width={96}
+              height={96}
+              priority
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             {empresa?.nombreComercial || "Plataforma"}

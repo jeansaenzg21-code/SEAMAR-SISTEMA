@@ -4,7 +4,8 @@ import * as XLSX from "xlsx";
 import { FACTURA_PROMPT } from "./ai/factura-prompt";
 import { VALORIZACION_PROMPT } from "./ai/valorizacion-prompt";
 import { CONTRATO_PROMPT } from "./ai/contrato-prompt";
-import { leerPdfConOCR } from "./pdf-ocr";
+import { leerPdfConOCR as leerPdfConOCRLocal } from "./pdf-ocr";
+import { contentTypeParaArchivo, leerPdfConOCR as leerImagenConOCR } from "./ocr-client";
 import { extraerCampos, mergeResultados } from "./document-parser";
 import { DocTiming } from "./instrumentation";
 import crypto from "crypto";
@@ -95,8 +96,7 @@ export async function procesarDocumento(
   nombreArchivo: string,
   tipo: "factura" | "valorizacion" | "contrato",
   promptPersonalizado?: string,
-  timing?: DocTiming
-  
+  timing?: DocTiming,
 ) {
 
   const nombre = nombreArchivo.toLowerCase();
@@ -115,10 +115,15 @@ const esExcel =
   nombre.endsWith(".xlsx") ||
   nombre.endsWith(".xls") ||
   nombre.endsWith(".csv");
+const esImagen = [".jpg", ".jpeg", ".png"].some((ext) => nombre.endsWith(ext));
 
   let textoDocumento = "";
 
-if (esExcel) {
+ if (esImagen) {
+   const contentType = contentTypeParaArchivo(nombreArchivo);
+   if (!contentType) throw new Error("Formato de imagen no soportado.");
+   textoDocumento = (await leerImagenConOCR(buffer, docId, contentType)).texto;
+ } else if (esExcel) {
   textoDocumento = leerExcel(buffer);
 } else {
   console.time("pdf_lectura")
@@ -143,7 +148,7 @@ console.log("TEXTO EXTRAIDO:", textoDocumento.length);
   try {
 
     t.start("OCR");
-    const ocrResult = await leerPdfConOCR(buffer, docId);
+     const ocrResult = await leerPdfConOCRLocal(buffer, docId);
     textoDocumento = ocrResult.texto;
     t.end("OCR");
 
@@ -264,37 +269,6 @@ console.log("===== DESPUES OPENAI =====");
       console.log("empresaEmisora:", resultado.empresaEmisora);
       console.log("empresaCliente:", resultado.empresaCliente);
       console.log("entidadPrincipal:", resultado.entidadPrincipal);
-      console.log("destino:", resultado.destino);
-
-// ===============================
-// VALIDACIÓN DEL DESTINO
-// ===============================
-
-const RUC_EMPRESA = "20611842458";
-
-console.log("VALIDACION DESTINO");
-console.log("rucEmisor :", resultado.rucEmisor);
-console.log("rucCliente:", resultado.rucCliente);
-console.log("destino IA :", resultado.destino);
-
-if (tipo === "factura") {
-
-  if (resultado.rucCliente === RUC_EMPRESA) {
-    resultado.destino = "PAGAR";
-  }
-
-  if (resultado.rucEmisor === RUC_EMPRESA) {
-    resultado.destino = "COBRAR";
-  }
-
-}
-
-console.log("DESTINO FINAL:", resultado.destino);
-if (resultado.destino == null) {
-  console.log("RUC_EMPRESA:", RUC_EMPRESA);
-  console.log("Comparacion cliente:", resultado.rucCliente === RUC_EMPRESA);
-  console.log("Comparacion emisor :", resultado.rucEmisor === RUC_EMPRESA);
-}
 
 console.log("==================================");
 console.log("JSON DEVUELTO POR OPENAI");

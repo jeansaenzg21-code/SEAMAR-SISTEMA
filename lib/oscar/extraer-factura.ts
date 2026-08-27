@@ -145,7 +145,7 @@ export async function extraerFacturaOscar(
     .update(buffer)
     .digest("hex");
 
-  let tipo: string;
+  let tipo: OrigenFactura;
   let textoDocumento: string;
   let ocrActivado: boolean;
 

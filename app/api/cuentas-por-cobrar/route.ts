@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { generarCodigoCuenta } from "@/lib/codigo-cuenta";
 export async function GET() {
 
   try {
@@ -8,7 +9,8 @@ export async function GET() {
   SELECT
     cxc.*,
     c.razon_social AS cliente,
-    p.nombre AS proyecto
+    p.nombre AS proyecto,
+    cxc.descripcion AS servicio
   FROM cuentas_por_cobrar cxc
   LEFT JOIN clientes c
     ON cxc.cliente_id = c.id
@@ -62,8 +64,7 @@ export async function POST(
 
     } = body;
 
-    const codigo =
-      `CXC-${Date.now()}`;
+    const codigo = await generarCodigoCuenta("CXC", fecha_emision);
 
       
 const [existente]: any = await pool.query(

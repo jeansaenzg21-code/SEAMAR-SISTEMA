@@ -160,12 +160,9 @@ PASO 3-AA — DETERMINACIÓN OBLIGATORIA DE EMISOR Y CLIENTE
 Orden obligatorio de razonamiento:
 1. Primero identificar visualmente EMISOR y CLIENTE.
 2. Después identificar numeroFactura.
-3. Después calcular destino.
-4. Nunca calcular destino antes de resolver emisor y cliente.
 
 VALIDACIÓN DE COHERENCIA EMISOR / CLIENTE
 
-Antes de calcular destino:
 - Verifica que empresaEmisora y rucEmisor correspondan a la razón social ubicada en el encabezado superior del documento.
 - Verifica que empresaCliente y rucCliente correspondan a la razón social ubicada dentro de bloques como "Señor(es)", "Cliente", "Datos del Cliente", "Razón Social del Cliente", "Adquirente" o "Destinatario".
 - Si la empresa del encabezado superior fue colocada como cliente, corrige la asignación.
@@ -173,11 +170,11 @@ Antes de calcular destino:
 
 En una factura comercial: el encabezado superior SIEMPRE representa al EMISOR; el bloque "Señor(es)" o "Cliente" SIEMPRE representa al CLIENTE.
 
-Esta validación tiene prioridad sobre: reconocimiento de nombres conocidos, frecuencia de aparición del nombre, coincidencia con el RUC de SEAMAR, y el cálculo de destino COBRAR/PAGAR. Primero corrige emisor y cliente; después calcula destino.
+Esta validación tiene prioridad sobre: reconocimiento de nombres conocidos, frecuencia de aparición del nombre y coincidencia con el RUC de SEAMAR. Primero corrige emisor y cliente antes de continuar.
 
 Si existe contradicción entre el nombre conocido de una empresa y la posición visual del documento, siempre gana la posición visual.
 
-Ejemplo: encabezado "PORRAS LAGOS DE CARDENAS MARIA ESTHER, RUC 10255776601" y bloque Señor(es) "SEAMAR DIVERS INTERNATIONAL S.A.C., RUC 20611842458" → empresaEmisora = "PORRAS LAGOS DE CARDENAS MARIA ESTHER", rucEmisor = "10255776601", empresaCliente = "SEAMAR DIVERS INTERNATIONAL S.A.C.", rucCliente = "20611842458", destino = "PAGAR".
+Ejemplo: encabezado "PORRAS LAGOS DE CARDENAS MARIA ESTHER, RUC 10255776601" y bloque Señor(es) "SEAMAR DIVERS INTERNATIONAL S.A.C., RUC 20611842458" → empresaEmisora = "PORRAS LAGOS DE CARDENAS MARIA ESTHER", rucEmisor = "10255776601", empresaCliente = "SEAMAR DIVERS INTERNATIONAL S.A.C.", rucCliente = "20611842458".
 
 VALIDACIÓN ESPECÍFICA PARA SEAMAR
 
@@ -192,9 +189,9 @@ Si aparece el RUC 20611842458 en el encabezado superior junto al logo o razón s
 empresaEmisora = "SEAMAR DIVERS INTERNATIONAL S.A.C."
 rucEmisor = "20611842458"
 
-La posición visual tiene prioridad absoluta. Nunca clasifiques a SEAMAR como emisor solamente porque sea una empresa conocida. Nunca uses frecuencia de aparición del nombre para decidir. Nunca uses el destino COBRAR/PAGAR para decidir quién es emisor o cliente. Primero determina emisor y cliente según la posición visual; después calcula destino.
+La posición visual tiene prioridad absoluta. Nunca clasifiques a SEAMAR como emisor solamente porque sea una empresa conocida. Nunca uses frecuencia de aparición del nombre para decidir. Determina emisor y cliente según la posición visual.
 
-Ejemplo: encabezado "PORRAS LAGOS DE CARDENAS MARIA ESTHER, RUC 10255776601" y bloque Señor(es) "SEAMAR DIVERS INTERNATIONAL S.A.C., RUC 20611842458" → resultado obligatorio: empresaEmisora = "PORRAS LAGOS DE CARDENAS MARIA ESTHER", rucEmisor = "10255776601", empresaCliente = "SEAMAR DIVERS INTERNATIONAL S.A.C.", rucCliente = "20611842458", destino = "PAGAR".
+Ejemplo: encabezado "PORRAS LAGOS DE CARDENAS MARIA ESTHER, RUC 10255776601" y bloque Señor(es) "SEAMAR DIVERS INTERNATIONAL S.A.C., RUC 20611842458" → resultado obligatorio: empresaEmisora = "PORRAS LAGOS DE CARDENAS MARIA ESTHER", rucEmisor = "10255776601", empresaCliente = "SEAMAR DIVERS INTERNATIONAL S.A.C.", rucCliente = "20611842458".
 
 Esta validación tiene prioridad máxima sobre cualquier otra inferencia.
 
@@ -304,7 +301,7 @@ D) DOCUMENTOS BANCARIOS
 
 Para documentos bancarios (BCP, BBVA, Interbank, Scotiabank, BanBif o cualquier banco) — cargos, comisiones, mantenimiento de cuenta, portes, gastos financieros, estados de cuenta:
 
-- empresaEmisora = el banco. empresaCliente = quien recibe el cargo. destino = "PAGAR".
+- empresaEmisora = el banco. empresaCliente = quien recibe el cargo.
 - NUNCA invertir: el banco siempre va en empresaEmisora; el titular de la cuenta siempre en empresaCliente, aunque su nombre aparezca primero o más destacado.
   Ejemplo: "Banco de Crédito del Perú, RUC 20100047218, Cliente: SEAMAR DIVERS INTERNATIONAL SAC" → empresaEmisora = "BANCO DE CREDITO DEL PERU", empresaCliente = "SEAMAR DIVERS INTERNATIONAL SAC".
 - Aplica el mismo proceso de A, B y C: el RUC del banco va en rucEmisor, y el código del comprobante va en numeroFactura, aunque el layout no sea el de una factura comercial.
@@ -316,24 +313,6 @@ E) VALIDACIÓN FINAL (obligatoria antes de responder)
 2. ¿rucEmisor null pero hay RUC visible del emisor? Corrige.
 3. ¿rucCliente null pero hay RUC visible del cliente (y no es boleta con DNI)? Corrige.
 4. ¿Llegó aquí sin encabezado de "NOTA DE CRÉDITO"/"NOTA DE DÉBITO"? Entonces está correctamente clasificado como factura sin importar el prefijo de su serie — no reclasifiques.
-
-## PASO 4 — destino
-
-RUC DE SEAMAR: 20611842458.
-
-- rucEmisor = 20611842458 → destino = "COBRAR".
-- rucCliente = 20611842458 → destino = "PAGAR".
-- Documento bancario (ver sección D) → destino = "PAGAR".
-
-Si rucEmisor y rucCliente quedaron ambos null, no inventes destino: revisa de nuevo el documento (ver PASO 3-A) y corrige si corresponde. Solo asigna destino con evidencia real (RUC de SEAMAR identificado u origen bancario confirmado). Si después de esa revisión no existe evidencia suficiente, devuelve:
-{
-  "destino": null
-}
-No fuerces "COBRAR" ni "PAGAR" por defecto.
-
-Determina destino únicamente con empresaEmisora, empresaCliente, rucEmisor y rucCliente — nunca con descripciones, productos, servicios, órdenes de compra, ni solo porque "SEAMAR" aparezca en un texto.
-
-entidadPrincipal: si destino = "COBRAR", usa empresaCliente; si "PAGAR", usa empresaEmisora; si destino = null, entidadPrincipal también es null.
 
 ## PASO 5 — DETRACCIÓN, FORMA DE PAGO Y CATEGORIZACIÓN
 
@@ -543,8 +522,6 @@ Nunca clasificar como EPP un equipo de trabajo, una herramienta, un repuesto o u
 
 FACTURA — extrae:
 
-destino,
-entidadPrincipal,
 tipoDocumento,
 numeroFactura,
 empresaEmisora,
@@ -569,8 +546,6 @@ descripcionServicio.
 
 Ejemplo de respuesta válida:
 {
-  "destino": "COBRAR",
-  "entidadPrincipal": "REFINERIA LA PAMPILLA S.A.A.",
   "tipoDocumento": "factura",
   "numeroFactura": "E001-13",
   "empresaEmisora": "SEAMAR DIVERS INTERNATIONAL S.A.C.",

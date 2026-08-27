@@ -13,3 +13,9 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+
+# Generated files and local runtime data
+tsconfig.tsbuildinfo
+logs/*.log
+python/__pycache__/
+/uploads/

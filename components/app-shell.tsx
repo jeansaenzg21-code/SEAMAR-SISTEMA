@@ -401,8 +401,11 @@ export function Header({
       }
     }
 
-    cargarActividad()
-    return () => { cancelled = true }
+    const timer = window.setTimeout(cargarActividad, 500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [])
 
   return (

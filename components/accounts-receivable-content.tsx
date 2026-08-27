@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { cacheGet, cacheSet } from "@/lib/simple-cache"
+import { cacheClear, cacheGet, cacheSet } from "@/lib/simple-cache"
 import {
   Filter,
   Download,
   Search,
   Eye,
-  RefreshCw,
   CalendarDays,
+  FilePlus2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -21,10 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  SincronizacionDialog,
-  type EventoSincronizacion,
-} from "@/components/sincronizacion-dialog"
+import type { EventoSincronizacion } from "@/components/sincronizacion-dialog"
+import { ImportarFacturaDialog } from "@/components/importar-factura-dialog"
 
 type Status =
   | "PENDIENTE"
@@ -36,10 +34,12 @@ type CuentaPorCobrar = {
   codigo: string
   cliente: string
   proyecto?: string | null
+  servicio?: string | null
   numero_factura: string
   descripcion?: string | null
   detraccion?: number | null
   forma_pago?: string | null
+  categorizacion?: string | null
 
   monto: number
   moneda: "SOLES" | "DOLARES"
@@ -60,6 +60,8 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
 
+const CUENTAS_POR_COBRAR_CACHE = "cuentas-por-cobrar"
+
 function StatusBadge({ status }: { status: Status }) {
   const label = {
     PENDIENTE: "Pendiente",
@@ -78,6 +80,22 @@ function StatusBadge({ status }: { status: Status }) {
       className={`rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status]}`}
     >
       {label[status]}
+    </span>
+  )
+}
+
+function ServicioBadge({ servicio }: { servicio?: string | null }) {
+  if (!servicio) {
+    return (
+      <span className="rounded-md border border-border bg-secondary/60 px-2 py-0.5 text-xs text-muted-foreground">
+        Sin asignar
+      </span>
+    )
+  }
+
+  return (
+    <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-foreground/90">
+      {servicio}
     </span>
   )
 }
@@ -155,6 +173,7 @@ const [sincronizacionId, setSincronizacionId] =
 
 const [mostrarExportar, setMostrarExportar] =
   useState(false);
+const [mostrarImportar, setMostrarImportar] = useState(false)
 
 const [monedaExportar, setMonedaExportar] =
   useState<"SOLES" | "DOLARES">("SOLES");
@@ -163,6 +182,7 @@ const [monedaExportar, setMonedaExportar] =
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     let cancelled = false
@@ -173,10 +193,25 @@ const [monedaExportar, setMonedaExportar] =
   const cargarCuentasPorCobrar = async (
   cantidadNueva = 0
 ) => {
-    try {
-      const response = await fetch("/api/cuentas-por-cobrar")
-      const data = await response.json()
+    const cached = cacheGet<CuentaPorCobrar[]>(CUENTAS_POR_COBRAR_CACHE)
+    if (cached) {
+      setAccountsReceivable(cached)
+    }
 
+    if (cantidadNueva > 0) {
+      cacheClear(CUENTAS_POR_COBRAR_CACHE)
+    }
+
+    try {
+      const response = await fetch("/api/cuentas-por-cobrar", {
+        cache: "no-store",
+      })
+      if (!response.ok) throw new Error("No se pudieron cargar las cuentas por cobrar")
+
+      const data = await response.json()
+      if (!Array.isArray(data)) throw new Error("Respuesta inválida de cuentas por cobrar")
+
+      cacheSet(CUENTAS_POR_COBRAR_CACHE, data)
       setAccountsReceivable(data)
       if (cantidadNueva > 0) {
 
@@ -391,23 +426,6 @@ const exportarMesExcel = () => {
 
   setMostrarExportar(false);
 };
-const dialogSincronizacion = (
-  <SincronizacionDialog
-    sincronizando={sincronizando}
-    documentosDetectados={documentosDetectados}
-    eventos={eventos}
-    mostrarResumen={mostrarResumen}
-    resumen={resultadoSync}
-    otraSeccion={
-      resultadoSync?.cuentas_pagar > 0
-        ? { titulo: "Ver cuentas por pagar", href: "/accounts-payable" }
-        : null
-    }
-    onCerrarResumen={() => setMostrarResumen(false)}
-    onDecidirPendiente={decidirDescarte}
-  />
-);
-
 const modalExportar = (
   mostrarExportar && (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -516,13 +534,6 @@ const modalExportar = (
       .map(([year, count]) => ({ year, count }))
   }, [baseFiltered])
 
-  // Auto-seleccionar el año más reciente disponible
-  useEffect(() => {
-    if (selectedYear === null && years.length > 0) {
-      setSelectedYear(years[0].year)
-    }
-  }, [years, selectedYear])
-
   // ---- Meses disponibles dentro del año seleccionado (todos visibles a la vez) ----
   const months = useMemo(() => {
     if (selectedYear === null) return []
@@ -579,6 +590,16 @@ const modalExportar = (
 
   // ---- Filtrado final mostrado en la tabla ----
   const filteredAccounts = useMemo(() => {
+    if (
+      selectedYear === null &&
+      selectedMonth === null &&
+      selectedDay === null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return []
+    }
+
     return baseFiltered.filter((item) => {
       const partes = partesFecha(item.fecha_emision)
       if (!partes) return false
@@ -591,59 +612,17 @@ const modalExportar = (
     })
   }, [baseFiltered, selectedYear, selectedMonth, selectedDay])
 
-  const descargarExcel = (item: CuentaPorCobrar) => {
-    const encabezados = [
-      "Código",
-      "Cliente",
-      "Proyecto",
-      "N° Factura",
-      "Detracción",
-      "Forma de Pago",
-      "Monto",
-      "Saldo",
-      "Estado",
-      "Fecha Emisión",
-      "Fecha Vencimiento",
-    ]
+  const pageSize = 50
+  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / pageSize))
+  const visibleAccounts = useMemo(
+    () => filteredAccounts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredAccounts, currentPage],
+  )
 
-    const datos = [
-      item.codigo,
-      item.cliente,
-      item.proyecto || "Sin asignar",
-      item.numero_factura,
-      item.detraccion != null
-  ? `${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.detraccion).toLocaleString("es-PE", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`
-  : "No",
-      item.forma_pago || "-",
-      `${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.monto).toLocaleString("es-PE")}`,
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, clientFilter, searchQuery, selectedYear, selectedMonth, selectedDay])
 
-`${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.saldo).toLocaleString("es-PE")}`,
-      item.estado,
-      item.fecha_emision,
-      item.fecha_vencimiento,
-    ]
-
-    const contenido = [
-      encabezados.map((v) => `"${v}"`).join(";"),
-      datos.map((v) => `"${v}"`).join(";"),
-    ].join("\n")
-
-    const blob = new Blob(["\uFEFF" + contenido], {
-      type: "text/csv;charset=utf-8;",
-    })
-
-    const url = window.URL.createObjectURL(blob)
-
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${item.codigo}.csv`
-    a.click()
-
-    window.URL.revokeObjectURL(url)
-  }
 
   
 
@@ -657,8 +636,16 @@ const modalExportar = (
 
   return (
   <>
-    {dialogSincronizacion}
     {modalExportar}
+    <ImportarFacturaDialog
+      target="cobrar"
+      open={mostrarImportar}
+      onOpenChange={setMostrarImportar}
+      onImportadas={() => {
+        cacheClear(CUENTAS_POR_COBRAR_CACHE)
+        cargarCuentasPorCobrar()
+      }}
+    />
 
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
@@ -723,14 +710,14 @@ const modalExportar = (
           </div>
 
           <div className="flex gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Sincronizar OneDrive"
-              onClick={sincronizarOneDrive}
-            >
-              <RefreshCw className="h-4 w-4 text-blue-500" />
-            </Button>
+             <Button
+               variant="outline"
+               className="border-border"
+               onClick={() => setMostrarImportar(true)}
+             >
+               <FilePlus2 className="mr-2 h-4 w-4" />
+               Importar facturas
+             </Button>
 <Button
   variant="outline"
   className="border-border"
@@ -836,42 +823,42 @@ const modalExportar = (
         </Card>
 
         <p className="text-sm text-muted-foreground">
-          Mostrando {filteredAccounts.length} documentos
+           Mostrando {visibleAccounts.length} de {filteredAccounts.length} documentos
           {tituloSeleccion ? ` · ${tituloSeleccion}` : ""}
         </p>
 
-        <div className="hidden lg:block">
+  <div className="hidden lg:block">
           <Card className="bg-card border-border">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-md">
+                <table className="w-full table-auto text-sm">
                   <thead className="border-b bg-secondary">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">Código</th>
-                      <th className="px-4 py-3 text-left font-medium">Cliente</th>
-                      <th className="px-4 py-3 text-left font-medium">Proyecto</th>
-                      <th className="px-4 py-3 text-left font-medium">N° Factura</th>
-                      <th className="px-4 py-3 text-left font-medium">Detracción</th>
-                      <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
-                      <th className="px-4 py-3 text-right font-medium">Monto</th>
-                      <th className="px-4 py-3 text-right font-medium">Saldo</th>
-                      <th className="px-4 py-3 text-left font-medium">Estado</th>
-                      <th className="px-4 py-3 text-left font-medium">Emisión</th>
-                      <th className="px-4 py-3 text-left font-medium">Vencimiento</th>
-                      <th className="px-4 py-3 text-left font-medium">Acciones</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Código</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap w-[30%]">Cliente</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Proyecto</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">N° Factura</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Detracción</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Forma de pago</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Categorización</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Monto</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Estado</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Emisión</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Vencimiento</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {filteredAccounts.map((item) => (
+                    {visibleAccounts.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border transition-colors hover:bg-secondary/40"
                       >
 
-    <td className="px-4 py-3 text-xs text-muted-foreground">
+    <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap text-center">
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
 
         {nuevosIds.includes(
           Number(item.id)
@@ -888,30 +875,34 @@ const modalExportar = (
       </div>
 
     </td>
-                        <td className="px-4 py-3 font-medium text-foreground">
+                        <td className="px-1.5 py-3 align-middle text-center font-medium text-foreground">
                           {item.cliente}
                         </td>
 
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {item.proyecto || "-"}
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
+                          <ServicioBadge servicio={item.proyecto} />
                         </td>
 
-                        <td className="px-4 py-3 font-mono text-xs">
+                        <td className="px-1.5 py-3 font-mono text-xs whitespace-nowrap align-middle text-center">
                           {item.numero_factura || "-"}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           <DetraccionBadge
     detraccion={item.detraccion}
     moneda={item.moneda}
   />
                         </td>
 
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap align-middle text-center">
                           {item.forma_pago || "-"}
                         </td>
 
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap align-middle text-center">
+                          {item.categorizacion || "OTROS"}
+                        </td>
+
+                        <td className="px-1.5 py-3 tabular-nums whitespace-nowrap align-middle text-center">
     {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
     {Number(item.monto).toLocaleString("es-PE", {
       minimumFractionDigits: 2,
@@ -919,32 +910,24 @@ const modalExportar = (
     })}
   </td>
 
-                        <td className="px-4 py-3 text-right tabular-nums">
-    {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-    {Number(item.saldo).toLocaleString("es-PE", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}
-  </td>
-
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           <StatusBadge status={item.estado} />
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           {item.fecha_emision
                             ? new Date(item.fecha_emision).toLocaleDateString("es-PE")
                             : "-"}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           {item.fecha_vencimiento
                             ? new Date(item.fecha_vencimiento).toLocaleDateString("es-PE")
                             : "-"}
                         </td>
 
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
+                          <div className="flex justify-center gap-2">
                             <Button
                               size="icon"
                               variant="outline"
@@ -954,16 +937,7 @@ const modalExportar = (
                                 }
                               }}
                             >
-                              
-    <Eye className="h-4 w-4" />
-  </Button>
-
-  <Button
-    size="icon"
-    variant="outline"
-    onClick={() => descargarExcel(item)}
-  >
-    <Download className="h-4 w-4" />
+                               <Eye className="h-4 w-4" />
   </Button>
                           </div>
                         </td>
@@ -973,10 +947,10 @@ const modalExportar = (
                     {filteredAccounts.length === 0 && (
                       <tr>
                         <td
-                          colSpan={12}
-                          className="px-4 py-8 text-center text-muted-foreground"
+                         colSpan={12}
+                          className="px-3 py-8 text-center text-muted-foreground"
                         >
-                          No hay cuentas por cobrar registradas para esta selección.
+               Selecciona un año, un estado o busca una factura para mostrar documentos.
                         </td>
                       </tr>
                     )}
@@ -989,7 +963,7 @@ const modalExportar = (
 
         {/* ---- Mobile: tarjetas ---- */}
         <div className="block lg:hidden space-y-3">
-          {filteredAccounts.map((item) => (
+          {visibleAccounts.map((item) => (
             <Card key={item.id} className="bg-card border-border">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -1004,7 +978,9 @@ const modalExportar = (
                   </div>
                   <div className="flex justify-between">
                     <span>Proyecto:</span>
-                    <span className="text-right font-medium text-foreground">{item.proyecto || "-"}</span>
+                    <span className="text-right font-medium text-foreground">
+                      <ServicioBadge servicio={item.proyecto} />
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>N° Factura:</span>
@@ -1021,20 +997,14 @@ const modalExportar = (
                     <span className="text-right font-medium text-foreground">{item.forma_pago || "-"}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span>Categorización:</span>
+                    <span className="text-right font-medium text-foreground">{item.categorizacion || "OTROS"}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span>Monto:</span>
                     <span className="text-right font-medium text-foreground">
                       {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
                       {Number(item.monto).toLocaleString("es-PE", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Saldo:</span>
-                    <span className="text-right font-medium text-foreground">
-                      {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-                      {Number(item.saldo).toLocaleString("es-PE", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -1079,10 +1049,20 @@ const modalExportar = (
 
           {filteredAccounts.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
-              No hay cuentas por cobrar registradas para esta selección.
+              Selecciona un año, un estado o busca una factura para mostrar documentos.
             </p>
           )}
         </div>
+
+        {filteredAccounts.length > 0 && (
+          <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+            <span className="text-muted-foreground">Página {currentPage} de {totalPages}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)}>Anterior</Button>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => page + 1)}>Siguiente</Button>
+            </div>
+          </div>
+        )}
       </div>
         </div>
   </>

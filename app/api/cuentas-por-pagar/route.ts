@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
+import { generarCodigoCuenta } from "@/lib/codigo-cuenta"
 
 export async function GET() {
   try {
@@ -7,12 +8,15 @@ export async function GET() {
       SELECT
         cxp.*,
         pr.razon_social AS proveedor,
-        p.nombre AS proyecto
+        p.nombre AS proyecto,
+        ps.nombre_servicio AS servicio
       FROM cuentas_por_pagar cxp
       LEFT JOIN proveedores pr
         ON cxp.proveedor_id = pr.id
       LEFT JOIN proyectos p
         ON cxp.proyecto_id = p.id
+      LEFT JOIN proyecto_servicios ps
+        ON cxp.servicio_id = ps.id
       ORDER BY cxp.id DESC
     `)
 
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
       fecha_vencimiento,
     } = body
 
-    const codigo = `CXP-${Date.now()}`
+    const codigo = await generarCodigoCuenta("CXP", fecha_emision)
 
     const [existente]: any = await pool.query(
       `

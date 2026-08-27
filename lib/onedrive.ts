@@ -438,6 +438,23 @@ export async function subirFacturaOscarAOneDrive(
   return subirArchivoAOneDrive(nombreArchivo, buffer, folderId, token);
 }
 
+export async function subirDocumentoAOneDrive(
+  nombreArchivo: string,
+  buffer: Buffer,
+) {
+  if (!ONEDRIVE_FOLDERS.DOCUMENTOS) {
+    throw new Error("ONEDRIVE_FOLDER_DOCUMENTOS no está configurada.");
+  }
+
+  const token = await obtenerTokenGraph();
+  return subirArchivoAOneDrive(
+    nombreArchivo,
+    buffer,
+    ONEDRIVE_FOLDERS.DOCUMENTOS,
+    token,
+  );
+}
+
 export async function descargarArchivoPorItemId(itemId: string) {
   return descargarArchivo(itemId);
 }

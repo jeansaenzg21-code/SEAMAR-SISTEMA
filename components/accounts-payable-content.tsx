@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { cacheGet, cacheSet } from "@/lib/simple-cache"
+import { cacheClear, cacheGet, cacheSet } from "@/lib/simple-cache"
 import {
   Filter,
   Download,
   Search,
   Eye,
-  RefreshCw,
   CalendarDays,
+  FilePlus2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -21,10 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  SincronizacionDialog,
-  type EventoSincronizacion,
-} from "@/components/sincronizacion-dialog"
+import type { EventoSincronizacion } from "@/components/sincronizacion-dialog"
+import { ImportarFacturaDialog } from "@/components/importar-factura-dialog"
 
 type Status =
   | "PENDIENTE"
@@ -56,6 +54,8 @@ const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
+
+const CUENTAS_POR_PAGAR_CACHE = "cuentas-por-pagar"
 
 function StatusBadge({ status }: { status: Status }) {
   const label = {
@@ -154,10 +154,7 @@ export function AccountsPayableContent() {
   const [nuevosIds, setNuevosIds] =
   useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState("all")
-  const [supplierFilter, setSupplierFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-
-  const [proveedores, setProveedores] = useState<any[]>([])
   const [mostrarResumen, setMostrarResumen] =
   useState(false);
 
@@ -178,6 +175,7 @@ const [sincronizacionId, setSincronizacionId] =
 
 const [mostrarExportar, setMostrarExportar] =
   useState(false);
+const [mostrarImportar, setMostrarImportar] = useState(false)
 
 const [monedaExportar, setMonedaExportar] =
   useState<"SOLES" | "DOLARES">("SOLES");
@@ -186,20 +184,36 @@ const [monedaExportar, setMonedaExportar] =
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([cargarCuentasPorPagar(), cargarProveedores()]).then(() => { if (cancelled) return })
+    cargarCuentasPorPagar().then(() => { if (cancelled) return })
     return () => { cancelled = true }
   }, [])
 
   const cargarCuentasPorPagar = async (
   cantidadNueva = 0
 ) => {
-    try {
-      const response = await fetch("/api/cuentas-por-pagar")
-      const data = await response.json()
+    const cached = cacheGet<CuentaPorPagar[]>(CUENTAS_POR_PAGAR_CACHE)
+    if (cached) {
+      setAccountsPayable(cached)
+    }
 
+    if (cantidadNueva > 0) {
+      cacheClear(CUENTAS_POR_PAGAR_CACHE)
+    }
+
+    try {
+      const response = await fetch("/api/cuentas-por-pagar", {
+        cache: "no-store",
+      })
+      if (!response.ok) throw new Error("No se pudieron cargar las cuentas por pagar")
+
+      const data = await response.json()
+      if (!Array.isArray(data)) throw new Error("Respuesta inválida de cuentas por pagar")
+
+      cacheSet(CUENTAS_POR_PAGAR_CACHE, data)
       setAccountsPayable(data)
       if (cantidadNueva > 0) {
 
@@ -215,23 +229,6 @@ const [monedaExportar, setMonedaExportar] =
       console.error(error)
     }
   }
-
-  const cargarProveedores = useCallback(async () => {
-    try {
-      const cached = cacheGet<any[]>("proveedores")
-      if (cached) {
-        setProveedores(cached)
-        return
-      }
-      const response = await fetch("/api/proveedores")
-      const data = await response.json()
-      const proveedores = Array.isArray(data) ? data : []
-      cacheSet("proveedores", proveedores)
-      setProveedores(proveedores)
-    } catch (error) {
-      console.error(error)
-    }
-  }, [])
 
   const sincronizarOneDrive = async () => {
 
@@ -414,23 +411,6 @@ const exportarMesExcel = () => {
 
   setMostrarExportar(false);
 };
-const dialogSincronizacion = (
-  <SincronizacionDialog
-    sincronizando={sincronizando}
-    documentosDetectados={documentosDetectados}
-    eventos={eventos}
-    mostrarResumen={mostrarResumen}
-    resumen={resultadoSync}
-    otraSeccion={
-      resultadoSync?.cuentas_cobrar > 0
-        ? { titulo: "Ver cuentas por cobrar", href: "/accounts-receivable" }
-        : null
-    }
-    onCerrarResumen={() => setMostrarResumen(false)}
-    onDecidirPendiente={decidirDescarte}
-  />
-);
-
 const modalExportar = (
   mostrarExportar && (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -500,8 +480,6 @@ const modalExportar = (
   const baseFiltered = useMemo(() => {
     return accountsPayable.filter((item) => {
       if (statusFilter !== "all" && item.estado !== statusFilter) return false
-      if (supplierFilter !== "all" && item.proveedor !== supplierFilter) return false
-
       if (
         searchQuery &&
         !String(item.codigo || "")
@@ -522,7 +500,7 @@ const modalExportar = (
 
       return true
     })
-  }, [accountsPayable, statusFilter, supplierFilter, searchQuery])
+  }, [accountsPayable, statusFilter, searchQuery])
 
   // ---- Años disponibles ----
   const years = useMemo(() => {
@@ -538,13 +516,6 @@ const modalExportar = (
       .sort((a, b) => b[0] - a[0])
       .map(([year, count]) => ({ year, count }))
   }, [baseFiltered])
-
-  // Auto-seleccionar el año más reciente disponible
-  useEffect(() => {
-    if (selectedYear === null && years.length > 0) {
-      setSelectedYear(years[0].year)
-    }
-  }, [years, selectedYear])
 
   // ---- Meses disponibles dentro del año seleccionado (todos visibles a la vez) ----
   const months = useMemo(() => {
@@ -602,6 +573,16 @@ const modalExportar = (
 
   // ---- Filtrado final mostrado en la tabla ----
   const filteredAccounts = useMemo(() => {
+    if (
+      selectedYear === null &&
+      selectedMonth === null &&
+      selectedDay === null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return []
+    }
+
     return baseFiltered.filter((item) => {
       const partes = partesFecha(item.fecha_emision)
       if (!partes) return false
@@ -612,60 +593,19 @@ const modalExportar = (
 
       return true
     })
-  }, [baseFiltered, selectedYear, selectedMonth, selectedDay])
+  }, [baseFiltered, selectedYear, selectedMonth, selectedDay, statusFilter, searchQuery])
 
-  const descargarExcel = (item: CuentaPorPagar) => {
-    const encabezados = [
-      "Código",
-      "Proveedor",
-      "Servicio",
-      "Número Documento",
-      "Detracción",
-      "Forma de Pago",
-      "Categorización",
-      "Monto",
-      "Saldo",
-      "Estado",
-      "Fecha Emisión",
-      "Fecha Vencimiento",
-    ]
+  const pageSize = 50
+  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / pageSize))
+  const visibleAccounts = useMemo(
+    () => filteredAccounts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredAccounts, currentPage],
+  )
 
-    const datos = [
-      item.codigo,
-      item.proveedor,
-      item.servicio || "Sin asignar",
-      item.numero_documento,
-      item.detraccion != null
-  ? `S/ ${Number(item.detraccion).toLocaleString("es-PE")}`
-  : "No",
-      item.forma_pago || "-",
-      item.categorizacion || "-",
-      `${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.monto).toLocaleString("es-PE")}`,
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, searchQuery, selectedYear, selectedMonth, selectedDay])
 
-`${item.moneda === "DOLARES" ? "US$" : "S/"} ${Number(item.saldo).toLocaleString("es-PE")}`,
-      item.estado,
-      item.fecha_emision,
-      item.fecha_vencimiento,
-    ]
-
-    const contenido = [
-      encabezados.map((v) => `"${v}"`).join(";"),
-      datos.map((v) => `"${v}"`).join(";"),
-    ].join("\n")
-
-    const blob = new Blob(["\uFEFF" + contenido], {
-      type: "text/csv;charset=utf-8;",
-    })
-
-    const url = window.URL.createObjectURL(blob)
-
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${item.codigo}.csv`
-    a.click()
-
-    window.URL.revokeObjectURL(url)
-  }
 
   
 
@@ -679,8 +619,16 @@ const modalExportar = (
 
   return (
   <>
-    {dialogSincronizacion}
     {modalExportar}
+    <ImportarFacturaDialog
+      target="pagar"
+      open={mostrarImportar}
+      onOpenChange={setMostrarImportar}
+      onImportadas={() => {
+        cacheClear(CUENTAS_POR_PAGAR_CACHE)
+        cargarCuentasPorPagar()
+      }}
+    />
 
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
@@ -722,37 +670,17 @@ const modalExportar = (
               </SelectContent>
             </Select>
 
-            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="w-44 bg-secondary border-border">
-                <SelectValue placeholder="Proveedor" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">
-                  Todos los proveedores
-                </SelectItem>
-
-                {proveedores.map((proveedor) => (
-                  <SelectItem
-                    key={proveedor.id}
-                    value={proveedor.razon_social}
-                  >
-                    {proveedor.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="flex gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Sincronizar OneDrive"
-              onClick={sincronizarOneDrive}
-            >
-              <RefreshCw className="h-4 w-4 text-blue-500" />
-            </Button>
+             <Button
+               variant="outline"
+               className="border-border"
+               onClick={() => setMostrarImportar(true)}
+             >
+               <FilePlus2 className="mr-2 h-4 w-4" />
+               Importar facturas
+             </Button>
 <Button
   variant="outline"
   className="border-border"
@@ -858,43 +786,42 @@ const modalExportar = (
         </Card>
 
         <p className="text-sm text-muted-foreground">
-          Mostrando {filteredAccounts.length} documentos
+           Mostrando {visibleAccounts.length} de {filteredAccounts.length} documentos
           {tituloSeleccion ? ` · ${tituloSeleccion}` : ""}
         </p>
 
         <div className="hidden lg:block">
           <Card className="bg-card border-border">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-secondary">
+              <div className="overflow-x-auto rounded-md">
+                <table className="w-full table-auto text-sm">
+                   <thead className="border-b bg-secondary">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-xs text-muted-foreground">Código</th>
-                      <th className="px-4 py-3 text-left font-medium">Proveedor</th>
-                      <th className="px-4 py-3 text-left font-medium">Servicio</th>
-                      <th className="px-4 py-3 text-left font-medium">N° Documento</th>
-                      <th className="px-4 py-3 text-left font-medium">Detracción</th>
-                      <th className="px-4 py-3 text-left font-medium">Forma de pago</th>
-                      <th className="px-4 py-3 text-left font-medium">Categorización</th>
-                      <th className="px-4 py-3 text-right font-medium">Monto</th>
-                      <th className="px-4 py-3 text-right font-medium">Saldo</th>
-                      <th className="px-4 py-3 text-left font-medium">Estado</th>
-                      <th className="px-4 py-3 text-left font-medium">Emisión</th>
-                      <th className="px-4 py-3 text-left font-medium">Vencimiento</th>
-                      <th className="px-4 py-3 text-left font-medium">Acciones</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Código</th>
+                      <th className="px-1.5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap w-[30%]">Proveedor</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Servicio</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">N° Documento</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Detracción</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Forma de pago</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Categorización</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Monto</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Estado</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Emisión</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Vencimiento</th>
+                      <th className="px-1.5 py-3 text-center text-xs font-semibold tracking-wide whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {filteredAccounts.map((item) => (
+                    {visibleAccounts.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border transition-colors hover:bg-secondary/40"
                       >
 
-    <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap text-center">
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
 
         {nuevosIds.includes(
           Number(item.id)
@@ -911,31 +838,31 @@ const modalExportar = (
       </div>
 
     </td>
-                        <td className="px-4 py-3 font-medium text-foreground">
+                        <td className="px-1.5 py-3 align-middle text-left font-medium text-foreground">
                           {item.proveedor}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           <ServicioBadge servicio={item.servicio} />
                         </td>
 
-                        <td className="px-4 py-3 font-mono text-xs">
+                        <td className="px-1.5 py-3 font-mono text-xs whitespace-nowrap align-middle text-center">
                           {item.numero_documento || "-"}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           <DetraccionBadge detraccion={item.detraccion} />
                         </td>
 
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap align-middle text-center">
                           {item.forma_pago || "-"}
                         </td>
 
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-1.5 py-3 text-muted-foreground whitespace-nowrap align-middle text-center">
                           {item.categorizacion || "-"}
                         </td>
 
-                        <td className="px-4 py-3 text-right tabular-nums">
+                        <td className="px-1.5 py-3 tabular-nums whitespace-nowrap align-middle text-center">
     {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
     {Number(item.monto).toLocaleString("es-PE", {
       minimumFractionDigits: 2,
@@ -943,28 +870,20 @@ const modalExportar = (
     })}
   </td>
 
-                        <td className="px-4 py-3 text-right tabular-nums">
-    {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-    {Number(item.saldo).toLocaleString("es-PE", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}
-  </td>
-
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           <StatusBadge status={item.estado} />
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           {formatearFecha(item.fecha_emision)}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
                           {formatearFecha(item.fecha_vencimiento)}
                         </td>
 
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
+                        <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
+                          <div className="flex justify-center gap-2">
                             <Button
                               size="icon"
                               variant="outline"
@@ -977,14 +896,6 @@ const modalExportar = (
     
     <Eye className="h-4 w-4" />
   </Button>
-
-  <Button
-    size="icon"
-    variant="outline"
-    onClick={() => descargarExcel(item)}
-  >
-    <Download className="h-4 w-4" />
-  </Button>
                           </div>
                         </td>
                       </tr>
@@ -993,8 +904,8 @@ const modalExportar = (
                     {filteredAccounts.length === 0 && (
                       <tr>
                         <td
-                          colSpan={13}
-                          className="px-4 py-8 text-center text-muted-foreground"
+                          colSpan={12}
+                          className="px-3 py-8 text-center text-muted-foreground"
                         >
                           No hay cuentas por pagar registradas para esta selección.
                         </td>
@@ -1009,7 +920,7 @@ const modalExportar = (
 
         {/* ---- Mobile: tarjetas ---- */}
         <div className="block lg:hidden space-y-3">
-          {filteredAccounts.map((item) => (
+          {visibleAccounts.map((item) => (
             <Card key={item.id} className="bg-card border-border">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -1057,16 +968,6 @@ const modalExportar = (
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Saldo:</span>
-                    <span className="text-right font-medium text-foreground">
-                      {item.moneda === "DOLARES" ? "US$" : "S/"}{" "}
-                      {Number(item.saldo).toLocaleString("es-PE", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
                     <span>Emisión:</span>
                     <span className="text-right font-medium text-foreground">
                       {formatearFecha(item.fecha_emision)}
@@ -1101,10 +1002,20 @@ const modalExportar = (
 
           {filteredAccounts.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
-              No hay cuentas por pagar registradas para esta selección.
+               Selecciona un año, un estado o busca una factura para mostrar documentos.
             </p>
           )}
         </div>
+
+        {filteredAccounts.length > 0 && (
+          <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+            <span className="text-muted-foreground">Página {currentPage} de {totalPages}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)}>Anterior</Button>
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => page + 1)}>Siguiente</Button>
+            </div>
+          </div>
+        )}
       </div>
         </div>
   </>
