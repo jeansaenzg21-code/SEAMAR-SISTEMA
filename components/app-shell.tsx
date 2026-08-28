@@ -67,6 +67,10 @@ const providersSection = [
     name: "Cuentas por Pagar",
     href: "/accounts-payable",
   },
+  {
+    name: "Programación de Pagos",
+    href: "/payment-scheduling",
+  },
 ]
 
 export function Sidebar({

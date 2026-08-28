@@ -8,6 +8,7 @@ import type { ResultSetHeader } from "mysql2/promise";
 export type TipoActividad =
   | "cxc"
   | "cxp"
+  | "programacion_pago"
   | "valorizacion"
   | "cliente"
   | "proyecto"
@@ -29,7 +30,8 @@ export type AccionActividad =
   | "cobrar"
   | "importacion"
   | "activar"
-  | "desactivar";
+  | "desactivar"
+  | "programar";
 
 // =============================================================================
 // INPUT
