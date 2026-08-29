@@ -1103,6 +1103,8 @@ export default function BankReconciliationContent() {
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<{ conciliacionId: string; archivoNombre: string } | null>(null);
   const [isReexecuting, setIsReexecuting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const loadHistorial = useCallback(async () => {
     setIsLoadingHistorial(true);
@@ -1348,21 +1350,6 @@ export default function BankReconciliationContent() {
     const data =
       await response.json();
 
-    console.log(
-      "HISTORIAL CARGADO",
-      data
-    );
-
-    console.log(
-  "MOVIMIENTOS",
-  data.movimientos?.length
-);
-
-console.log(
-  "COINCIDENCIAS",
-  data.coincidencias?.length
-);
-
     const movimientosHistorial =
   (data.movimientos ?? []).map(
     (m: any, index: number) => {
@@ -1373,34 +1360,6 @@ console.log(
       (c: any) =>
         Number(c.movimiento_id) === Number(m.id)
     );
-
-    if (coincidenciasMovimiento.length > 0) {
-  console.log("MATCH", {
-    movimiento: m.id,
-    coincidencias: coincidenciasMovimiento,
-  });
-}
-
-if (coincidenciasMovimiento.length > 0) {
-  console.log(
-    "COINCIDENCIA COMPLETA",
-    JSON.stringify(
-      coincidenciasMovimiento[0],
-      null,
-      2
-    )
-  );
-}
-
-console.log(
-  "COINCIDENCIA EJEMPLO",
-  data.coincidencias?.[0]
-);
-
-console.log(
-  "COINCIDENCIAS",
-  data.coincidencias?.length
-);
 
       return mapMovimientoFromApi(
         {
@@ -1415,39 +1374,25 @@ console.log(
     }
   );
 
-  console.log(
-  "PRIMER MOVIMIENTO",
-  movimientosHistorial[0]
-);
-
-const movimientoConciliado =
-  movimientosHistorial.find(
-    (m: any) =>
-      m.coincidencias?.length > 0
-  );
-
-console.log(
-  "MOVIMIENTO CONCILIADO",
-  JSON.stringify(
-    movimientoConciliado,
-    null,
-    2
-  )
-);
     setMovimientos(
       movimientosHistorial
     );
 
-    const primerConciliado =
-  movimientosHistorial.find(
-    (m: any) => m.coincidencias?.length
-  );
+    const seleccionPrevia = selectedMovimiento?.id;
+    const movimientoSeleccionado =
+      movimientosHistorial.find(
+        (m: any) =>
+          String(m.id) === String(seleccionPrevia)
+      ) ??
+      movimientosHistorial.find(
+        (m: any) => (m.coincidencias ?? []).length > 0
+      ) ??
+      movimientosHistorial[0] ??
+      null;
 
-setSelectedMovimiento(
-  primerConciliado ??
-  movimientosHistorial[0] ??
-  null
-);
+    setSelectedMovimiento(
+      movimientoSeleccionado
+    );
 
     setHistorialSeleccionado(
       conciliacionId
@@ -1495,6 +1440,20 @@ const seleccionarCoincidencia = async (
       throw new Error(data.error);
     }
 
+    const comoConciliado = (m: MovimientoBancario): MovimientoBancario =>
+      Number(m.id) === Number(movimientoId)
+        ? {
+            ...m,
+            estado: "conciliado",
+            coincidencias: (m.coincidencias ?? []).filter(
+              (c) => Number(c.id) === Number(documentoId)
+            ),
+          }
+        : m;
+
+    setMovimientos((prev) => prev.map(comoConciliado));
+    setSelectedMovimiento((prev) => (prev ? comoConciliado(prev) : null));
+
     if (historialSeleccionado) {
 
       await abrirHistorial(
@@ -1502,7 +1461,6 @@ const seleccionarCoincidencia = async (
       );
 
     }
-
 
     setConciliadosRecientes(prev => [
   ...prev,
@@ -1533,6 +1491,26 @@ const seleccionarCoincidencia = async (
     () => activeFilter ? movimientos.filter((m) => m.estado === activeFilter) : movimientos,
     [movimientos, activeFilter]
   );
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)),
+    [filtered]
+  );
+
+  const paginatedMovimientos = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
 
   const summary = useMemo<Record<EstadoMovimiento, MovimientoBancario[]>>(
     () => ({
@@ -1657,7 +1635,7 @@ const seleccionarCoincidencia = async (
           ) : (
             <div className="overflow-hidden rounded-xl border border-border/70">
               <div className="overflow-x-auto">
-                {filtered.map((m) => (
+                {paginatedMovimientos.map((m) => (
                   <MovementRow
                     key={m.id}
                     movimiento={m}
@@ -1666,6 +1644,49 @@ const seleccionarCoincidencia = async (
                     esReciente={conciliadosRecientes.includes(Number(m.id))}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {paginatedMovimientos.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-border/70">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length} movimientos
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                  .map((p, idx, arr) => (
+                    <span key={p} className="flex items-center gap-1">
+                      {idx > 0 && arr[idx - 1] !== p - 1 && (
+                        <span className="px-1 text-muted-foreground">...</span>
+                      )}
+                      <Button
+                        variant={currentPage === p ? "default" : "outline"}
+                        size="sm"
+                        className="min-w-[36px]"
+                        onClick={() => setCurrentPage(p)}
+                      >
+                        {p}
+                      </Button>
+                    </span>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Siguiente
+                </Button>
               </div>
             </div>
           )}

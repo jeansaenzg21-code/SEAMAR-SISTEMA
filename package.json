@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "backup:manual": "tsx scripts/backup-db.ts --tipo manual",
+    "backup:auto": "tsx scripts/backup-scheduler.ts",
+    "backup:retencion": "tsx scripts/backup-db.ts --retencion",
+    "backup:restore": "tsx scripts/restore-db.ts"
   },
   "dependencies": {
     "@azure/identity": "^4.13.1",

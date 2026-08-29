@@ -1,6 +1,7 @@
 import type { ValorizacionStatus } from "@/lib/types"
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { normalizarMoneda } from "@/lib/moneda"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -8,7 +9,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(amount: number | null | undefined, currency?: string): string {
   if (amount == null) return "-"
-  const prefix = currency === "USD" ? "$" : "S/"
+  const esDolares = normalizarMoneda(currency) === "DOLARES"
+  const prefix = esDolares ? "US$" : "S/"
   return `${prefix} ${Number(amount).toLocaleString("es-PE")}`
 }
 

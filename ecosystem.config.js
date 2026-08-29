@@ -18,5 +18,24 @@ module.exports = {
         OCR_MAX_WORKERS: "1",
       },
     },
+    {
+      name: "backup-scheduler",
+      script: "scripts/backup-scheduler.ts",
+      interpreter: "npx",
+      interpreter_args: "tsx",
+      autorestart: true,
+      max_restarts: 5,
+      restart_delay: 30000,
+      time: true,
+      error_file: "./logs/backup-scheduler-error.log",
+      out_file: "./logs/backup-scheduler-out.log",
+      merge_logs: true,
+      // PM2 reinicia el proceso (y por lo tanto ejecuta el backup automático)
+      // a las 11:30 p.m. de todos los días.
+      cron_restart: "30 23 * * *",
+      env: {
+        BACKUP_SCHEDULER_CRON: "1",
+      },
+    },
   ],
 };

@@ -23,7 +23,7 @@ Fechas: YYYY-MM-DD. Convierte "27-Feb-26" → "2026-02-27". Si no existe, null.
 
 Montos: número, no texto. Quita "S/", "$", "USD", comas y símbolos. Ej: "S/ 23,000.00" → 23000 | "$ 1,500.50" → 1500.5. Si no existe, null.
 
-Moneda: "S/", "SOLES", "PEN" → "SOLES". "$", "USD", "DOLARES" → "DOLARES". Si no aparece, null.
+Moneda: "S/", "SOLES", "PEN" → "SOLES". "$", "US$", "USD", "US D", "DOLAR", "DÓLAR", "DOLARES", "DOLAR AMERICANO" → "DOLARES". Nunca asumas "SOLES" solo porque el documento sea peruano: si hay símbolo "$", "US$" o texto "DOLAR", la moneda es "DOLARES". Si no aparece evidencia de moneda, null.
 
 ## ESTRUCTURA DE SALIDA
 

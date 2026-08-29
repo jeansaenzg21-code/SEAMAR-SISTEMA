@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/mysql"
 import { buildExcelBuffer, excelResponse } from "@/lib/excel-export"
 import type { ExcelColumn, ExcelReportConfig, ExcelStatusStyle, ExcelTotalRow } from "@/lib/excel-export"
+import { normalizarMoneda } from "@/lib/moneda"
 
 const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -14,13 +15,16 @@ export async function GET(request: NextRequest) {
     const empresaNombre = empresaRows[0]?.nombre_comercial || ""
 
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-    const month = searchParams.get("month")
-    const moneda = searchParams.get("moneda") ?? "SOLES"
+    const year = Number(searchParams.get("year"))
+    const month = Number(searchParams.get("month"))
+    const moneda = normalizarMoneda(searchParams.get("moneda")) ?? "SOLES"
 
-    if (!year || !month) {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
       return NextResponse.json({ error: "Debe indicar año y mes" }, { status: 400 })
     }
+
+    const inicio = new Date(Date.UTC(year, month - 1, 1))
+    const fin = new Date(Date.UTC(year, month, 1))
 
     const [rows]: any = await pool.query(
       `SELECT
@@ -38,12 +42,12 @@ export async function GET(request: NextRequest) {
         cxp.fecha_vencimiento
       FROM cuentas_por_pagar cxp
       LEFT JOIN proveedores pr ON cxp.proveedor_id = pr.id
-      WHERE YEAR(cxp.fecha_emision) = ? AND MONTH(cxp.fecha_emision) = ? AND cxp.moneda = ?
-      ORDER BY cxp.fecha_emision ASC`,
-      [year, month, moneda]
+      WHERE cxp.fecha_emision >= ? AND cxp.fecha_emision < ? AND cxp.moneda = ?
+      ORDER BY cxp.fecha_emision ASC, cxp.id ASC`,
+      [inicio.toISOString().slice(0, 10), fin.toISOString().slice(0, 10), moneda]
     )
 
-    const nombreMes = MONTHS[Number(month) - 1]
+    const nombreMes = MONTHS[month - 1]
 
     const columns: ExcelColumn[] = [
       { header: "Código", key: "codigo", width: 18 },
@@ -88,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const buffer = await buildExcelBuffer(config)
-    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXP_${moneda}_${nombreMes}_${year}.xlsx`
+    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXP_${moneda === "DOLARES" ? "USD" : "SOLES"}_${nombreMes}_${year}.xlsx`
     return excelResponse(buffer, filename)
   } catch (error) {
     console.error(error)

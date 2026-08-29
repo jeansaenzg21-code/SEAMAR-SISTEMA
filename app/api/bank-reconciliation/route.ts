@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { writeFile, unlink } from "fs/promises";
-import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { createHash, randomUUID } from "crypto";
 import { PythonShell } from "python-shell";
 import pool from "@/lib/mysql";
 import { actualizarDocumentoPorConciliacion } from "@/lib/conciliacion";
+import { resolvePythonPath } from "@/lib/python";
 
 export async function POST(request: Request) {
   try {
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       resultado = await PythonShell.run(
         "python/bank_reconciliation.py",
         {
-          pythonPath: process.env.PYTHON_PATH,
+          pythonPath: resolvePythonPath(),
           args: [
             rutaArchivo,
             process.env.DB_HOST || "localhost",
@@ -156,6 +156,8 @@ export async function POST(request: Request) {
           throw new Error("insertId es " + movimientoId + " para conciliacion_movimientos [" + i + "]");
         }
 
+        movimiento["id"] = String(movimientoId);
+
         for (let j = 0; j < coincidencias.length; j++) {
           const coincidencia = coincidencias[j];
 
@@ -257,20 +259,6 @@ export async function POST(request: Request) {
           totalPendientes,
           conciliacionId,
         ]
-      );
-
-      lastQuery = "Guardar archivo y UPDATE archivo_ruta";
-
-      const dirUploads = join(process.cwd(), "uploads", "conciliaciones");
-      if (!existsSync(dirUploads)) {
-        mkdirSync(dirUploads, { recursive: true });
-      }
-      const rutaPerm = join(dirUploads, conciliacionId + ".xlsx");
-      await writeFile(rutaPerm, buffer);
-
-      const [rutaUpdateResult]: any = await connection.query(
-        "UPDATE conciliaciones_bancarias SET archivo_ruta = ? WHERE id = ?",
-        [rutaPerm, conciliacionId]
       );
 
       lastQuery = "COMMIT";

@@ -3,6 +3,9 @@ import pool from "@/lib/mysql"
 import { obtenerSesion } from "@/lib/session"
 import { registrarActividad } from "@/lib/actividad"
 import { generarCodigoCuenta } from "@/lib/codigo-cuenta"
+import { normalizarMoneda } from "@/lib/moneda"
+import { verificarPeriodoRegistrable } from "@/lib/backups"
+import { resolverVencimiento } from "@/lib/vencimiento"
 
 function texto(value: unknown): string | null {
   if (value === null || value === undefined) return null
@@ -59,13 +62,19 @@ export async function POST(request: NextRequest) {
     }
 
     const codigo = await generarCodigoCuenta("CXP", texto(factura.fechaEmision))
+    const { fecha: vencimientoFinal, origen: vencimientoOrigen } = resolverVencimiento(texto(factura.fechaVencimiento), true)
+
+    const periodo = await verificarPeriodoRegistrable(texto(factura.fechaEmision))
+    if (!periodo.permitido) {
+      return NextResponse.json({ error: periodo.motivo }, { status: 409 })
+    }
 
     const [resultado]: any = await pool.query(
       `INSERT INTO cuentas_por_pagar
        (codigo, proveedor_id, numero_documento, detraccion, forma_pago,
         categorizacion, descripcion, monto, moneda, saldo, fecha_emision,
-        fecha_vencimiento, estado, archivo_url, archivo_onedrive_id, archivo_nombre)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)`,
+        fecha_vencimiento, vencimiento_origen, estado, archivo_url, archivo_onedrive_id, archivo_nombre)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)`,
       [
         codigo,
         proveedorId,
@@ -75,10 +84,11 @@ export async function POST(request: NextRequest) {
         texto(factura.categorizacion) || "OTROS",
         texto(factura.servicio),
         monto,
-        texto(factura.moneda) || "SOLES",
+        normalizarMoneda(factura.moneda) ?? "SOLES",
         monto,
         texto(factura.fechaEmision),
-        texto(factura.fechaVencimiento),
+        vencimientoFinal,
+        vencimientoOrigen,
         texto(factura.archivo?.webUrl),
         texto(factura.archivo?.itemId),
         texto(factura.archivo?.nombre),

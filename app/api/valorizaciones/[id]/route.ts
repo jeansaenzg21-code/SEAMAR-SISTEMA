@@ -3,6 +3,7 @@ import pool from "@/lib/mysql";
 import { subirArchivoAOneDrive } from "@/lib/onedrive";
 import { ONEDRIVE_FOLDERS } from "@/lib/onedrive-config";
 import { getAccessToken } from "@/lib/msal";
+import { monedaO } from "@/lib/moneda";
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -16,7 +17,7 @@ const negocio_operacion = String(formData.get("negocio_operacion") || "");
 const numero_orden_servicio = String(formData.get("numero_orden_servicio") || "");
 const descripcion = String(formData.get("descripcion") || "");
 const monto = Number(formData.get("monto") || 0);
-const moneda = String(formData.get("moneda") || "PEN");
+const moneda = monedaO(formData.get("moneda"), "SOLES");
 const periodo = String(formData.get("periodo") || "");
 const fecha_ejecucion = String(formData.get("fecha_ejecucion") || "");
 const encargado = String(formData.get("encargado") || "");

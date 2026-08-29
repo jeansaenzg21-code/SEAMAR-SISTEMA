@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { normalizarMoneda, monedaO } from "./moneda";
 
 function sheetToArray(sheet: XLSX.WorkSheet): any[][] {
   const ref = sheet["!ref"];
@@ -48,6 +49,9 @@ function valorComoNumero(valor: any) {
   }
 
   let texto = valorComoTexto(valor)
+    .toString()
+    .replace(/US\s*D\b|USD|\$/gi, "")
+    .replace(/\b(D[ÓO]LARES?|SOLES?|PEN)\b/gi, "")
     .replace("S/.", "")
     .replace("S/", "")
     .trim();
@@ -220,6 +224,34 @@ function buscarFilaDatosReal(
   return null;
 }
 
+/**
+ * Escanea todas las celdas de la hoja buscando evidencia de moneda
+ * (S/, PEN, SOLES... vs US$, USD, $, DOLAR...). Devuelve "SOLES",
+ * "DOLARES" o null si no hay evidencia.
+ */
+function detectarMonedaHoja(data: any[][]) {
+  let hayDolares = false;
+  let haySoles = false;
+
+  for (let r = 0; r < data.length; r++) {
+    const row = data[r];
+    if (!row) continue;
+
+    for (let c = 0; c < row.length; c++) {
+      const celda = valorComoTexto(row[c]);
+      if (!celda) continue;
+
+      const moneda = normalizarMoneda(celda);
+      if (moneda === "DOLARES") hayDolares = true;
+      else if (moneda === "SOLES") haySoles = true;
+
+      if (hayDolares) return "DOLARES";
+    }
+  }
+
+  return haySoles ? "SOLES" : null;
+}
+
 function buscarTotalFinalHoja(data: any[][]) {
   let totalFinal = 0;
 
@@ -233,7 +265,11 @@ function buscarTotalFinalHoja(data: any[][]) {
         .replace(/\s/g, "")
         .trim();
 
-      if (texto === "totals/." || texto === "total" || texto.includes("totals/")) {
+      if (
+        texto === "total" ||
+        texto.includes("totals/.") ||
+        (texto.startsWith("total") && (texto.includes("s/") || texto.includes("$") || texto.includes("usd")))
+      ) {
         for (let rr = r + 1; rr < data.length; rr++) {
           const posibleTotal = valorComoNumero(
             data[rr]?.[c]
@@ -291,6 +327,10 @@ const valorizaciones: any[] = [];
     if (!sheet) continue;
 
     const data = sheetToArray(sheet);
+
+    const monedaHoja =
+      detectarMonedaHoja(data) ??
+      monedaO(process.env.EXCEL_DEFAULT_MONEDA, "SOLES");
 
     const otTexto = valorComoTexto(
       data[0]?.[1]
@@ -384,7 +424,7 @@ const codigoValorizacion =
       monto: total,
       total,
 
-      moneda: process.env.EXCEL_DEFAULT_MONEDA || "PEN",
+      moneda: monedaHoja,
 
       fechaEjecucion: fechaInicio,
       fechaInicio,

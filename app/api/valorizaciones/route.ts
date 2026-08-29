@@ -4,6 +4,8 @@ import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive";
 import { Buffer } from "buffer";
 import { getAccessToken } from "@/lib/msal";
 import { obtenerSesion } from "@/lib/session";
+import { monedaO } from "@/lib/moneda";
+import { verificarPeriodoRegistrable } from "@/lib/backups";
 
 
 
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
       Number(formData.get("monto") || 0)
 
     const moneda =
-      String(formData.get("moneda") || "PEN")
+      monedaO(formData.get("moneda"), "SOLES")
 
     const periodo =
       String(formData.get("periodo") || "")
@@ -125,6 +127,11 @@ export async function POST(request: Request) {
 
     const encargado =
       String(formData.get("encargado") || "")
+
+    const periodoAbierto = await verificarPeriodoRegistrable(fecha_ejecucion || null)
+    if (!periodoAbierto.permitido) {
+      return NextResponse.json({ success: false, message: periodoAbierto.motivo }, { status: 409 })
+    }
 
     const [result]: any =
   await pool.query(

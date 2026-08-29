@@ -35,6 +35,7 @@ import { DocumentosPreview } from "@/components/DocumentosPreview"
 import { ExportDialog } from "@/components/export-dialog"
 import type { ValorizacionStatus, DocumentoValorizacion } from "@/lib/types"
 import { formatCurrency, mapEstadoApiToStatus } from "@/lib/utils"
+import { monedaO } from "@/lib/moneda"
 import { StatusBadge } from "@/components/status-badge"
 import { ValuationMetricsCards } from "@/components/valuation-metrics-cards"
 
@@ -51,6 +52,7 @@ interface Valuation {
   description: string
   projectName: string
   amount: number
+  moneda: string
   status: ValorizacionStatus
   date: string
   encargado: string
@@ -83,6 +85,7 @@ interface ProyectoCliente {
   tipo?: string
   descripcion?: string
   monto?: number
+  moneda?: string
   [key: string]: unknown
 }
 
@@ -97,6 +100,7 @@ interface ApiValorizacionItem {
   descripcion?: string
   monto?: number | string
   pu?: number | string
+  moneda?: string
   documentos_adjuntos?: number | string
   estado?: string
   fecha_ejecucion?: string
@@ -120,6 +124,7 @@ interface ValorizacionFormValues {
   ordenServicio: string
   description: string
   amount: string
+  moneda: string
   fecha: string
   encargado: string
   documentos: File[]
@@ -193,6 +198,7 @@ function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
     type: item.negocio_operacion || "",
     description: item.descripcion || "",
     amount: Number(item.monto || 0),
+    moneda: monedaO(item.moneda, "SOLES"),
     pu: Number(item.pu || 0),
     documentos_adjuntos: Number(item.documentos_adjuntos || 0),
     documentos_completos: Number(item.documentos_adjuntos || 0),
@@ -257,7 +263,7 @@ function buildValorizacionFormData(values: ValorizacionFormValues, proyectoNombr
   formData.append("descripcion", values.description)
   formData.append("monto", String(values.amount))
   formData.append("estado", VALORIZATION_API_STATUS.BORRADOR)
-  formData.append("moneda", "PEN")
+  formData.append("moneda", monedaO(values.moneda, "SOLES"))
   formData.append("periodo", values.fecha)
   formData.append("fecha_ejecucion", values.fecha)
   formData.append("encargado", values.encargado)
@@ -655,7 +661,7 @@ function useValorizaciones() {
       item.orden_servicio,
       item.type,
       item.description,
-      `S/ ${item.amount.toLocaleString("es-PE")}`,
+      `${monedaO(item.moneda, "SOLES") === "DOLARES" ? "US$" : "S/"} ${item.amount.toLocaleString("es-PE")}`,
       item.status,
       item.encargado,
       item.date,
@@ -810,12 +816,12 @@ function ValorizacionesTableComponent({
 
                   {vistaCliente === "repsol" && (
                     <td className="px-5 py-4 whitespace-nowrap align-top">
-                      {item.pu ? formatCurrency(item.pu) : "-"}
+                      {item.pu ? formatCurrency(item.pu, item.moneda) : "-"}
                     </td>
                   )}
 
                   <td className="px-5 py-4 whitespace-nowrap align-top">
-                    {item.amount != null ? formatCurrency(item.amount) : "-"}
+                    {item.amount != null ? formatCurrency(item.amount, item.moneda) : "-"}
                   </td>
 
                   <td className="px-5 py-4 whitespace-nowrap align-top">{item.date || "-"}</td>
@@ -897,7 +903,7 @@ function ValorizacionesTableComponent({
                   <div className="text-xs text-muted-foreground space-y-1">
                     <div className="flex justify-between"><span>Cliente:</span><span className="text-right font-medium text-foreground">{item.client}</span></div>
                     {item.orden_servicio && <div className="flex justify-between"><span>OS:</span><span className="text-right font-medium text-foreground">{item.orden_servicio}</span></div>}
-                    <div className="flex justify-between"><span>Monto:</span><span className="text-right font-medium text-foreground">S/ {Number(item.amount).toLocaleString("es-PE")}</span></div>
+                    <div className="flex justify-between"><span>Monto:</span><span className="text-right font-medium text-foreground">{formatCurrency(item.amount, item.moneda)}</span></div>
                     <div className="flex justify-between"><span>Periodo:</span><span className="text-right font-medium text-foreground">{item.date}</span></div>
                     {item.projectName && <div className="flex justify-between"><span>Proyecto:</span><span className="text-right font-medium text-foreground">{item.projectName}</span></div>}
                     <div className="flex justify-between"><span>Encargado:</span><span className="text-right font-medium text-foreground">{item.encargado}</span></div>
@@ -939,6 +945,7 @@ const FORM_INICIAL: ValorizacionFormValues = {
   ordenServicio: "",
   description: "",
   amount: "",
+  moneda: "SOLES",
   fecha: "",
   encargado: "",
   documentos: [],
@@ -999,6 +1006,7 @@ function ValorizacionFormModal({
         ordenServicio: editingValuation.orden_servicio,
         description: editingValuation.description,
         amount: String(editingValuation.amount),
+        moneda: monedaO(editingValuation.moneda, "SOLES"),
         fecha: editingValuation.date,
         encargado: editingValuation.encargado,
         documentos: [],
@@ -1028,7 +1036,8 @@ function ValorizacionFormModal({
     const proyecto = proyectosCliente.find((p) => String(p.id) === proyectoId)
     if (proyecto) {
       actualizarCampo("description", proyecto.descripcion || proyecto.nombre || "")
-      if (proyecto.monto) actualizarCampo("amount", String(proyecto.monto))
+      if (proyecto.monto != null) actualizarCampo("amount", String(proyecto.monto))
+      if (proyecto.moneda) actualizarCampo("moneda", monedaO(proyecto.moneda, "SOLES"))
     }
   }
 
@@ -1124,7 +1133,7 @@ function ValorizacionFormModal({
           </div>
 
           <div className="grid gap-2">
-            <Label>Monto estimado (S/)</Label>
+            <Label>Monto estimado</Label>
             <Input
               type="number"
               placeholder="0.00"
@@ -1132,6 +1141,19 @@ function ValorizacionFormModal({
               onChange={(e) => actualizarCampo("amount", e.target.value)}
               disabled={isSaving}
             />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Moneda</Label>
+            <Select value={form.moneda} onValueChange={(v) => actualizarCampo("moneda", v)} disabled={isSaving}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar moneda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SOLES">Soles (S/)</SelectItem>
+                <SelectItem value="DOLARES">Dólares (US$)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid gap-2">
@@ -1336,7 +1358,7 @@ function ValorizacionDetailDialog({
         </DialogHeader>
 
         <ValuationMetricsCards items={[
-          { label: "MONTO", value: formatCurrency(valuation.amount) },
+          { label: "MONTO", value: formatCurrency(valuation.amount, valuation.moneda) },
           { label: "AVANCE", value: `${getAvanceValorizacion(valuation.status)}%` },
           { label: "RESP.", value: valuation.encargado || "Sin responsable" },
         ]} />

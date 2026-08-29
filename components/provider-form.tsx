@@ -3,7 +3,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
 type ProviderFormProps = {
@@ -15,7 +14,6 @@ export default function ProviderForm({
 }: ProviderFormProps) {
     const [businessName, setBusinessName] = useState("")
     const [ruc, setRuc] = useState("")
-    const [rucConsultado, setRucConsultado] = useState("")
     const [status, setStatus] = useState("Activo")
     const [contactoPrincipal, setContactoPrincipal] = useState("")
     const [correo, setCorreo] = useState("")
@@ -33,13 +31,6 @@ export default function ProviderForm({
   correoValido
     const registrarProveedor = async () => {
   try {
-    if (ruc !== rucConsultado) {
-      alert(
-        "El RUC fue modificado. Consulte SUNAT nuevamente."
-  )
-  return
-}
-
     const response = await fetch("/api/proveedores", {
       method: "POST",
       headers: {
@@ -68,57 +59,9 @@ export default function ProviderForm({
     alert("Error de conexión")
   }
 }
-const consultarRuc = async () => {
-  if (ruc.length !== 11) {
-    alert("El RUC debe tener 11 dígitos")
-    return
-  }
-
-  try {
-    const response = await fetch(
-      "/api/sunat/ruc",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          ruc,
-        }),
-      }
-    )
-
-    const data = await response.json()
-
-    if (data.code !== "200") {
-
-  setBusinessName("")
-  setDireccion("")
-  setRucConsultado("")
-
-  alert("RUC no encontrado")
-  return
-}
-
-    setBusinessName(
-      data.razon_social || ""
-    )
-    setRucConsultado(ruc)
-
-    setDireccion(
-      data.direccion || ""
-    )
-
-  } catch (error) {
-    console.error(error)
-    alert("Error al consultar SUNAT")
-  }
-}
 const handleCancelar = () => {
   setBusinessName("")
   setRuc("")
-  setRucConsultado("")
   setStatus("Activo")
   setContactoPrincipal("")
   setCorreo("")
@@ -161,48 +104,24 @@ const handleCancelar = () => {
               <label className="text-sm font-medium">
                 RUC *
               </label>
-              <div className="relative mt-2">
-  <Input
-    value={ruc}
-    onChange={(e) => {
+              <Input
+  value={ruc}
+  onChange={(e) => {
   const nuevoRuc =
     e.target.value
       .replace(/\D/g, "")
       .slice(0, 11)
 
   setRuc(nuevoRuc)
-
-  setBusinessName("")
-  setDireccion("")
-  setRucConsultado("")
 }}
-    maxLength={11}
-    placeholder="Ingrese el RUC"
-    className={`pr-10 ${
-      ruc.length !== 11
-        ? "border-red-500/50"
-        : ""
-    }`}
-  />
-
-  <button
-    type="button"
-    onClick={consultarRuc}
-    disabled={ruc.length !== 11}
-    className="
-      absolute
-      right-3
-      top-1/2
-      -translate-y-1/2
-      text-muted-foreground
-      hover:text-primary
-      disabled:opacity-40
-    "
-  >
-    <Search className="h-4 w-4" />
-  </button>
-</div>
-
+  maxLength={11}
+  placeholder="Ingrese el RUC"
+  className={`mt-2 ${
+    ruc.length !== 11
+      ? "border-red-500/50"
+      : ""
+  }`}
+/>
             </div>
           </div>
 

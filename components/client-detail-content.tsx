@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"  
 import { useEffect, useState } from "react"
+import { monedaO } from "@/lib/moneda"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,7 +91,7 @@ const [projectForm, setProjectForm] =
     descripcion: "",
     tipo: "PROYECTO",
     monto: "",
-    moneda: "PEN",
+    moneda: "SOLES",
     fecha_inicio: "",
     fecha_fin: "",
   })
@@ -159,7 +160,7 @@ const abrirContrato = () => {
         ? String(data.data.monto)
         : prev.monto,
     moneda:
-      data.data.moneda || prev.moneda,
+      monedaO(data.data.moneda) || prev.moneda,
     fecha_inicio:
       data.data.fecha_inicio || prev.fecha_inicio,
     fecha_fin:
@@ -1114,8 +1115,8 @@ if (!client) {
       }
       className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
     >
-      <option value="PEN">PEN</option>
-      <option value="USD">USD</option>
+      <option value="SOLES">Soles (S/)</option>
+      <option value="DOLARES">Dólares (US$)</option>
     </select>
   </div>
 </div>
@@ -1242,7 +1243,7 @@ if (
   descripcion: "",
   tipo: "PROYECTO",
   monto: "",
-  moneda: "PEN",
+  moneda: "SOLES",
   fecha_inicio: "",
   fecha_fin: "",
 })

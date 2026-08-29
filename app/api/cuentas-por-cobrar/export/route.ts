@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/mysql"
 import { buildExcelBuffer, excelResponse } from "@/lib/excel-export"
 import type { ExcelColumn, ExcelReportConfig, ExcelStatusStyle, ExcelTotalRow } from "@/lib/excel-export"
+import { normalizarMoneda } from "@/lib/moneda"
 
 const MONTHS = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -14,13 +15,17 @@ export async function GET(request: NextRequest) {
     const empresaNombre = empresaRows[0]?.nombre_comercial || ""
 
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-    const month = searchParams.get("month")
-    const estado = searchParams.get("estado")
+    const year = Number(searchParams.get("year"))
+    const month = Number(searchParams.get("month"))
+    const moneda = normalizarMoneda(searchParams.get("moneda")) ?? "SOLES"
 
-    if (!year || !month) {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
       return NextResponse.json({ error: "Debe indicar año y mes" }, { status: 400 })
     }
+
+    const inicio = new Date(Date.UTC(year, month - 1, 1))
+    const fin = new Date(Date.UTC(year, month, 1))
+    const params: any[] = [inicio.toISOString().slice(0, 10), fin.toISOString().slice(0, 10)]
 
     let query = `
       SELECT
@@ -31,26 +36,32 @@ export async function GET(request: NextRequest) {
         cxc.descripcion,
         cxc.monto,
         cxc.saldo,
+        cxc.moneda,
         cxc.estado,
         cxc.fecha_emision,
         cxc.fecha_vencimiento
       FROM cuentas_por_cobrar cxc
       LEFT JOIN clientes c ON cxc.cliente_id = c.id
       LEFT JOIN proyectos p ON cxc.proyecto_id = p.id
-      WHERE YEAR(cxc.fecha_emision) = ? AND MONTH(cxc.fecha_emision) = ?
+      WHERE cxc.fecha_emision >= ? AND cxc.fecha_emision < ?
     `
-    const params: any[] = [year, month]
 
+    if (moneda === "DOLARES" || moneda === "SOLES") {
+      query += " AND cxc.moneda = ?"
+      params.push(moneda)
+    }
+
+    const estado = searchParams.get("estado")
     if (estado && estado !== "TODOS") {
       query += " AND cxc.estado = ?"
       params.push(estado)
     }
 
-    query += " ORDER BY cxc.fecha_emision ASC"
+    query += " ORDER BY cxc.fecha_emision ASC, cxc.id ASC"
 
     const [rows]: any = await pool.query(query, params)
 
-    const nombreMes = MONTHS[Number(month) - 1]
+    const nombreMes = MONTHS[month - 1]
 
     const columns: ExcelColumn[] = [
       { header: "Código", key: "codigo", width: 18 },
@@ -84,7 +95,7 @@ export async function GET(request: NextRequest) {
       titulo: "REPORTE DE CUENTAS POR COBRAR",
       periodo: `${nombreMes} ${year}`,
       columns,
-      moneda: "SOLES",
+      moneda: moneda || "SOLES",
       data: rows,
       monedaColumns: [6, 7],
       dateColumns: [9, 10],
@@ -94,7 +105,7 @@ export async function GET(request: NextRequest) {
     }
 
     const buffer = await buildExcelBuffer(config)
-    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXC_${nombreMes}_${year}.xlsx`
+    const filename = `${empresaNombre ? empresaNombre.replace(/\s+/g, "_") + "_" : ""}CXC_${moneda === "DOLARES" ? "USD" : "SOLES"}_${nombreMes}_${year}.xlsx`
     return excelResponse(buffer, filename)
   } catch (error) {
     console.error(error)

@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Building2, Users, ShieldCheck, Palette, ArrowLeft, type LucideIcon } from "lucide-react"
+import { Building2, Users, ShieldCheck, Palette, ArrowLeft, DatabaseBackup, Archive, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRol } from "@/lib/role-context"
 import { EmpresaSection } from "@/components/configuracion/sections/empresa-section"
 import { UsuariosSection } from "@/components/configuracion/sections/usuarios-section"
 import { SeguridadSection } from "@/components/configuracion/sections/seguridad-section"
 import { AparienciaSection } from "@/components/configuracion/sections/apariencia-section"
+import { RespaldoSection } from "@/components/configuracion/sections/respaldo-section"
+import { HistoricoSection } from "@/components/configuracion/sections/historico-section"
 
 const SECTIONS_CONFIG = {
   empresa: {
@@ -35,12 +37,24 @@ const SECTIONS_CONFIG = {
     icon: Palette,
     Component: AparienciaSection,
   },
+  respaldo: {
+    label: "Respaldo y restauración",
+    description: "Genera, valida, descarga, restaura y aplica retención de respaldos de la base de datos",
+    icon: DatabaseBackup,
+    Component: RespaldoSection,
+  },
+  historico: {
+    label: "Archivo histórico",
+    description: "Cierra y archiva periodos contables con sus respaldos de seguridad",
+    icon: Archive,
+    Component: HistoricoSection,
+  },
 } as const
 
 type SectionId = keyof typeof SECTIONS_CONFIG
 
 const SECTIONS_VISIBILITY: Record<string, SectionId[]> = {
-  ADMINISTRADOR: ["empresa", "usuarios", "seguridad", "apariencia"],
+  ADMINISTRADOR: ["empresa", "usuarios", "seguridad", "apariencia", "respaldo", "historico"],
   SUPERVISOR: ["seguridad", "apariencia"],
 }
 

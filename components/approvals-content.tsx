@@ -23,6 +23,7 @@ import { ValuationMetricsCards } from "@/components/valuation-metrics-cards"
 import type { ValorizacionStatus } from "@/lib/types"
 import { formatDate } from "@/lib/utils"
 import { StatusBadge } from "@/components/status-badge"
+import { normalizarMoneda } from "@/lib/moneda"
 
 type Approval = {
   id: string
@@ -50,7 +51,7 @@ function mapApiToApproval(v: any): Approval {
     codigo: v.codigo,
     client: v.proveedor,
     description: v.descripcion,
-    amount: `${v.moneda === "USD" ? "$" : "S/"} ${Number(v.monto ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    amount: `${normalizarMoneda(v.moneda) === "DOLARES" ? "US$" : "S/"} ${Number(v.monto ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     status:
       v.estado === "BORRADOR"
         ? "draft"

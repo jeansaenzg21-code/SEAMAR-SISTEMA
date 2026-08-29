@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/mysql"
+import { monedaO } from "@/lib/moneda"
 
 export async function GET() {
   try {
@@ -113,7 +114,7 @@ export async function POST(
           descripcion || null,
           tipo || "PROYECTO",
           monto ? Number(monto) : 0,
-          moneda || "PEN",
+          monedaO(moneda, "SOLES"),
           fecha_inicio || new Date().toISOString().slice(0, 10),
 fecha_fin || null,
           contrato_nombre,

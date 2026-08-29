@@ -314,6 +314,8 @@ function UploadFacturaDialog({
   const [detectadas, setDetectadas] = useState<Detectada[]>([])
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [importando, setImportando] = useState(false)
+  const [fallos, setFallos] = useState<{ nombre: string; motivo: string }[] | null>(null)
+  const [cerrarTrasAceptar, setCerrarTrasAceptar] = useState(false)
   const archivoRef = useRef<HTMLInputElement>(null)
   const galeriaRef = useRef<HTMLInputElement>(null)
   const camaraRef = useRef<HTMLInputElement>(null)
@@ -328,6 +330,8 @@ function UploadFacturaDialog({
       setDetectadas([])
       setSeleccionadas(new Set())
       setImportando(false)
+      setFallos(null)
+      setCerrarTrasAceptar(false)
     }
   }, [open])
 
@@ -447,9 +451,11 @@ function UploadFacturaDialog({
     setError(null)
     let guardadas = 0
     let omitidas = 0
+    const fallas: { nombre: string; motivo: string }[] = []
 
     for (const d of elegidas) {
       const r = d.resultado!
+      const nombre = r.archivo?.nombre || d.nombreArchivo
       try {
         const res = await fetch("/api/oscar/facturas", {
           method: "POST",
@@ -464,22 +470,61 @@ function UploadFacturaDialog({
             onedriveWebUrl: r.archivo.webUrl,
           }),
         })
-        if (res.ok) guardadas++
-        else omitidas++
-      } catch {
+        if (res.ok) {
+          guardadas++
+        } else {
+          omitidas++
+          const data = await res.json().catch(() => ({}))
+          let motivo: string
+          if (data.duplicado) {
+            d.duplicado = true
+            motivo = "ya existe una factura registrada con ese RUC de emisor y número de documento (duplicada)."
+          } else if (data.error) {
+            motivo = String(data.error)
+          } else {
+            motivo = "ocurrió un error interno del sistema."
+          }
+          fallas.push({ nombre, motivo })
+        }
+      } catch (error: any) {
         omitidas++
+        fallas.push({
+          nombre,
+          motivo: error?.message || "ocurrió un error interno del sistema.",
+        })
       }
     }
 
     setImportando(false)
+
+    if (omitidas > 0) {
+      setDetectadas((prev) =>
+        prev.map((d) => {
+          const marcada = elegidas.find((e) => e.key === d.key)
+          return marcada ? { ...d, duplicado: marcada.duplicado ?? d.duplicado } : d
+        }),
+      )
+    }
+
+    if (fallas.length > 0) {
+      setFallos(fallas)
+      setCerrarTrasAceptar(guardadas > 0)
+    }
+
     onImportadas(guardadas, omitidas)
-    onOpenChange(false)
+    if (fallas.length === 0) onOpenChange(false)
+  }
+
+  const aceptarFallos = () => {
+    setFallos(null)
+    if (cerrarTrasAceptar) onOpenChange(false)
   }
 
   const hayDeteccion = detectadas.length > 0
   const seleccionandoArchivos = !hayDeteccion && !procesando
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(o) => {
@@ -708,14 +753,14 @@ function UploadFacturaDialog({
                     <div
                       key={d.key}
                       onClick={() => habilitada && alternarSeleccion(d.key)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                      className={`flex items-start gap-3 rounded-xl px-3 py-3 transition-colors ${
                         habilitada
                           ? "cursor-pointer hover:bg-muted/50"
                           : "opacity-60"
                       }`}
                     >
                       <div
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
                           seleccionada
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border"
@@ -728,9 +773,9 @@ function UploadFacturaDialog({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{d.nombreArchivo}</p>
+                        <p className="break-words text-sm font-medium leading-snug">{d.nombreArchivo}</p>
                         {d.resultado && (
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
                             {d.resultado.cabecera.razonSocialEmisor ||
                               d.resultado.cabecera.rucEmisor ||
                               "Emisor desconocido"}
@@ -740,6 +785,11 @@ function UploadFacturaDialog({
                             {d.resultado.cabecera.total != null
                               ? ` · ${formatoMoneda(d.resultado.cabecera.total, d.resultado.cabecera.moneda)}`
                               : ""}
+                          </p>
+                        )}
+                        {d.error && (
+                          <p className="mt-0.5 break-words text-xs leading-relaxed text-destructive">
+                            {d.error}
                           </p>
                         )}
                       </div>
@@ -835,6 +885,39 @@ function UploadFacturaDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {fallos && fallos.length > 0 && (
+      <AlertDialog open onOpenChange={(value) => { if (!value) setFallos(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {fallos.length === 1
+                ? "Una factura no se importó"
+                : `${fallos.length} facturas no se importaron`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {fallos.length === 1
+                ? "La siguiente factura no pudo ser registrada:"
+                : "Las siguientes facturas no pudieron ser registradas:"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+            {fallos.map((fallo, i) => (
+              <div key={i} className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="break-words text-sm font-medium">{fallo.nombre}</p>
+                <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
+                  Motivo: {fallo.motivo}
+                </p>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={aceptarFallos}>Aceptar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+    </>
   )
 }
 

@@ -1,5 +1,6 @@
 import pool from "./mysql";
 import { buscarOSPorNumero } from "./onedrive";
+import { normalizarMoneda } from "./moneda";
 export async function guardarValorizacion(
   data: any,
   creadoPor?: string
@@ -181,7 +182,7 @@ Number(
   ).toFixed(2)
 ),
 
-data.moneda || "PEN",
+data.moneda = normalizarMoneda(data.moneda) ?? "SOLES",
 
 data.periodo || "",
 
@@ -363,7 +364,7 @@ export async function guardarContrato(
         servicio.cantidad ?? 1,
         servicio.precioUnitario ?? null,
         servicio.montoPactado ?? 0,
-        data.moneda ?? "SOLES",
+        normalizarMoneda(data.moneda ?? servicio.moneda) ?? "SOLES",
         archivo?.nombre ?? null,
         archivo?.onedriveId ?? null,
         archivo?.url ?? null,

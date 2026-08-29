@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import os
 import sys
 import mysql.connector
 
@@ -15,6 +16,7 @@ db_user = sys.argv[3] if len(sys.argv) > 3 else "root"
 db_password = sys.argv[4] if len(sys.argv) > 4 else ""
 db_name = sys.argv[5] if len(sys.argv) > 5 else "seamar"
 moneda = sys.argv[6] if len(sys.argv) > 6 else "PEN"
+archivo_json = sys.argv[7] if len(sys.argv) > 7 else None
 
 MAPEO_MONEDA = {
     "PEN": "SOLES",
@@ -59,13 +61,18 @@ sys.stderr.write("PYTHON DIAG CONNECTION PARAMS: " + json.dumps({
 sys.stderr.flush()
 
 # =========================
-# EXCEL
+# MOVIMIENTOS (EXCEL o JSON reconstruido desde BD)
 # =========================
 
-excel = pd.read_excel(
-    archivo,
-    header=4
-)
+if archivo_json and os.path.exists(archivo_json):
+    with open(archivo_json, encoding="utf-8") as f:
+        movimientos_data = json.load(f)
+    excel = pd.DataFrame(movimientos_data)
+else:
+    excel = pd.read_excel(
+        archivo,
+        header=4
+    )
 
 excel.columns = [
     str(col).strip()
@@ -145,7 +152,6 @@ QUERY_COBRAR = f"""
     LEFT JOIN proyectos p ON p.id = cxc.proyecto_id
     WHERE cxc.fecha_emision IS NOT NULL
       AND cxc.moneda = '{moneda_bd}'
-      AND cxc.estado != 'COBRADO'
 """
 
 QUERY_PAGAR = f"""
@@ -162,7 +168,6 @@ QUERY_PAGAR = f"""
     LEFT JOIN proyectos   p ON p.id = cxp.proyecto_id
     WHERE cxp.fecha_emision IS NOT NULL
       AND cxp.moneda = '{moneda_bd}'
-      AND cxp.estado != 'PAGADO'
 """
 
 # =========================

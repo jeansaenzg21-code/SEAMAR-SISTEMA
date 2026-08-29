@@ -13,7 +13,9 @@ export type TipoActividad =
   | "cliente"
   | "proyecto"
   | "conciliacion"
-  | "configuracion";
+  | "configuracion"
+  | "backup"
+  | "periodo";
 
 // =============================================================================
 // ACCIONES
@@ -31,7 +33,11 @@ export type AccionActividad =
   | "importacion"
   | "activar"
   | "desactivar"
-  | "programar";
+  | "programar"
+  | "backup"
+  | "restaurar"
+  | "validar"
+  | "archivar";
 
 // =============================================================================
 // INPUT

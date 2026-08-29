@@ -19,3 +19,4 @@ tsconfig.tsbuildinfo
 logs/*.log
 python/__pycache__/
 /uploads/
+/backups/

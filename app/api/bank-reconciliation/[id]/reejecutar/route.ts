@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { writeFile, readFile, unlink } from "fs/promises";
-import { existsSync } from "fs";
+import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { PythonShell } from "python-shell";
 import pool from "@/lib/mysql";
 import { actualizarDocumentoPorConciliacion } from "@/lib/conciliacion";
+import { resolvePythonPath } from "@/lib/python";
 
 export async function POST(
   _request: Request,
@@ -16,7 +16,7 @@ export async function POST(
     const id = (await params).id;
 
     const [rows]: any = await pool.query(
-      "SELECT archivo_ruta, moneda FROM conciliaciones_bancarias WHERE id = ?",
+      "SELECT moneda FROM conciliaciones_bancarias WHERE id = ?",
       [id]
     );
 
@@ -27,38 +27,58 @@ export async function POST(
       );
     }
 
-    const rutaPerm = rows[0].archivo_ruta;
     const moneda = rows[0].moneda || "PEN";
 
-    if (!rutaPerm || !existsSync(rutaPerm)) {
+    const [movimientosDB]: any = await pool.query(
+      `SELECT fecha, referencia, descripcion, monto, tipo
+       FROM conciliacion_movimientos
+       WHERE conciliacion_id = ?
+       ORDER BY id`,
+      [id]
+    );
+
+    if (movimientosDB.length === 0) {
       return NextResponse.json(
-        { success: false, error: "El archivo de extracto bancario ya no está disponible. Vuelve a subir el archivo." },
+        { success: false, error: "No hay movimientos registrados para esta conciliación." },
         { status: 404 }
       );
     }
 
-    const buffer = await readFile(rutaPerm);
-    const rutaTemp = join(tmpdir(), `bank_${randomUUID()}.xlsx`);
-    await writeFile(rutaTemp, buffer);
+    const movimientosJson = movimientosDB.map((m: any) => {
+      const fecha = m.fecha instanceof Date
+        ? m.fecha.toISOString().slice(0, 10)
+        : String(m.fecha ?? "").slice(0, 10);
+      const monto = Number(m.monto) || 0;
+      return {
+        Fecha: fecha,
+        "Descripción operación": m.descripcion ?? "",
+        "Referencia2": m.referencia ?? "",
+        Monto: m.tipo === "credito" ? monto : -monto,
+      };
+    });
+
+    const rutaMovimientosJson = join(tmpdir(), `mov_${randomUUID()}.json`);
+    await writeFile(rutaMovimientosJson, JSON.stringify(movimientosJson));
 
     let resultado;
     try {
       resultado = await PythonShell.run(
         "python/bank_reconciliation.py",
         {
-          pythonPath: process.env.PYTHON_PATH,
+          pythonPath: resolvePythonPath(),
           args: [
-            rutaTemp,
+            "",
             process.env.DB_HOST || "localhost",
             process.env.DB_USER || "root",
             process.env.DB_PASSWORD || "MYSQL",
             process.env.DB_NAME || "seamar",
             moneda,
+            rutaMovimientosJson,
           ],
         }
       );
     } finally {
-      await unlink(rutaTemp).catch(() => {});
+      await unlink(rutaMovimientosJson).catch(() => {});
     }
 
     const json = JSON.parse(resultado.join(""));
@@ -141,6 +161,8 @@ export async function POST(
         if (movimientoId === undefined || movimientoId === null || movimientoId === 0) {
           throw new Error("[REEJ] insertId es " + movimientoId + " para conciliacion_movimientos [" + i + "]");
         }
+
+        movimiento["id"] = String(movimientoId);
 
         for (let j = 0; j < coincidencias.length; j++) {
           const coincidencia = coincidencias[j];

@@ -24,6 +24,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type Targeta = "pagar" | "cobrar"
 
@@ -93,6 +102,8 @@ export function ImportarFacturaDialog({
   const [fase, setFase] = useState(-1)
   const [indiceActual, setIndiceActual] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [fallos, setFallos] = useState<{ nombre: string; motivo: string }[] | null>(null)
+  const [cerrarTrasAceptar, setCerrarTrasAceptar] = useState(false)
 
   useEffect(() => {
     if (!open) {
@@ -104,6 +115,8 @@ export function ImportarFacturaDialog({
       setFase(-1)
       setIndiceActual(0)
       setError(null)
+      setFallos(null)
+      setCerrarTrasAceptar(false)
     }
   }, [open])
 
@@ -197,17 +210,34 @@ export function ImportarFacturaDialog({
     if (elegidas.length === 0) return
     setGuardando(true)
     let guardadas = 0
+    const fallidas: { nombre: string; motivo: string }[] = []
 
     for (const item of elegidas) {
-      const response = await fetch(`/api/cuentas-por-${target}/importar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ factura: item.factura }),
-      })
-      if (response.ok) guardadas++
-      else {
-        const data = await response.json().catch(() => ({}))
-        if (data.duplicado) item.duplicada = true
+      try {
+        const response = await fetch(`/api/cuentas-por-${target}/importar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ factura: item.factura }),
+        })
+        if (response.ok) guardadas++
+        else {
+          const data = await response.json().catch(() => ({}))
+          let motivo: string
+          if (data.duplicado) {
+            item.duplicada = true
+            motivo = "ya existe una factura registrada con el mismo número (duplicada)."
+          } else if (data.error) {
+            motivo = String(data.error)
+          } else {
+            motivo = "ocurrió un error interno del sistema."
+          }
+          fallidas.push({ nombre: item.nombre, motivo })
+        }
+      } catch (error: any) {
+        fallidas.push({
+          nombre: item.nombre,
+          motivo: error?.message || "ocurrió un error interno del sistema.",
+        })
       }
     }
 
@@ -224,16 +254,32 @@ export function ImportarFacturaDialog({
 
     setGuardando(false)
 
+    if (fallidas.length > 0) {
+      setFallos(fallidas)
+      setCerrarTrasAceptar(guardadas > 0)
+    }
+
     if (guardadas > 0) {
       toast.success(
         `${guardadas} factura${guardadas === 1 ? "" : "s"} importada${guardadas === 1 ? "" : "s"}${
-          omitidas > 0 ? ` · ${omitidas} omitida${omitidas === 1 ? "" : "s"}` : ""
+          omitidas > 0 ? ` · ${omitidas} no se import${omitidas === 1 ? "ó" : "aron"}` : ""
         }.`,
       )
+    } else if (fallidas.length === 0) {
+      toast.error("No se pudo importar ninguna factura.")
+    }
+
+    if (fallidas.length === 0 && guardadas > 0) {
       onImportadas()
       onOpenChange(false)
-    } else {
-      toast.error("No se pudo importar ninguna factura.")
+    }
+  }
+
+  const aceptarFallos = () => {
+    setFallos(null)
+    if (cerrarTrasAceptar) {
+      onImportadas()
+      onOpenChange(false)
     }
   }
 
@@ -252,6 +298,7 @@ export function ImportarFacturaDialog({
   }
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(value) => {
@@ -445,12 +492,12 @@ export function ImportarFacturaDialog({
                     <div
                       key={item.id}
                       onClick={() => habilitada && alternarSeleccion(item.id)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                      className={`flex items-start gap-3 rounded-xl px-3 py-3 transition-colors ${
                         habilitada ? "cursor-pointer hover:bg-muted/50" : "opacity-60"
                       }`}
                     >
                       <div
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
                           seleccionada
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border"
@@ -463,13 +510,13 @@ export function ImportarFacturaDialog({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{item.nombre}</p>
+                        <p className="break-words text-sm font-medium leading-snug">{item.nombre}</p>
                         {item.factura ? (
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
                             {resumenFactura(item.factura)}
                           </p>
                         ) : (
-                          <p className="truncate text-xs text-destructive">
+                          <p className="mt-0.5 break-words text-xs leading-relaxed text-destructive">
                             {item.error || "No se pudieron extraer los datos"}
                           </p>
                         )}
@@ -559,5 +606,38 @@ export function ImportarFacturaDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {fallos && fallos.length > 0 && (
+      <AlertDialog open onOpenChange={(value) => { if (!value) setFallos(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {fallos.length === 1
+                ? "Una factura no se importó"
+                : `${fallos.length} facturas no se importaron`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {fallos.length === 1
+                ? "La siguiente factura no pudo ser registrada:"
+                : "Las siguientes facturas no pudieron ser registradas:"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+            {fallos.map((fallo, i) => (
+              <div key={i} className="rounded-xl border border-border bg-muted/30 p-3">
+                <p className="break-words text-sm font-medium">{fallo.nombre}</p>
+                <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
+                  Motivo: {fallo.motivo}
+                </p>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={aceptarFallos}>Aceptar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+    </>
   )
 }

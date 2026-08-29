@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { cacheClear, cacheGet, cacheSet } from "@/lib/simple-cache"
 import {
   Filter,
   Download,
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import type { EventoSincronizacion } from "@/components/sincronizacion-dialog"
 import { ImportarFacturaDialog } from "@/components/importar-factura-dialog"
+import { EditarVencimiento } from "@/components/editar-vencimiento"
 
 type Status =
   | "PENDIENTE"
@@ -47,6 +47,7 @@ type CuentaPorPagar = {
   estado: Status
   fecha_emision: string
   fecha_vencimiento: string
+  vencimiento_origen?: "FACTURA" | "SISTEMA" | "MANUAL" | null
   archivo_url: string
 }
 
@@ -54,8 +55,6 @@ const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
-
-const CUENTAS_POR_PAGAR_CACHE = "cuentas-por-pagar"
 
 function StatusBadge({ status }: { status: Status }) {
   const label = {
@@ -122,23 +121,6 @@ function DetraccionBadge({
   )
 }
 
-// Helper: obtiene año/mes/día locales a partir de fecha_emision
-function partesFecha(fecha: string) {
-  if (!fecha) return null;
-
-  const soloFecha = fecha.substring(0, 10);
-
-  const [year, month, day] = soloFecha
-    .split("-")
-    .map(Number);
-
-  return {
-    year,
-    month: month - 1,
-    day,
-  };
-}
-
 function formatearFecha(fecha?: string | null) {
   if (!fecha) return "-";
 
@@ -150,11 +132,19 @@ function formatearFecha(fecha?: string | null) {
 }
 
 export function AccountsPayableContent() {
-  const [accountsPayable, setAccountsPayable] = useState<CuentaPorPagar[]>([])
+  const [rows, setRows] = useState<CuentaPorPagar[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [nuevosIds, setNuevosIds] =
   useState<number[]>([]);
   const [statusFilter, setStatusFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [resumen, setResumen] = useState<{
+    years: { year: number; count: number }[]
+    months: { month: number; count: number }[]
+    days: { day: number; count: number }[]
+  }>({ years: [], months: [], days: [] })
   const [mostrarResumen, setMostrarResumen] =
   useState(false);
 
@@ -186,49 +176,94 @@ const [monedaExportar, setMonedaExportar] =
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Debounce de la búsqueda: la búsqueda se resuelve en el servidor (prefijo).
   useEffect(() => {
-    let cancelled = false
-    cargarCuentasPorPagar().then(() => { if (cancelled) return })
-    return () => { cancelled = true }
-  }, [])
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
-  const cargarCuentasPorPagar = async (
-  cantidadNueva = 0
-) => {
-    const cached = cacheGet<CuentaPorPagar[]>(CUENTAS_POR_PAGAR_CACHE)
-    if (cached) {
-      setAccountsPayable(cached)
-    }
+  const tieneFiltros =
+    statusFilter !== "all" ||
+    debouncedSearch.trim() !== "" ||
+    selectedYear !== null ||
+    selectedMonth !== null ||
+    selectedDay !== null
 
-    if (cantidadNueva > 0) {
-      cacheClear(CUENTAS_POR_PAGAR_CACHE)
-    }
+  const paramsResumen = useMemo(() => {
+    const p = new URLSearchParams()
+    if (statusFilter !== "all") p.set("estado", statusFilter)
+    if (debouncedSearch.trim()) p.set("q", debouncedSearch.trim())
+    if (selectedYear !== null) p.set("year", String(selectedYear))
+    if (selectedMonth !== null) p.set("month", String(selectedMonth + 1))
+    return p
+  }, [statusFilter, debouncedSearch, selectedYear, selectedMonth])
 
+  const paramsRows = useMemo(() => {
+    const p = new URLSearchParams(paramsResumen)
+    if (selectedDay !== null) p.set("day", String(selectedDay))
+    p.set("page", String(currentPage))
+    p.set("pageSize", "50")
+    return p
+  }, [paramsResumen, selectedDay, currentPage])
+
+  const cargarResumen = useCallback(async () => {
     try {
-      const response = await fetch("/api/cuentas-por-pagar", {
+      const response = await fetch(`/api/cuentas-por-pagar/resumen?${paramsResumen}`, {
         cache: "no-store",
       })
-      if (!response.ok) throw new Error("No se pudieron cargar las cuentas por pagar")
-
+      if (!response.ok) return
       const data = await response.json()
-      if (!Array.isArray(data)) throw new Error("Respuesta inválida de cuentas por pagar")
-
-      cacheSet(CUENTAS_POR_PAGAR_CACHE, data)
-      setAccountsPayable(data)
-      if (cantidadNueva > 0) {
-
-  const idsNuevos =
-    data
-      .slice(0, cantidadNueva)
-      .map((x: any) => Number(x.id));
-
-  setNuevosIds(idsNuevos);
-
-}
+      if (data.success === false) return
+      setResumen({
+        years: data.years || [],
+        months: data.months || [],
+        days: data.days || [],
+      })
     } catch (error) {
       console.error(error)
     }
-  }
+  }, [paramsResumen])
+
+  useEffect(() => {
+    cargarResumen()
+  }, [cargarResumen])
+
+  const cargarCuentasPorPagar = useCallback(
+    async (cantidadNueva = 0) => {
+      if (!tieneFiltros) {
+        setRows([])
+        setTotal(0)
+        return
+      }
+      try {
+        const response = await fetch(`/api/cuentas-por-pagar?${paramsRows}`, {
+          cache: "no-store",
+        })
+        if (!response.ok) throw new Error("No se pudieron cargar las cuentas por pagar")
+        const data = await response.json()
+        if (data.success === false) throw new Error("Respuesta inválida de cuentas por pagar")
+        const fila = Array.isArray(data.rows) ? data.rows : []
+        setRows(fila)
+        setTotal(Number(data.total ?? 0))
+        setTotalPages(Number(data.totalPages ?? 1))
+        if (cantidadNueva > 0) {
+          setNuevosIds(fila.slice(0, cantidadNueva).map((x: any) => Number(x.id)))
+        }
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    [tieneFiltros, paramsRows]
+  )
+
+  useEffect(() => {
+    if (!tieneFiltros) {
+      setRows([])
+      setTotal(0)
+    } else {
+      cargarCuentasPorPagar()
+    }
+  }, [tieneFiltros, paramsRows, cargarCuentasPorPagar])
 
   const sincronizarOneDrive = async () => {
 
@@ -476,83 +511,10 @@ const modalExportar = (
   )
 );
 
-  // ---- Filtros base: estado, proveedor, búsqueda (sin fecha) ----
-  const baseFiltered = useMemo(() => {
-    return accountsPayable.filter((item) => {
-      if (statusFilter !== "all" && item.estado !== statusFilter) return false
-      if (
-        searchQuery &&
-        !String(item.codigo || "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) &&
-        !String(item.proveedor || "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) &&
-        !String(item.servicio || "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) &&
-        !String(item.numero_documento || "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      ) {
-        return false
-      }
-
-      return true
-    })
-  }, [accountsPayable, statusFilter, searchQuery])
-
-  // ---- Años disponibles ----
-  const years = useMemo(() => {
-    const map = new Map<number, number>()
-
-    baseFiltered.forEach((item) => {
-      const partes = partesFecha(item.fecha_emision)
-      if (!partes) return
-      map.set(partes.year, (map.get(partes.year) || 0) + 1)
-    })
-
-    return Array.from(map.entries())
-      .sort((a, b) => b[0] - a[0])
-      .map(([year, count]) => ({ year, count }))
-  }, [baseFiltered])
-
-  // ---- Meses disponibles dentro del año seleccionado (todos visibles a la vez) ----
-  const months = useMemo(() => {
-    if (selectedYear === null) return []
-
-    const map = new Map<number, number>()
-
-    baseFiltered.forEach((item) => {
-      const partes = partesFecha(item.fecha_emision)
-      if (!partes || partes.year !== selectedYear) return
-      map.set(partes.month, (map.get(partes.month) || 0) + 1)
-    })
-
-    return Array.from(map.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([month, count]) => ({ month, count }))
-  }, [baseFiltered, selectedYear])
-
-  // ---- Días del mes seleccionado: SIEMPRE todos los días del mes, sin paginación ----
-  const days = useMemo(() => {
-    if (selectedYear === null || selectedMonth === null) return []
-
-    const counts = new Map<number, number>()
-
-    baseFiltered.forEach((item) => {
-      const partes = partesFecha(item.fecha_emision)
-      if (!partes || partes.year !== selectedYear || partes.month !== selectedMonth) return
-      counts.set(partes.day, (counts.get(partes.day) || 0) + 1)
-    })
-
-    const totalDiasMes = new Date(selectedYear, selectedMonth + 1, 0).getDate()
-
-    return Array.from({ length: totalDiasMes }, (_, i) => {
-      const day = i + 1
-      return { day, count: counts.get(day) || 0 }
-    })
-  }, [baseFiltered, selectedYear, selectedMonth])
+// ---- Años / meses / días: agregados calculados en el servidor (/resumen) ----
+  const years = resumen.years
+  const months = selectedYear === null ? [] : resumen.months
+  const days = selectedMonth === null ? [] : resumen.days
 
   // Al cambiar de año, resetear mes/día
   const handleSelectYear = (year: number) => {
@@ -571,40 +533,12 @@ const modalExportar = (
     setSelectedDay((prev) => (prev === day ? null : day))
   }
 
-  // ---- Filtrado final mostrado en la tabla ----
-  const filteredAccounts = useMemo(() => {
-    if (
-      selectedYear === null &&
-      selectedMonth === null &&
-      selectedDay === null &&
-      statusFilter === "all" &&
-      searchQuery.trim() === ""
-    ) {
-      return []
-    }
-
-    return baseFiltered.filter((item) => {
-      const partes = partesFecha(item.fecha_emision)
-      if (!partes) return false
-
-      if (selectedYear !== null && partes.year !== selectedYear) return false
-      if (selectedMonth !== null && partes.month !== selectedMonth) return false
-      if (selectedDay !== null && partes.day !== selectedDay) return false
-
-      return true
-    })
-  }, [baseFiltered, selectedYear, selectedMonth, selectedDay, statusFilter, searchQuery])
-
-  const pageSize = 50
-  const totalPages = Math.max(1, Math.ceil(filteredAccounts.length / pageSize))
-  const visibleAccounts = useMemo(
-    () => filteredAccounts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredAccounts, currentPage],
-  )
+  // La tabla muestra únicamente la página actual traída del servidor.
+  const visibleAccounts = rows
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [statusFilter, searchQuery, selectedYear, selectedMonth, selectedDay])
+  }, [statusFilter, debouncedSearch, selectedYear, selectedMonth, selectedDay])
 
 
   
@@ -624,8 +558,7 @@ const modalExportar = (
       target="pagar"
       open={mostrarImportar}
       onOpenChange={setMostrarImportar}
-      onImportadas={() => {
-        cacheClear(CUENTAS_POR_PAGAR_CACHE)
+onImportadas={() => {
         cargarCuentasPorPagar()
       }}
     />
@@ -786,7 +719,7 @@ const modalExportar = (
         </Card>
 
         <p className="text-sm text-muted-foreground">
-           Mostrando {visibleAccounts.length} de {filteredAccounts.length} documentos
+           Mostrando {visibleAccounts.length} de {total} documentos
           {tituloSeleccion ? ` · ${tituloSeleccion}` : ""}
         </p>
 
@@ -879,7 +812,13 @@ const modalExportar = (
                         </td>
 
                         <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
-                          {formatearFecha(item.fecha_vencimiento)}
+                          <EditarVencimiento
+                            cuentaId={item.id}
+                            fechaVencimiento={item.fecha_vencimiento || null}
+                            origen={item.vencimiento_origen}
+                            modulo="cxp"
+                            onGuardado={cargarCuentasPorPagar}
+                          />
                         </td>
 
                         <td className="px-1.5 py-3 whitespace-nowrap align-middle text-center">
@@ -901,7 +840,7 @@ const modalExportar = (
                       </tr>
                     ))}
 
-                    {filteredAccounts.length === 0 && (
+{total === 0 && (
                       <tr>
                         <td
                           colSpan={12}
@@ -976,7 +915,13 @@ const modalExportar = (
                   <div className="flex justify-between">
                     <span>Vencimiento:</span>
                     <span className="text-right font-medium text-foreground">
-                      {formatearFecha(item.fecha_vencimiento)}
+                      <EditarVencimiento
+                        cuentaId={item.id}
+                        fechaVencimiento={item.fecha_vencimiento || null}
+                        origen={item.vencimiento_origen}
+                        modulo="cxp"
+                        onGuardado={cargarCuentasPorPagar}
+                      />
                     </span>
                   </div>
                 </div>
@@ -1000,14 +945,14 @@ const modalExportar = (
             </Card>
           ))}
 
-          {filteredAccounts.length === 0 && (
+          {total === 0 && (
             <p className="text-center text-muted-foreground py-8">
                Selecciona un año, un estado o busca una factura para mostrar documentos.
             </p>
           )}
         </div>
 
-        {filteredAccounts.length > 0 && (
+        {total > 0 && (
           <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
             <span className="text-muted-foreground">Página {currentPage} de {totalPages}</span>
             <div className="flex gap-2">
