@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
 import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive";
-import { Buffer } from "buffer";
 import { getAccessToken } from "@/lib/msal";
 import { obtenerSesion } from "@/lib/session";
 import { monedaO } from "@/lib/moneda";
 import { verificarPeriodoRegistrable } from "@/lib/backups";
+import { existeDocumentoValorizacion } from "@/lib/valorizacion-documentos";
 
 
 
@@ -85,10 +85,27 @@ ON c.id = p.cliente_id
 }
 
 
+/** Máximo correlativo (número final del código) para una empresa y año. */
+async function maxCorrelativo(proveedor: string, anio: number): Promise<number> {
+  const [rows]: any = await pool.query(
+    `SELECT codigo FROM valorizaciones WHERE proveedor = ? AND codigo LIKE ?`,
+    [proveedor, `VAL-${anio}-%`]
+  )
+
+  let max = 0
+
+  for (const fila of rows) {
+    const partes = String(fila.codigo).split("-")
+    const numero = Number(partes[partes.length - 1])
+    if (!isNaN(numero)) max = Math.max(max, numero)
+  }
+
+  return max
+}
+
 export async function POST(request: Request) {
   try {
 
-    const token = await getAccessToken();
     const sesion = await obtenerSesion();
     const formData = await request.formData()
 
@@ -133,65 +150,144 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: periodoAbierto.motivo }, { status: 409 })
     }
 
-    const [result]: any =
-  await pool.query(
-      `
-      INSERT INTO valorizaciones (
-        proveedor,
-        ruc,
-        negocio_operacion,
-        proyecto_id,
-        numero_orden_servicio,
-        descripcion,
-        monto,
-        moneda,
-        periodo,
-        fecha_ejecucion,
-        encargado,
-        estado,
-        creado_por,
-        archivo_nombre,
-        respaldo_nombre
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        proveedor,
-        null,
-        negocio_operacion,
-        proyecto_id,
-        numero_orden_servicio,
-        descripcion,
-        monto,
-        moneda,
-        periodo || null,
-        fecha_ejecucion || null,
-        encargado,
-        "BORRADOR",
-        sesion?.nombre || sesion?.correo || "Sistema",
-        documentos.map((doc) => doc.name).join(", "),
-        documentos.map((doc) => doc.name).join(", "),
-      ]
-    )
+    const anio =
+  (() => {
+    const d = fecha_ejecucion ? new Date(fecha_ejecucion) : new Date()
+    return !isNaN(d.getTime()) ? d.getFullYear() : new Date().getFullYear()
+  })()
 
-    const valorizacionId =
+  let correlativo =
+  (await maxCorrelativo(proveedor, anio)) + 1
+
+  let codigo =
+  `VAL-${anio}-${String(correlativo).padStart(3, "0")}`
+
+  let result: any
+
+  for (let intento = 0; intento < 100; intento++) {
+
+    try {
+      ;[result] = await pool.query(
+        `
+        INSERT INTO valorizaciones (
+          codigo,
+          proveedor,
+          ruc,
+          negocio_operacion,
+          proyecto_id,
+          numero_orden_servicio,
+          descripcion,
+          monto,
+          moneda,
+          periodo,
+          fecha_ejecucion,
+          encargado,
+          estado,
+          creado_por,
+          archivo_nombre,
+          respaldo_nombre
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          codigo,
+          proveedor,
+          null,
+          negocio_operacion,
+          proyecto_id,
+          numero_orden_servicio,
+          descripcion,
+          monto,
+          moneda,
+          periodo || null,
+          fecha_ejecucion || null,
+          encargado,
+          "BORRADOR",
+          sesion?.nombre || sesion?.correo || "Sistema",
+          documentos.map((doc) => doc.name).join(", "),
+          documentos.map((doc) => doc.name).join(", "),
+        ]
+      )
+      break
+    } catch (error: any) {
+      if (error?.errno === 1062) {
+        correlativo += 1
+        codigo = `VAL-${anio}-${String(correlativo).padStart(3, "0")}`
+        continue
+      }
+      throw error
+    }
+  }
+
+  const valorizacionId =
   result.insertId
 
 
-for (const documento of documentos) {
+  if (documentos.length > 0) {
+
+  let token: string | null = null
 
   try {
+    token = await getAccessToken()
+  } catch (error) {
+    console.error("No se pudo obtener token de OneDrive:", error)
+    token = null
+  }
 
-    const bytes = await documento.arrayBuffer()
+  const subidos: Array<{ nombre: string; onedrive_id: string; url: string }> = []
+  const fallidos: Array<{ nombre: string }> = []
 
-    const buffer = Buffer.from(bytes)
+  if (token) {
+    const resultados = await Promise.all(
+      documentos.map(async (documento) => {
+        try {
+          const bytes = await documento.arrayBuffer()
 
-    const archivoSubido =
-  await subirDocumentoRespaldoAOneDrive(
-    documento.name,
-    buffer,
-    token
-  )
+          const buffer = Buffer.from(bytes)
+
+          const archivoSubido =
+        await subirDocumentoRespaldoAOneDrive(
+          documento.name,
+          buffer,
+          token
+        )
+
+          return {
+            ok: true as const,
+            nombre: archivoSubido.nombre,
+            onedrive_id: archivoSubido.itemId,
+            url: archivoSubido.webUrl,
+          }
+        } catch (error) {
+          console.error(
+            `No se pudo subir "${documento.name}" a OneDrive:`,
+            error
+          )
+          return { ok: false as const, nombre: documento.name }
+        }
+      })
+    )
+
+    for (const resultado of resultados) {
+      if (resultado.ok) {
+        subidos.push(resultado)
+      } else {
+        fallidos.push(resultado)
+      }
+    }
+  } else {
+    for (const documento of documentos) {
+      fallidos.push({ nombre: documento.name })
+    }
+  }
+
+  for (const documento of subidos) {
+    const yaExiste = await existeDocumentoValorizacion(
+      valorizacionId,
+      documento.nombre,
+      documento.onedrive_id
+    );
+    if (yaExiste) continue;
 
     await pool.query(
       `
@@ -205,29 +301,29 @@ for (const documento of documentos) {
       `,
       [
   valorizacionId,
-  archivoSubido.nombre,
-  archivoSubido.itemId,
-  archivoSubido.webUrl,
+  documento.nombre,
+  documento.onedrive_id,
+  documento.url,
 ]
     )
-  } catch (error) {
-
-console.log(
-  "ENTRO AL CATCH"
-)
-
-    console.error(
-      "No se pudo subir a OneDrive:",
-      error
-    )
-
-    throw error
   }
-}
 
     return NextResponse.json({
       success: true,
-      documentos: documentos.length,
+      documentos: subidos.length,
+      documentosFallidos: fallidos.map((f) => f.nombre),
+      mensaje:
+        fallidos.length > 0
+          ? `Valorización registrada, pero no se pudieron subir los documentos a OneDrive: ${fallidos
+              .map((f) => f.nombre)
+              .join(", ")}`
+          : undefined,
+    })
+  }
+
+    return NextResponse.json({
+      success: true,
+      documentos: 0,
     })
   } catch (error) {
     console.error(error)

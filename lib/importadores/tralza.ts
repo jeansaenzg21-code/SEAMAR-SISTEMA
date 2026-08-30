@@ -16,6 +16,7 @@ export const tralzaImportador: Importador = {
   },
 
   async importar(
+    _empresa: string,
     buffer: Buffer,
     nombreArchivo: string,
     _seleccion: string[],
@@ -29,9 +30,23 @@ export const tralzaImportador: Importador = {
       throw new Error("No se pudo obtener el número de Orden de Servicio del documento")
     }
 
+    // Solo dígitos, conservando ceros a la izquierda ("OS 00000117" -> "00000117").
+    const osSoloDigitos = String(json.numeroOrdenServicio).replace(/[^\d]/g, "")
+    if (!osSoloDigitos) {
+      throw new Error("No se pudo obtener el número de Orden de Servicio del documento")
+    }
+    json.numeroOrdenServicio = osSoloDigitos
+
     json.empresaCliente = "TRALZA"
     json.proveedor = "TRALZA"
-    json.proyecto = `OS ${json.numeroOrdenServicio}`
+
+    if (json.descripcion) {
+      json.descripcion = String(json.descripcion).replace(/\s+/g, " ").trim()
+    }
+
+    // Si el sistema no encuentra un proyecto, la columna Proyecto queda en blanco:
+    // la descripción va en su propia columna y no debe reutilizarse como proyecto.
+    json.proyecto = ""
 
     const datos = [json]
 

@@ -38,6 +38,37 @@ export async function POST() {
 
     for (const archivo of lista) {
 
+  // Salvaguarda: evita reprocesar archivos que el propio sistema ya subió a la
+  // carpeta VALORIZACIONES (importaciones) y que quedaron vinculados a una
+  // valorización, para no registrar duplicados.
+  const [yaVinculado]: any = await pool.query(
+    `
+    SELECT 1 AS existe
+    FROM valorizaciones
+    WHERE archivo_onedrive_id = ?
+    LIMIT 1
+    `,
+    [archivo.id]
+  );
+
+  if (yaVinculado.length > 0) {
+    continue;
+  }
+
+  const [yaDocumentado]: any = await pool.query(
+    `
+    SELECT 1 AS existe
+    FROM valorizacion_documentos
+    WHERE onedrive_id = ?
+    LIMIT 1
+    `,
+    [archivo.id]
+  );
+
+  if (yaDocumentado.length > 0) {
+    continue;
+  }
+
   const archivoCompleto =
   await descargarArchivo(
     archivo.id

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import Link from "next/link"
 import {
   Card,
@@ -41,6 +41,9 @@ export interface DashboardKPI {
   id: KpiId
   value: number
   description: string
+  // Cuando es true el valor es un total (sin moneda definida) y se muestra
+  // como número plano, sin símbolo de moneda.
+  plain?: boolean
 }
 
 // AlertaEstado es un identificador interno enviado por el backend (nunca un
@@ -87,6 +90,7 @@ export interface DashboardData {
   recentActivity: DashboardActivity[]
   topClients: DashboardClient[]
   availableYears: number[]
+  availableMonedas: Moneda[]
 }
 
 
@@ -188,11 +192,12 @@ const RIESGO_CONFIG: Record<Riesgo, { label: string; className: string }> = {
 
 // Moneda soportada por el selector de filtros. El backend recibirá este
 // valor tal cual vía query param `moneda`.
-export type Moneda = "SOLES" | "DOLARES"
+export type Moneda = "SOLES" | "DOLARES" | "TODAS"
 
 const MONEDA_OPTIONS: { value: Moneda; label: string }[] = [
   { value: "SOLES", label: "Soles" },
   { value: "DOLARES", label: "Dólares" },
+  { value: "TODAS", label: "Todas" },
 ]
 
 // Los meses se listan en español, en orden calendario. El valor enviado al
@@ -242,6 +247,13 @@ function formatCurrency(
   })}`
 
 }
+function formatPlainAmount(value: number): string {
+  return value.toLocaleString("es-PE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
+
 function formatRelativeTime(iso: string): string {
 
   const fecha = new Date(iso);
@@ -297,7 +309,9 @@ function KPICard({
         </div>
 
         <div className="text-2xl font-bold tracking-tight">
-          {formatCurrency(kpi.value, moneda)}
+          {kpi.plain
+            ? formatPlainAmount(kpi.value)
+            : formatCurrency(kpi.value, moneda)}
         </div>
 
         <p className="mt-1 text-sm text-muted-foreground">
@@ -419,6 +433,10 @@ export function DashboardContent() {
   const [mes, setMes] = useState<string>(String(new Date().getMonth() + 1))
   const [anio, setAnio] = useState<string>(String(new Date().getFullYear()))
 
+  // Marca si el usuario cambió la moneda manualmente para no pisarle su
+  // elección con la autodetección basada en las monedas con valorizaciones.
+  const cambioManualMoneda = useRef(false)
+
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -447,6 +465,16 @@ export function DashboardContent() {
     return () => { cancelled = true }
   }, [loadDashboard])
 
+  // Ajusta el filtro de moneda a la moneda de las valorizaciones existentes
+  // cuando el usuario aún no la ha cambiado manualmente.
+  useEffect(() => {
+    if (cambioManualMoneda.current) return
+    const disponibles = dashboardData?.availableMonedas ?? []
+    if (disponibles.length > 0 && !disponibles.includes(moneda)) {
+      setMoneda(disponibles[0])
+    }
+  }, [dashboardData, moneda])
+
   return (
     <div className="space-y-8">
       {/* Encabezado */}
@@ -467,7 +495,10 @@ export function DashboardContent() {
           una nueva consulta a GET /api/dashboard con los query params
           correspondientes (ver loadDashboard). No requiere botón "Buscar". */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <Select value={moneda} onValueChange={(value) => setMoneda(value as Moneda)}>
+        <Select value={moneda} onValueChange={(value) => {
+            cambioManualMoneda.current = true
+            setMoneda(value as Moneda)
+          }}>
           <SelectTrigger className="w-full sm:w-[160px]">
             <SelectValue placeholder="Moneda" />
           </SelectTrigger>

@@ -4,6 +4,7 @@ import { subirArchivoAOneDrive } from "@/lib/onedrive";
 import { ONEDRIVE_FOLDERS } from "@/lib/onedrive-config";
 import { getAccessToken } from "@/lib/msal";
 import { monedaO } from "@/lib/moneda";
+import { existeDocumentoValorizacion } from "@/lib/valorizacion-documentos";
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -65,6 +66,13 @@ const archivoSubido = await subirArchivoAOneDrive(
   ONEDRIVE_FOLDERS.DOCUMENTOS_RESPALDO,
   token
 );
+
+  const yaExiste = await existeDocumentoValorizacion(
+    id,
+    archivoSubido.nombre,
+    archivoSubido.itemId
+  );
+  if (yaExiste) continue;
 
   await pool.query(
     `

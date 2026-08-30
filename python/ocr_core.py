@@ -70,6 +70,36 @@ def _ocr_en_imagen(imagen, ocr):
     return texto
 
 
+def _ocr_con_rotaciones(imagen, ocr):
+    """Ejecuta OCR en 0° y 180° y devuelve el texto de la orientación con mejor puntaje.
+
+    Los escaneos suelen quedar girados 180° dentro del PDF; PaddleOCR no aplica
+    el clasificador de orientación en esta instalación, así que se comparan ambas
+    orientaciones y se conserva la de mayor confianza.
+    """
+    mejor_texto = ""
+    mejor_puntaje = -1.0
+
+    candidatas = [
+        imagen,
+        cv2.rotate(imagen, cv2.ROTATE_180),
+    ]
+
+    for img in candidatas:
+        try:
+            resultado = ocr.ocr(img)
+        except Exception:
+            continue
+
+        texto, puntaje = _procesar_resultado_ocr(resultado)
+
+        if texto and puntaje > mejor_puntaje:
+            mejor_puntaje = puntaje
+            mejor_texto = texto
+
+    return mejor_texto
+
+
 def _ajustar_resolucion(imagen):
     alto, ancho = imagen.shape[:2]
     lado = max(alto, ancho)
@@ -119,8 +149,8 @@ def _variantes_preprocesado(gris):
     return [binaria, binaria_suave, otsu, clahe_img]
 
 
-def _ocr_mejor_texto(imagen, ocr):
-    """Ejecuta OCR sobre las variantes y devuelve el texto con mejor puntaje."""
+def _mejor_texto_y_puntaje(imagen, ocr):
+    """OCR sobre las variantes de preprocesado; devuelve (texto, puntaje) del mejor."""
     if imagen.ndim == 3:
         gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
     else:
@@ -141,7 +171,13 @@ def _ocr_mejor_texto(imagen, ocr):
             mejor_puntaje = puntaje
             mejor_texto = texto
 
-    return mejor_texto
+    return mejor_texto, mejor_puntaje
+
+
+def _ocr_mejor_texto(imagen, ocr):
+    """Ejecuta OCR sobre las variantes y devuelve el texto con mejor puntaje."""
+    texto, _ = _mejor_texto_y_puntaje(imagen, ocr)
+    return texto
 
 
 def _ordenar_puntos(pts):
@@ -225,15 +261,20 @@ def extraer_texto_imagen(ruta_imagen, ocr):
 
     imagen = _ajustar_resolucion(imagen)
 
-    mejor = _ocr_mejor_texto(imagen, ocr)
+    mejor_texto, mejor_puntaje = _mejor_texto_y_puntaje(imagen, ocr)
+
+    rotada = cv2.rotate(imagen, cv2.ROTATE_180)
+    texto_rotada, puntaje_rotada = _mejor_texto_y_puntaje(rotada, ocr)
+    if texto_rotada and puntaje_rotada > mejor_puntaje:
+        mejor_texto, mejor_puntaje = texto_rotada, puntaje_rotada
 
     enderezada = _corregir_perspectiva(imagen)
     if enderezada is not None:
-        texto_enderezada = _ocr_mejor_texto(enderezada, ocr)
-        if texto_enderezada and len(texto_enderezada) > len(mejor):
-            mejor = texto_enderezada
+        texto_enderezada, puntaje_enderezada = _mejor_texto_y_puntaje(enderezada, ocr)
+        if texto_enderezada and puntaje_enderezada > mejor_puntaje:
+            mejor_texto = texto_enderezada
 
-    return mejor
+    return mejor_texto
 
 
 def extraer_texto(pdf_path, ocr):
@@ -252,7 +293,7 @@ def extraer_texto(pdf_path, ocr):
         imagen = cv2.GaussianBlur(imagen, (3, 3), 0)
         imagen = cv2.adaptiveThreshold(imagen, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15)
 
-        pagina_texto = _ocr_en_imagen(imagen, ocr)
+        pagina_texto = _ocr_con_rotaciones(imagen, ocr)
         if pagina_texto:
             texto.append(pagina_texto)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
 import { obtenerSesion } from "@/lib/session";
+import { documentosRequeridos, nombreCortoCliente } from "@/lib/valorizacion-documentos";
 
 export async function PATCH(
   req: Request,
@@ -116,18 +117,17 @@ export async function PATCH(
 
       const proveedor = String(clienteRows[0]?.proveedor || "").toUpperCase();
 
-      const esRepsol = proveedor.includes("REPSOL");
-      const documentosRequeridos = esRepsol ? 4 : 3;
+      const documentoMinimo = documentosRequeridos(proveedor);
 
-      if (Number(valorizacion?.documentos_adjuntos || 0) < documentosRequeridos) {
-        observacionesSistema.push(`Documentos incompletos para ${esRepsol ? "REPSOL" : "TDP"}`);
+      if (Number(valorizacion?.documentos_adjuntos || 0) < documentoMinimo) {
+        observacionesSistema.push(`Documentos incompletos para ${nombreCortoCliente(proveedor)}`);
       }
 
       if (observacionesSistema.length > 0) {
         estadoFinal = "OBSERVADO";
       }
 
-      if (Number(valorizacion?.documentos_adjuntos || 0) >= documentosRequeridos) {
+      if (Number(valorizacion?.documentos_adjuntos || 0) >= documentoMinimo) {
         await pool.query(
           `UPDATE valorizacion_observaciones SET estado = 'RESUELTA', fecha_resolucion = NOW() WHERE valorizacion_id = ? AND tipo = 'SISTEMA' AND estado = 'PENDIENTE' AND observacion LIKE ?`,
           [id, 'Documentos incompletos%']

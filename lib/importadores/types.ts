@@ -15,6 +15,7 @@ export interface ResultadoImportacion {
 export interface Importador {
   detectar(buffer: Buffer, nombreArchivo: string): Promise<{ items: ItemDetectado[] }>
   importar(
+    empresa: string,
     buffer: Buffer,
     nombreArchivo: string,
     seleccion: string[],

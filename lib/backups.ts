@@ -852,10 +852,18 @@ export async function estadoPeriodoPorFecha(
     return { existe: false, estado: null, anio, mes };
   }
 
-  const [rows]: any = await pool.query(
-    `SELECT estado FROM periodos WHERE anio = ? AND mes = ? LIMIT 1`,
-    [anio, mes]
-  );
+  let rows: any;
+  try {
+    [rows] = await pool.query(
+      `SELECT estado FROM periodos WHERE anio = ? AND mes = ? LIMIT 1`,
+      [anio, mes]
+    );
+  } catch (error: any) {
+    if (error?.errno === 1146 || error?.code === "ER_NO_SUCH_TABLE") {
+      return { existe: false, estado: null, anio, mes };
+    }
+    throw error;
+  }
 
   if (!rows?.[0]) return { existe: false, estado: null, anio, mes };
   return { existe: true, estado: rows[0].estado, anio, mes };

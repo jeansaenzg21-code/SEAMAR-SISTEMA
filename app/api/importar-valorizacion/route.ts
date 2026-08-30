@@ -72,6 +72,7 @@ console.log(`[${importDebugId}] Fase 2: importando valorizaciones`);
     console.log(`[${importDebugId}] creadoPor:`, creadoPor);
 
     const resultado = await importador.importar(
+      empresa,
       buffer,
       archivo.name,
       seleccion,

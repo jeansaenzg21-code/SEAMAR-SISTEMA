@@ -54,39 +54,40 @@ export async function GET(request: Request) {
     // =========================
     // VALORIZACIONES APROBADAS
     // =========================
+    const esTodasLasMonedas = moneda === "TODAS"
     const [valorizacionesRows]: any = await pool.query(
+  esTodasLasMonedas
+    ? `
+  SELECT COALESCE(SUM(monto), 0) AS total
+  FROM valorizaciones
+  WHERE estado = 'APROBADO'
   `
+    : `
   SELECT COALESCE(SUM(monto), 0) AS total
   FROM valorizaciones
   WHERE moneda = ?
-    AND MONTH(fecha_ejecucion) = ?
-    AND YEAR(fecha_ejecucion) = ?
     AND estado = 'APROBADO'
   `,
-  [
-    moneda,
-    mes,
-    anio
-  ]
+  esTodasLasMonedas ? [] : [moneda]
 );
 
     // =========================
     // VALORIZACIONES PENDIENTES
     // =========================
     const [pendientesRows]: any = await pool.query(
+  esTodasLasMonedas
+    ? `
+  SELECT COALESCE(SUM(monto), 0) AS total
+  FROM valorizaciones
+  WHERE estado IN ('BORRADOR', 'EN_REVISION', 'OBSERVADO')
   `
+    : `
   SELECT COALESCE(SUM(monto), 0) AS total
   FROM valorizaciones
   WHERE moneda = ?
-    AND MONTH(fecha_ejecucion) = ?
-    AND YEAR(fecha_ejecucion) = ?
     AND estado IN ('BORRADOR', 'EN_REVISION', 'OBSERVADO')
   `,
-  [
-    moneda,
-    mes,
-    anio
-  ]
+  esTodasLasMonedas ? [] : [moneda]
 );
 
 // =========================
@@ -168,23 +169,47 @@ if (alertasData.observado_5d > 0) {
     const availableYears = yearsRows.map((r: any) => r.anio);
 
     // =========================
+    // MONEDAS CON VALORIZACIONES
+    // =========================
+    const [monedasRows]: any = await pool.query(`
+      SELECT moneda
+      FROM valorizaciones
+      WHERE moneda IN ('SOLES', 'DOLARES')
+      GROUP BY moneda
+      ORDER BY MAX(fecha_ejecucion) DESC
+    `);
+    const availableMonedas = monedasRows.map((r: any) => r.moneda);
+
+    // =========================
     // TOP CLIENTES POR INDICADOR
     // =========================
     const [topRows]: any = await pool.query(`
       SELECT
         c.id,
         c.razon_social AS nombre,
-        COALESCE(SUM(cxc.saldo), 0) AS cxc,
-        COUNT(DISTINCT v.id) AS valorizaciones,
-        COALESCE(SUM(CASE WHEN cxc.fecha_vencimiento < CURDATE() AND cxc.estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO') THEN cxc.saldo ELSE 0 END), 0) AS mora
+        COALESCE(cc.cxc, 0) AS cxc,
+        COALESCE(vv.cantidad, 0) AS valorizaciones,
+        COALESCE(cc.mora, 0) AS mora
       FROM clientes c
-      INNER JOIN cuentas_por_cobrar cxc ON c.id = cxc.cliente_id
-        AND cxc.moneda = ?
-        AND cxc.estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO')
       -- En valorizaciones el campo "proveedor" almacena el nombre del cliente.
       -- Por ello el JOIN se realiza usando clientes.razon_social.
-      LEFT JOIN valorizaciones v ON c.razon_social = v.proveedor
-      GROUP BY c.id, c.razon_social
+      LEFT JOIN (
+        SELECT cliente_id,
+               SUM(saldo) AS cxc,
+               SUM(CASE WHEN fecha_vencimiento < CURDATE() AND estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO') THEN saldo ELSE 0 END) AS mora
+        FROM cuentas_por_cobrar
+        WHERE moneda = ?
+          AND estado IN ('PENDIENTE', 'FACTURADO', 'VENCIDO')
+        GROUP BY cliente_id
+      ) cc ON c.id = cc.cliente_id
+      LEFT JOIN (
+        SELECT c2.id AS cliente_id,
+               COUNT(*) AS cantidad
+        FROM clientes c2
+        INNER JOIN valorizaciones v ON c2.razon_social = v.proveedor
+        GROUP BY c2.id
+      ) vv ON c.id = vv.cliente_id
+      WHERE cc.cliente_id IS NOT NULL OR vv.cliente_id IS NOT NULL
       ORDER BY cxc DESC
       LIMIT 5
     `, [moneda]);
@@ -225,12 +250,14 @@ if (alertasData.observado_5d > 0) {
         {
           id: "valorizaciones",
           value: Number(valorizacionesRows[0].total),
-          description: "Valorizaciones aprobadas",
+          description: esTodasLasMonedas ? "Total en todas las monedas" : "Total aprobado",
+          plain: esTodasLasMonedas,
         },
         {
   id: "pending_valuations",
   value: Number(pendientesRows[0].total),
-  description: "Valorizaciones pendientes",
+  description: esTodasLasMonedas ? "Total en todas las monedas" : "Total pendiente",
+  plain: esTodasLasMonedas,
 }
       ],
 
@@ -251,6 +278,7 @@ if (alertasData.observado_5d > 0) {
 })),
       topClients: topClients,
       availableYears,
+      availableMonedas,
     });
   } catch (error) {
     console.error(error);

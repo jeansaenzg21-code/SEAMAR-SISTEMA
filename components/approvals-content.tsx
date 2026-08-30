@@ -114,6 +114,7 @@ export function ApprovalsContent() {
 
 const [isViewOpen, setIsViewOpen] =
   useState(false)
+  const [activeTab, setActiveTab] = useState("pending")
   const filteredApprovals = approvals.filter((item) =>
     String(item.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -244,6 +245,9 @@ const abrirDetalle = async (item: Approval) => {
     </Card>
   )
 
+  const esAprobadaEnPestanaAprobadas =
+    selectedApproval?.status === "approved" && activeTab === "approved"
+
   return (
     <div className="min-h-screen">
       <div className="p-6 space-y-6">
@@ -296,7 +300,7 @@ const abrirDetalle = async (item: Approval) => {
           />
         </div>
 
-        <Tabs defaultValue="pending">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="pending">Pendientes</TabsTrigger>
             <TabsTrigger value="observed">Observadas</TabsTrigger>
@@ -540,49 +544,54 @@ const abrirDetalle = async (item: Approval) => {
     </div>
   )}
 
-  <div className="mt-4 flex gap-2">
-    <Input
-      placeholder="Responder observación..."
-      value={observation}
-      onChange={(e) => setObservation(e.target.value)}
-    />
+  {!esAprobadaEnPestanaAprobadas && (
+    <div className="mt-4 flex gap-2">
+      <Input
+        placeholder="Responder observación..."
+        value={observation}
+        onChange={(e) => setObservation(e.target.value)}
+      />
 
-    <Button
-      variant="outline"
-      onClick={async () => {
-        if (!selectedApproval) return
+      <Button
+        variant="outline"
+        onClick={async () => {
+          if (!selectedApproval) return
 
-        await fetch(
-          `/api/valorizaciones/${selectedApproval.id}/estado`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              estado: "OBSERVADO",
-              observacion: observation,
-            }),
-          }
-        )
-
-        setApprovals((prev) =>
-          prev.map((item) =>
-            String(item.id) === String(selectedApproval.id)
-              ? { ...item, status: "observed" }
-              : item
+          await fetch(
+            `/api/valorizaciones/${selectedApproval.id}/estado`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                estado: "OBSERVADO",
+                observacion: observation,
+              }),
+            }
           )
-        )
 
-        setIsViewOpen(false)
-        setSelectedApproval(null)
-      }}
-    >
-      Enviar
-    </Button>
-  
-        </div>
+          setApprovals((prev) =>
+            prev.map((item) =>
+              String(item.id) === String(selectedApproval.id)
+                ? { ...item, status: "observed" }
+                : item
+            )
+          )
+
+          setIsViewOpen(false)
+          setSelectedApproval(null)
+        }}
+      >
+        Enviar
+      </Button>
+
+    </div>
+  )}
   
     <div className="sticky bottom-0 flex gap-3 border-t bg-background pt-4">
-      {rolUsuario === "SUPERVISOR" || rolUsuario === "ADMINISTRADOR" ? (
+      {(rolUsuario === "SUPERVISOR" ||
+        rolUsuario === "ADMINISTRADOR") &&
+      activeTab !== "observed" &&
+      !esAprobadaEnPestanaAprobadas ? (
   <Button
     className="flex-1 bg-green-600 hover:bg-green-700"
     onClick={() => {
@@ -593,6 +602,7 @@ const abrirDetalle = async (item: Approval) => {
   </Button>
 ) : null}
 
+      {!esAprobadaEnPestanaAprobadas && (
       <Button
   variant="outline"
   className="flex-1"
@@ -626,6 +636,7 @@ const abrirDetalle = async (item: Approval) => {
 >
   Solicitar corrección
 </Button>
+  )}
     </div>
   </DialogContent>
 </Dialog>

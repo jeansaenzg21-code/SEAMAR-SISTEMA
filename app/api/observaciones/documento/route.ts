@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive"
 import { getAccessToken } from "@/lib/msal"
 import pool from "@/lib/mysql"
+import { existeDocumentoValorizacion, documentosRequeridos } from "@/lib/valorizacion-documentos"
 
 export async function POST(req: Request) {
   const debugId = `OBS_UPLOAD_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -35,6 +36,18 @@ export async function POST(req: Request) {
     )
     console.log(`[${debugId}] subida exitosa:`, JSON.stringify(resultado, null, 2));
 
+    const yaExiste = await existeDocumentoValorizacion(
+      String(valorizacionId),
+      resultado.nombre,
+      resultado.itemId
+    )
+    if (yaExiste) {
+      return NextResponse.json(
+        { error: "El documento ya está registrado en esta valorización" },
+        { status: 409 }
+      )
+    }
+
     const [insertResult]: any = await pool.query(
       `INSERT INTO valorizacion_documentos (valorizacion_id, nombre, onedrive_id, url) VALUES (?, ?, ?, ?)`,
       [valorizacionId, resultado.nombre, resultado.itemId, resultado.webUrl]
@@ -47,9 +60,8 @@ export async function POST(req: Request) {
 
     if (valInfo.length > 0) {
       const proveedor = String(valInfo[0].proveedor || '').toUpperCase()
-      const esRepsol = proveedor.includes('REPSOL')
-      const documentosRequeridos = esRepsol ? 4 : 3
-      if (Number(valInfo[0].total_docs) >= documentosRequeridos) {
+      const documentosMinimos = documentosRequeridos(proveedor)
+      if (Number(valInfo[0].total_docs) >= documentosMinimos) {
         await pool.query(
           `UPDATE valorizacion_observaciones SET estado = 'RESUELTA', fecha_resolucion = NOW() WHERE valorizacion_id = ? AND tipo = 'SISTEMA' AND estado = 'PENDIENTE' AND observacion LIKE ?`,
           [valorizacionId, 'Documentos incompletos%']

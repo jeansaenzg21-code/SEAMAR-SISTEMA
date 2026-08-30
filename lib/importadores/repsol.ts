@@ -33,6 +33,7 @@ export const repsolImportador: Importador = {
 },
 
   async importar(
+    _empresa: string,
     buffer: Buffer,
     nombreArchivo: string,
     seleccion: string[],

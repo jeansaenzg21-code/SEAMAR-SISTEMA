@@ -1,6 +1,7 @@
 import pool from "./mysql";
 import { buscarOSPorNumero } from "./onedrive";
 import { normalizarMoneda } from "./moneda";
+import { documentosRequeridos, nombreCortoCliente } from "./valorizacion-documentos";
 export async function guardarValorizacion(
   data: any,
   creadoPor?: string
@@ -12,7 +13,7 @@ export async function guardarValorizacion(
     .includes("REPSOL");
 
 const documentosCompletos =
-  Number(data.documentosAdjuntos || 0) >= 4;
+  Number(data.documentosAdjuntos || 0) >= documentosRequeridos(data.proveedor);
 
 console.time("buscar_os_onedrive")
 const os =
@@ -93,7 +94,7 @@ if (!codigo) {
   console.log("empresaCliente:", data.empresaCliente);
   console.log("proveedor:", data.proveedor);
 
-  if (data.ruc) {
+  if (data.ruc && !data.forzarCliente) {
     console.time("busqueda_cliente_ruc")
     const [cliente]: any = await pool.query(
       `SELECT razon_social FROM clientes WHERE ruc = ? LIMIT 1`,
@@ -215,7 +216,9 @@ console.timeEnd("insert_valorizacion_mysql")
   const valorizacionId =
   result.insertId;
 
-if (esRepsol && !os) {
+if (!os) {
+
+  const clienteCorto = nombreCortoCliente(data.proveedor);
 
   await pool.query(
     `
@@ -227,19 +230,23 @@ if (esRepsol && !os) {
 
       observacion,
 
-      usuario
+      usuario,
+
+      estado
 
     )
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
     `,
     [
       valorizacionId,
 
       "SISTEMA",
 
-      "Documentos incompletos para REPSOL",
+      `Documentos incompletos para ${clienteCorto}`,
 
-      "Sistema"
+      "Sistema",
+
+      "PENDIENTE"
     ]
   );
 

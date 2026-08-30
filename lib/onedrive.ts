@@ -345,6 +345,19 @@ export async function subirDocumentoRespaldoAOneDrive(
   );
 }
 
+export async function subirValorizacionAOneDrive(
+  nombreArchivo: string,
+  buffer: Buffer,
+  token: string
+) {
+  return subirArchivoAOneDrive(
+    nombreArchivo,
+    buffer,
+    ONEDRIVE_FOLDERS.VALORIZACIONES,
+    token
+  );
+}
+
 const NOMBRE_CARPETA_FACTURAS_OSCAR = "Repositorio";
 const NOMBRE_CARPETA_PADRE_FACTURAS_OSCAR = "SistemaSeamar";
 let carpetaFacturasOscarCache: string | null = null;

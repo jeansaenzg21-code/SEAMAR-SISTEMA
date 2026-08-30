@@ -5,7 +5,7 @@ import { tralzaImportador } from "./tralza"
 import pool from "@/lib/mysql"
 import { guardarValorizacion } from "@/lib/valorizaciones"
 import { getAccessToken } from "@/lib/graph"
-import { subirDocumentoRespaldoAOneDrive } from "@/lib/onedrive"
+import { subirValorizacionAOneDrive } from "@/lib/onedrive"
 import { registrarActividad } from "@/lib/actividad"
 
 const importadores: Record<string, Importador> = {
@@ -41,7 +41,7 @@ export async function guardarValorizacionesConDocumentos(
 
   console.log(`[${debugId}] INICIANDO subida a OneDrive (1 sola llamada)...`);
   console.time("onedrive_subida")
-  const archivoSubido = await subirDocumentoRespaldoAOneDrive(archivoNombre, archivoBuffer, token)
+  const archivoSubido = await subirValorizacionAOneDrive(archivoNombre, archivoBuffer, token)
   console.timeEnd("onedrive_subida")
   console.log(`[${debugId}] Subida completada: nombre=${archivoSubido.nombre} itemId=${archivoSubido.itemId}`);
 
@@ -71,18 +71,35 @@ export async function guardarValorizacionesConDocumentos(
     console.time("insert_valorizacion_documentos")
     const [rows]: any = data.codigo
       ? await pool.query(
-          `SELECT id FROM valorizaciones WHERE codigo = ? AND archivo_onedrive_id = ? LIMIT 1`,
+          `SELECT id, archivo_onedrive_id FROM valorizaciones WHERE codigo = ? AND archivo_onedrive_id = ? LIMIT 1`,
           [data.codigo, archivoSubido.itemId]
         )
       : await pool.query(
-          `SELECT id FROM valorizaciones WHERE archivo_onedrive_id = ? ORDER BY id DESC LIMIT 1`,
+          `SELECT id, archivo_onedrive_id FROM valorizaciones WHERE archivo_onedrive_id = ? ORDER BY id DESC LIMIT 1`,
           [archivoSubido.itemId]
         )
 
     if (rows.length > 0) {
+      const valorizacionId = rows[0].id
+
+      // No guardar como documento de respaldo el archivo principal que ya quedó
+      // vinculado en valorizaciones.archivo_onedrive_id (evita registros duplicados).
+      if (rows[0].archivo_onedrive_id === archivoSubido.itemId) {
+        continue
+      }
+
+      const [yaExiste]: any = await pool.query(
+        `SELECT id FROM valorizacion_documentos
+         WHERE valorizacion_id = ? AND onedrive_id = ? LIMIT 1`,
+        [valorizacionId, archivoSubido.itemId]
+      )
+      if (yaExiste.length > 0) {
+        continue
+      }
+
       await pool.query(
         `INSERT INTO valorizacion_documentos (valorizacion_id, nombre, onedrive_id, url) VALUES (?, ?, ?, ?)`,
-        [rows[0].id, archivoSubido.nombre, archivoSubido.itemId, archivoSubido.webUrl]
+        [valorizacionId, archivoSubido.nombre, archivoSubido.itemId, archivoSubido.webUrl]
       )
     }
     console.timeEnd("insert_valorizacion_documentos")

@@ -1,7 +1,35 @@
 "use client"
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
-import { FileText, Filter, MoreVertical, Plus, RefreshCw } from "lucide-react"
+import { Fragment, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { toast } from "sonner"
+import {
+  AlertCircle,
+  Banknote,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Coins,
+  Eye,
+  FileStack,
+  FileText,
+  Filter,
+  FolderOpen,
+  GitBranch,
+  Hash,
+  Info,
+  ListChecks,
+  Lock,
+  MessageSquare,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  UploadCloud,
+  User,
+  type LucideIcon,
+} from "lucide-react"
 import { useRol, useUser } from "@/lib/role-context"
 import { cacheGet, cacheSet } from "@/lib/simple-cache"
 
@@ -34,7 +62,7 @@ import {
 import { DocumentosPreview } from "@/components/DocumentosPreview"
 import { ExportDialog } from "@/components/export-dialog"
 import type { ValorizacionStatus, DocumentoValorizacion } from "@/lib/types"
-import { formatCurrency, mapEstadoApiToStatus } from "@/lib/utils"
+import { cn, formatCurrency, mapEstadoApiToStatus } from "@/lib/utils"
 import { monedaO } from "@/lib/moneda"
 import { StatusBadge } from "@/components/status-badge"
 import { ValuationMetricsCards } from "@/components/valuation-metrics-cards"
@@ -136,7 +164,13 @@ interface ApiResult {
   [key: string]: unknown
 }
 
-type VistaCliente = "repsol" | "tdp" | "general"
+/** Item devuelto por la detección del archivo de importación (ej: hoja del Excel). */
+interface ItemDetectado {
+  id: string
+  nombre: string
+}
+
+type VistaCliente = "repsol" | "tdp" | "tralza" | "general"
 
 /* ============================================================================
  * 2) CONSTANTES / ENUMS
@@ -178,9 +212,10 @@ const EMPRESA_DOCUMENTOS_REQUERIDOS: Array<{
 ]
 
 /** Etiqueta de la columna "orden de servicio" según la vista de cliente activa. */
-const ORDEN_SERVICIO_LABEL: Record<Extract<VistaCliente, "repsol" | "tdp">, string> = {
+const ORDEN_SERVICIO_LABEL: Record<"repsol" | "tdp" | "tralza", string> = {
   repsol: "N° O/T",
   tdp: "N° OS",
+  tralza: "N° OS",
 }
 
 /* ============================================================================
@@ -213,6 +248,7 @@ function mapApiItemToValuation(item: ApiValorizacionItem): Valuation {
 enviado_revision_por: item.enviado_revision_por,
 aprobado_por: item.aprobado_por,
 observado_por: item.observado_por,
+    documentos: Array.isArray(item.documentos) ? (item.documentos as DocumentoValorizacion[]) : [],
   }
 }
 
@@ -237,6 +273,8 @@ function getVistaCliente(clientFilter: string): VistaCliente {
   const filtro = (clientFilter || "").toUpperCase()
   if (filtro.includes("REPSOL")) return "repsol"
   if (filtro.includes("TERMINALES") || filtro.includes("TDP")) return "tdp"
+  if (filtro.includes("TRANSPORTES") || filtro.includes("TRALZA") || filtro.includes("TRALSA"))
+    return "tralza"
   return "general"
 }
 
@@ -305,9 +343,23 @@ function validarDocumentosRequeridos(params: {
  * 4) CAPA DE RED (mismos endpoints y payloads que el componente original)
  * ==========================================================================*/
 
+/**
+ * Parsea una respuesta evitando el "Unexpected token '<' ... is not valid JSON"
+ * que ocurre cuando el servidor devuelve una página HTML (404/500) en vez de JSON.
+ */
+async function parseJsonSeguro(res: Response): Promise<unknown> {
+  const texto = await res.text()
+  try {
+    return JSON.parse(texto)
+  } catch {
+    return null
+  }
+}
+
 async function fetchValorizacionesApi(): Promise<ApiValorizacionItem[] | ApiResult> {
   const res = await fetch("/api/valorizaciones")
-  return res.json()
+  const data = await parseJsonSeguro(res)
+  return Array.isArray(data) ? data : (data as ApiResult) ?? { success: false }
 }
 
 const CACHE_KEY_CLIENTES = "clientes"
@@ -316,7 +368,7 @@ async function fetchClientesApi(): Promise<Cliente[]> {
   const cached = cacheGet<Cliente[]>(CACHE_KEY_CLIENTES)
   if (cached) return cached
   const res = await fetch("/api/clientes")
-  const data = await res.json()
+  const data = await parseJsonSeguro(res)
   const clientes = Array.isArray(data) ? data : []
   cacheSet(CACHE_KEY_CLIENTES, clientes)
   return clientes
@@ -324,14 +376,15 @@ async function fetchClientesApi(): Promise<Cliente[]> {
 
 async function fetchProyectosClienteApi(clienteId: string | number): Promise<ProyectoCliente[]> {
   const res = await fetch(`/api/proyectos/cliente/${clienteId}`)
-  const data = await res.json()
+  const data = await parseJsonSeguro(res)
   return Array.isArray(data) ? data : []
 }
 
 async function fetchDocumentosApi(valorizacionId: string): Promise<DocumentoValorizacion[]> {
   const res = await fetch(`/api/valorizaciones/${valorizacionId}/documentos`)
-  const data = await res.json()
-  return Array.isArray(data) ? data : []
+  if (!res.ok) return []
+  const data = await parseJsonSeguro(res)
+  return Array.isArray(data) ? (data as DocumentoValorizacion[]) : []
 }
 
 async function eliminarDocumentoApi(documentoId: string | number): Promise<ApiResult> {
@@ -631,7 +684,7 @@ function useValorizaciones() {
         }
 
         await cargarValorizaciones()
-        alert("Valorización registrada correctamente")
+        alert(data.mensaje || "Valorización registrada correctamente")
         return data
       } catch (error) {
         console.error(error)
@@ -736,9 +789,10 @@ function ValorizacionesTableComponent({
   onEnviarRevision,
   onDescargar,
 }: ValorizacionesTableProps) {
-  // "repsol" y "tdp" muestran la misma columna de orden de servicio,
+  // "repsol", "tdp" y "tralza" muestran la misma columna de orden de servicio,
   // solo cambia la etiqueta del encabezado.
-  const mostrarColumnaOrdenServicio = vistaCliente === "repsol" || vistaCliente === "tdp"
+  const mostrarColumnaOrdenServicio =
+    vistaCliente === "repsol" || vistaCliente === "tdp" || vistaCliente === "tralza"
 
   return (
     <Card className="bg-card border-border">
@@ -755,7 +809,7 @@ function ValorizacionesTableComponent({
                 </th>
                 {mostrarColumnaOrdenServicio && (
                   <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
-                    {ORDEN_SERVICIO_LABEL[vistaCliente as "repsol" | "tdp"]}
+                    {ORDEN_SERVICIO_LABEL[vistaCliente as "repsol" | "tdp" | "tralza"]}
                   </th>
                 )}
                 <th className="px-5 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap">
@@ -873,7 +927,19 @@ function ValorizacionesTableComponent({
 
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => onVer(item)}>Ver</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEditar(item)}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onEditar(item)}
+                          className={item.status === "approved" ? "text-muted-foreground data-[highlighted]:text-muted-foreground" : ""}
+                        >
+                          {item.status === "approved" ? (
+                            <span className="flex items-center gap-2">
+                              <Lock className="h-3.5 w-3.5" />
+                              Editar
+                            </span>
+                          ) : (
+                            "Editar"
+                          )}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEnviarRevision(item)}>
                           Enviar a revisión
                         </DropdownMenuItem>
@@ -910,7 +976,21 @@ function ValorizacionesTableComponent({
                   </div>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border">
                     <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" onClick={() => onVer(item)}>Ver</Button>
-                    <Button size="sm" variant="outline" className="flex-1 min-h-[44px]" onClick={() => onEditar(item)}>Editar</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 min-h-[44px]"
+                      onClick={() => onEditar(item)}
+                    >
+                      {item.status === "approved" ? (
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Lock className="h-3.5 w-3.5" />
+                          Editar
+                        </span>
+                      ) : (
+                        "Editar"
+                      )}
+                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button size="sm" variant="outline" className="min-h-[44px]"><MoreVertical className="h-4 w-4" /></Button>
@@ -938,6 +1018,37 @@ function ValorizacionesTableComponent({
  * renderizar cuando `valuations` o `vistaCliente` realmente cambian.
  */
 const ValorizacionesTable = memo(ValorizacionesTableComponent)
+
+interface UsuarioSistema {
+  id: string | number
+  usuario: string
+  nombre: string
+  cargo?: string | null
+  estado?: string
+}
+
+/** Observación registrada para una valorización (valorizacion_observaciones). */
+interface ObservacionDetalle {
+  id: string | number
+  tipo?: string
+  observacion?: string
+  usuario?: string
+  fecha?: string
+  estado?: string
+  fecha_resolucion?: string | null
+}
+
+/** Formatea una fecha ISO a dd/MM/yyyy hh:mm (hora local). */
+function formatearFechaObservacion(fecha?: string): string {
+  if (!fecha) return ""
+  const d = new Date(fecha)
+  if (Number.isNaN(d.getTime())) return fecha
+  const dd = String(d.getDate()).padStart(2, "0")
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const hh = String(d.getHours()).padStart(2, "0")
+  const min = String(d.getMinutes()).padStart(2, "0")
+  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${min}`
+}
 
 const FORM_INICIAL: ValorizacionFormValues = {
   client: "",
@@ -979,8 +1090,37 @@ function ValorizacionFormModal({
   const [documentosExistentes, setDocumentosExistentes] = useState<DocumentoValorizacion[]>([])
   const [isLoadingDocumentosExistentes, setIsLoadingDocumentosExistentes] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [usuariosSistema, setUsuariosSistema] = useState<UsuarioSistema[]>([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false)
 
   const proyectosCliente = useProyectosCliente(form.client, clientes)
+
+  useEffect(() => {
+    if (!open) return
+
+    let cancelado = false
+    setCargandoUsuarios(true)
+
+    fetch("/api/configuracion/usuarios", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (cancelado) return
+        const activos = (Array.isArray(data) ? data : []).filter(
+          (u: UsuarioSistema) => u?.estado === "ACTIVO" || u?.estado == null
+        )
+        setUsuariosSistema(activos)
+      })
+      .catch(() => {
+        if (!cancelado) setUsuariosSistema([])
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoUsuarios(false)
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [open])
 
   const cargarDocumentosExistentes = useCallback(
     async (id: string) => {
@@ -1077,231 +1217,394 @@ function ValorizacionFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isSaving && onOpenChange(next)}>
-      <DialogContent className="w-full sm:max-w-[43.75rem] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editingValuation ? "Editar Valorización" : "Nueva Valorización"}</DialogTitle>
-          <DialogDescription>Complete los datos principales de la valorización.</DialogDescription>
+      <DialogContent className="w-full sm:max-w-[46rem] flex flex-col gap-0 p-0 max-h-[90vh] overflow-hidden sm:rounded-2xl">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              {editingValuation ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            </span>
+            {editingValuation ? "Editar Valorización" : "Nueva Valorización"}
+          </DialogTitle>
+          <DialogDescription>
+            Complete los datos principales de la valorización. Los campos con{" "}
+            <span className="text-destructive">*</span> son obligatorios.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 py-4">
-          <div className="grid gap-2">
-            <Label>Cliente</Label>
-            <Select value={form.client} onValueChange={(v) => actualizarCampo("client", v)} disabled={isSaving}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.razon_social}>
-                    {cliente.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Información general
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
 
-          <div className="grid gap-2">
-            <Label>Servicio / Proyecto</Label>
-            <Select value={form.type} onValueChange={seleccionarProyecto} disabled={isSaving}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar proyecto o servicio" />
-              </SelectTrigger>
-              <SelectContent>
-                {proyectosCliente.length === 0 ? (
-                  <SelectItem value="sin-proyectos" disabled>
-                    No hay proyectos/servicios
-                  </SelectItem>
-                ) : (
-                  proyectosCliente.map((proyecto) => (
-                    <SelectItem key={proyecto.id} value={String(proyecto.id)}>
-                      {proyecto.tipo} - {proyecto.nombre}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>N° Orden de Servicio</Label>
-            <Input
-              placeholder="Ej: OS-000112"
-              value={form.ordenServicio}
-              onChange={(e) => actualizarCampo("ordenServicio", e.target.value)}
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Monto estimado</Label>
-            <Input
-              type="number"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={(e) => actualizarCampo("amount", e.target.value)}
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Moneda</Label>
-            <Select value={form.moneda} onValueChange={(v) => actualizarCampo("moneda", v)} disabled={isSaving}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar moneda" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SOLES">Soles (S/)</SelectItem>
-                <SelectItem value="DOLARES">Dólares (US$)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Fecha de Inicio</Label>
-            <Input
-              type="date"
-              value={form.fecha}
-              onChange={(e) => actualizarCampo("fecha", e.target.value)}
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="grid gap-2 col-span-2">
-            <Label>Encargado</Label>
-            <Input
-              placeholder="Ingrese Encargado"
-              value={form.encargado}
-              onChange={(e) => actualizarCampo("encargado", e.target.value)}
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="grid gap-2 col-span-2">
-            <Label>Descripción</Label>
-            <Textarea
-              placeholder="Introduzca la descripción..."
-              value={form.description}
-              onChange={(e) => actualizarCampo("description", e.target.value)}
-              disabled={isSaving}
-            />
-          </div>
-
-          <div className="grid gap-2 col-span-2">
-            <Label>Documentos de respaldo</Label>
-
-            {form.client && (
-              <div className="rounded-lg border p-3 mb-2">
-                <p className="font-medium">Empresa: {form.client}</p>
-                <p>Requiere: {cantidadDocumentosRequeridos} documentos</p>
-                <p>Adjuntados: {cantidadDocumentosAdjuntos}</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Cliente
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Select value={form.client} onValueChange={(v) => actualizarCampo("client", v)} disabled={isSaving}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientes.map((cliente) => (
+                      <SelectItem key={cliente.id} value={cliente.razon_social}>
+                        {cliente.razon_social}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {tieneDocumentosExistentes ? (
-              <div className="space-y-3">
-                <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-600">
-                  Esta valorización ya posee documentos registrados. Elimine primero los documentos
-                  existentes para poder cargar nuevos archivos.
-                </div>
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                  Servicio / Proyecto
+                </Label>
+                <Select value={form.type} onValueChange={seleccionarProyecto} disabled={isSaving}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar proyecto o servicio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {proyectosCliente.length === 0 ? (
+                      <SelectItem value="sin-proyectos" disabled>
+                        No hay proyectos/servicios
+                      </SelectItem>
+                    ) : (
+                      proyectosCliente.map((proyecto) => (
+                        <SelectItem key={proyecto.id} value={String(proyecto.id)}>
+                          {proyecto.tipo} - {proyecto.nombre}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  {documentosExistentes.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm">
-                          {doc.nombre || doc.archivo_nombre || doc.nombre_archivo || `Documento ${doc.id}`}
-                        </span>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        {(doc.url || doc.archivo_url) && (
-                          <a
-                            href={String(doc.url || doc.archivo_url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-400 hover:underline"
-                          >
-                            Ver
-                          </a>
-                        )}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isSaving}
-                          onClick={() => handleEliminarDocumento(doc.id)}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                  N° Orden de Servicio
+                </Label>
+                <div className="relative">
+                  <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Ej: OS-000112"
+                    value={form.ordenServicio}
+                    onChange={(e) => actualizarCampo("ordenServicio", e.target.value)}
+                    disabled={isSaving}
+                  />
                 </div>
               </div>
-            ) : (
-              <>
-                <label
-                  htmlFor="documentos"
-                  className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center hover:bg-muted/50 ${
-                    isSaving ? "pointer-events-none opacity-50" : ""
-                  }`}
-                >
-                  <span className="text-sm font-medium">Subir documentos</span>
-                  <span className="text-xs text-muted-foreground">
-                    Adjunta los archivos requeridos según la empresa
-                  </span>
-                </label>
 
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
+                  Monto estimado
+                  <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Banknote className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                  <Input
+                    className="pl-9"
+                    type="number"
+                    placeholder="0.00"
+                    value={form.amount}
+                    onChange={(e) => actualizarCampo("amount", e.target.value)}
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <Coins className="h-3.5 w-3.5 text-muted-foreground" />
+                  Moneda
+                </Label>
+                <Select value={form.moneda} onValueChange={(v) => actualizarCampo("moneda", v)} disabled={isSaving}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar moneda" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SOLES">Soles (S/)</SelectItem>
+                    <SelectItem value="DOLARES">Dólares (US$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                  Fecha de Inicio
+                </Label>
                 <Input
-                  id="documentos"
-                  type="file"
-                  multiple
-                  className="hidden"
+                  type="date"
+                  value={form.fecha}
+                  onChange={(e) => actualizarCampo("fecha", e.target.value)}
                   disabled={isSaving}
-                  onChange={(e) => {
-                    agregarDocumentos(e.target.files)
-                    e.target.value = ""
-                  }}
+                  className="[color-scheme:dark]"
                 />
+              </div>
 
-                {form.client && cantidadDocumentosRequeridos > 0 && (
-                  <div className="rounded-md bg-muted/40 p-3 text-sm">
-                    <span className="font-medium">
-                      {cantidadDocumentosAdjuntos}/{cantidadDocumentosRequeridos}
-                    </span>{" "}
-                    documentos adjuntos requeridos para {form.client}
+              <div className="grid gap-2 sm:col-span-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  Encargado
+                </Label>
+                <Select
+                  value={form.encargado}
+                  onValueChange={(v) => actualizarCampo("encargado", v)}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        cargandoUsuarios
+                          ? "Cargando usuarios..."
+                          : "Seleccione el encargado"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cargandoUsuarios ? (
+                      <SelectItem value="__cargando__" disabled>
+                        Cargando usuarios...
+                      </SelectItem>
+                    ) : usuariosSistema.length === 0 ? (
+                      <SelectItem value="__vacio__" disabled>
+                        No hay usuarios registrados
+                      </SelectItem>
+                    ) : (
+                      usuariosSistema.map((u) => (
+                        <SelectItem key={u.id ?? u.usuario} value={u.nombre}>
+                          <span className="flex flex-col">
+                            <span>{u.nombre}</span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {u.cargo || u.usuario}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2 sm:col-span-2">
+                <Label className="flex items-center gap-1.5 text-xs font-medium">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  Descripción
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Introduzca la descripción..."
+                  value={form.description}
+                  onChange={(e) => actualizarCampo("description", e.target.value)}
+                  disabled={isSaving}
+                  className="min-h-[90px] resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <FileStack className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Documentos de respaldo
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <div className="space-y-3">
+              {form.client && (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border bg-card px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Empresa
+                    </p>
+                    <p className="truncate text-sm font-semibold">{form.client}</p>
                   </div>
-                )}
+                  <div className="rounded-lg border bg-card px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Requeridos
+                    </p>
+                    <p className="text-sm font-semibold">{cantidadDocumentosRequeridos} documento(s)</p>
+                  </div>
+                  <div className="rounded-lg border bg-card px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Adjuntados
+                    </p>
+                    <p
+                      className={`text-sm font-semibold ${
+                        cantidadDocumentosRequeridos > 0 &&
+                        cantidadDocumentosAdjuntos >= cantidadDocumentosRequeridos
+                          ? "text-green-500"
+                          : cantidadDocumentosAdjuntos > 0
+                            ? "text-yellow-500"
+                            : ""
+                      }`}
+                    >
+                      {cantidadDocumentosAdjuntos}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-                {form.documentos.length > 0 && (
-                  <div className="space-y-1">
-                    {form.documentos.map((doc, index) => (
-                      <p key={index} className="text-xs text-muted-foreground">
-                        {index + 1}. {doc.name}
-                      </p>
+              {tieneDocumentosExistentes ? (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-600">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      Esta valorización ya posee documentos registrados. Elimine primero los documentos
+                      existentes para poder cargar nuevos archivos.
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {documentosExistentes.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border bg-muted/20 px-3 py-2.5"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileText className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="truncate text-sm">
+                            {doc.nombre || doc.archivo_nombre || doc.nombre_archivo || `Documento ${doc.id}`}
+                          </span>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          {(doc.url || doc.archivo_url) && (
+                            <a
+                              href={String(doc.url || doc.archivo_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-blue-400 hover:underline"
+                            >
+                              Ver
+                            </a>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={isSaving}
+                            onClick={() => handleEliminarDocumento(doc.id)}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              ) : (
+                <>
+                  <label
+                    htmlFor="documentos"
+                    className={`group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 ${
+                      isSaving ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                      <UploadCloud className="h-6 w-6" />
+                    </span>
+                    <span className="text-sm font-semibold">Subir documentos</span>
+                    <span className="text-xs text-muted-foreground">
+                      Arrastra tus archivos aquí o haz clic para seleccionarlos
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/70">
+                      PDF, Excel, imágenes y otros formatos
+                    </span>
+                  </label>
+
+                  <Input
+                    id="documentos"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    disabled={isSaving}
+                    onChange={(e) => {
+                      agregarDocumentos(e.target.files)
+                      e.target.value = ""
+                    }}
+                  />
+
+                  {form.client && cantidadDocumentosRequeridos > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2.5">
+                      <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        Progreso de documentos requeridos
+                      </span>
+                      <span
+                        className={`text-sm font-semibold ${
+                          cantidadDocumentosAdjuntos >= cantidadDocumentosRequeridos
+                            ? "text-green-500"
+                            : "text-yellow-500"
+                        }`}
+                      >
+                        {cantidadDocumentosAdjuntos}/{cantidadDocumentosRequeridos}
+                      </span>
+                    </div>
+                  )}
+
+                  {form.documentos.length > 0 && (
+                    <div className="space-y-2">
+                      {form.documentos.map((doc, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2.5"
+                        >
+                          <FileText className="h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{doc.name}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {doc.size > 1024 * 1024
+                                ? `${(doc.size / (1024 * 1024)).toFixed(1)} MB`
+                                : `${(doc.size / 1024).toFixed(0)} KB`}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                            #{index + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t bg-muted/20 px-6 py-4 sm:items-center sm:justify-between">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button onClick={handleGuardar} disabled={isSaving}>
+          <Button onClick={handleGuardar} disabled={isSaving} className="min-w-[190px]">
             {isSaving ? (
               <>
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 {editingValuation ? "Actualizando..." : "Guardando..."}
               </>
             ) : editingValuation ? (
-              "Actualizar Valorización"
+              <>
+                <Pencil className="h-4 w-4 mr-2" />
+                Actualizar Valorización
+              </>
             ) : (
-              "Crear Valorización"
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Valorización
+              </>
             )}
           </Button>
         </DialogFooter>
@@ -1319,6 +1622,48 @@ interface ValorizacionDetailDialogProps {
 rolUsuario: string
 }
 
+/** Cabecera de sección, con el mismo estilo que el formulario de edición. */
+function DetalleSeccion({
+  icon: Icon,
+  titulo,
+}: {
+  icon: LucideIcon
+  titulo: string
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-2">
+      <Icon className="h-4 w-4 shrink-0 text-primary" />
+      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        {titulo}
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+/** Fila de resumen (solo lectura), con el dato alineado a la derecha. */
+function FilaResumen({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon
+  label: string
+  value: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-3">
+      <dt className="flex items-center gap-2.5 text-sm text-muted-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        {label}
+      </dt>
+      <dd className="min-w-0 text-right text-sm font-semibold text-foreground">{value || "—"}</dd>
+    </div>
+  )
+}
+
 function ValorizacionDetailDialog({
   open,
   onOpenChange,
@@ -1328,8 +1673,39 @@ function ValorizacionDetailDialog({
   rolUsuario,
 }: ValorizacionDetailDialogProps) {
   const [comentarioObservacion, setComentarioObservacion] = useState("")
+  const [observacionesDetalle, setObservacionesDetalle] = useState<ObservacionDetalle[]>([])
+  const [cargandoObservaciones, setCargandoObservaciones] = useState(false)
+
+  useEffect(() => {
+    if (!open || !valuation) return
+
+    let cancelado = false
+    setCargandoObservaciones(true)
+    setObservacionesDetalle([])
+
+    fetch(`/api/valorizaciones/${valuation.id}/detalle`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data: { observaciones?: unknown }) => {
+        if (cancelado) return
+        setObservacionesDetalle(
+          Array.isArray(data.observaciones) ? (data.observaciones as ObservacionDetalle[]) : []
+        )
+      })
+      .catch(() => {
+        if (!cancelado) setObservacionesDetalle([])
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoObservaciones(false)
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [open, valuation])
 
   if (!valuation) return null
+
+  const esAprobada = valuation.status === "approved"
 
   async function handleEnviarAObservado() {
     const success = await enviarAObservado(valuation!, comentarioObservacion)
@@ -1341,112 +1717,331 @@ function ValorizacionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">{valuation.codigo}</p>
-
-            <DialogTitle className="text-xl">{valuation.description || "Sin proyecto"}</DialogTitle>
-
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <DialogContent className="w-full sm:max-w-[46rem] flex flex-col gap-0 p-0 max-h-[90vh] overflow-hidden sm:rounded-2xl">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle className="flex flex-wrap items-center gap-3">
+            <span className="flex h-11 w-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <Eye className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="mb-0.5 block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Detalle de Valorización
+              </span>
+              <span className="block text-2xl font-extrabold tracking-tight text-foreground">
+                {valuation.codigo || "VAL—"}
+              </span>
+            </span>
+            <span className="ml-auto shrink-0">
               <StatusBadge status={valuation.status} />
-              <span>{valuation.client}</span>
-              <span>·</span>
-              <span>{valuation.date}</span>
-            </div>
-          </div>
+            </span>
+          </DialogTitle>
+          <DialogDescription className="flex flex-wrap items-center gap-x-2">
+            <span>{valuation.client || "Sin cliente"}</span>
+            <span>·</span>
+            <span>{valuation.projectName || "Sin proyecto"}</span>
+            <span>·</span>
+            <span>{valuation.date || "Sin fecha"}</span>
+          </DialogDescription>
         </DialogHeader>
 
-        <ValuationMetricsCards items={[
-          { label: "MONTO", value: formatCurrency(valuation.amount, valuation.moneda) },
-          { label: "AVANCE", value: `${getAvanceValorizacion(valuation.status)}%` },
-          { label: "RESP.", value: valuation.encargado || "Sin responsable" },
-        ]} />
+        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          <ValuationMetricsCards items={[
+            { label: "MONTO", value: formatCurrency(valuation.amount, valuation.moneda) },
+            { label: "AVANCE", value: `${getAvanceValorizacion(valuation.status)}%` },
+            {
+              label: "DOCUMENTOS",
+              value: `${valuation.documentos?.length ?? valuation.documentos_adjuntos ?? 0}`,
+            },
+          ]} />
 
-        <div className="space-y-3">
-          <p className="text-xs font-semibold tracking-widest text-muted-foreground">DOCUMENTOS ADJUNTOS</p>
-          <DocumentosPreview documentos={valuation.documentos} />
-        </div>
+          <div>
+            <DetalleSeccion icon={ClipboardList} titulo="Información general" />
 
-        <div className="space-y-4 pt-4">
-          <p className="text-xs font-semibold tracking-widest text-muted-foreground">LÍNEA DE APROBACIÓN</p>
+            <div className="overflow-hidden rounded-2xl border bg-card">
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-primary/20 via-primary/5 to-transparent px-5 py-4 ring-1 ring-inset ring-primary/10">
+                <span className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Banknote className="h-4 w-4" />
+                  Monto
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="text-2xl font-bold tracking-tight">
+                    {formatCurrency(valuation.amount, valuation.moneda)}
+                  </span>
+                  <span
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                      valuation.moneda === "DOLARES"
+                        ? "bg-blue-500/15 text-blue-500"
+                        : "bg-green-500/15 text-green-500"
+                    )}
+                  >
+                    <Coins className="h-3 w-3" />
+                    {valuation.moneda || "SOLES"}
+                  </span>
+                </span>
+              </div>
 
-          <div className="border-l pl-4 space-y-5">
-            <div>
-  <p className="font-semibold">
-    {valuation.creado_por || "Sistema"}
-  </p>
-  <p className="text-sm text-muted-foreground">
-    Creación de borrador
-  </p>
-  <p className="text-xs text-muted-foreground">
-    {valuation.date}
-  </p>
-</div>
+              <dl className="divide-y divide-border">
+                <FilaResumen icon={Building2} label="Cliente" value={valuation.client} />
+                <FilaResumen icon={FolderOpen} label="Servicio / Proyecto" value={valuation.projectName} />
+                <FilaResumen icon={Hash} label="N° Orden de Servicio" value={valuation.orden_servicio} />
+                <FilaResumen icon={CalendarDays} label="Fecha" value={valuation.date} />
+                {valuation.pu > 0 && (
+                  <FilaResumen icon={Banknote} label="Precio unitario" value={formatCurrency(valuation.pu, valuation.moneda)} />
+                )}
+                <FilaResumen icon={User} label="Encargado" value={valuation.encargado} />
+              </dl>
 
-{valuation.status !== "draft" && (
-  <div>
-    <p className="font-semibold">
-      {valuation.enviado_revision_por || "Pendiente"}
-    </p>
-
-    <p className="text-sm text-muted-foreground">
-      Envió a cliente para revisión
-    </p>
-
-    <p className="text-xs text-muted-foreground">
-      En revisión
-    </p>
-  </div>
-)}
-
-{valuation.status === "approved" && (
-  <div>
-    <p className="font-semibold">
-      {valuation.aprobado_por || "Pendiente"}
-    </p>
-
-    <p className="text-sm text-muted-foreground">
-      Valorización aprobada
-    </p>
-
-    <p className="text-xs text-muted-foreground">
-      {valuation.fecha_fin || "—"}
-    </p>
-  </div>
-)}
+              {valuation.description && (
+                <div className="border-t border-border px-5 py-4">
+                  <p className="mb-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    Descripción
+                  </p>
+                  <p className="text-sm font-medium leading-relaxed text-foreground">
+                    {valuation.description}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-3 pt-4">
-          <p className="text-xs font-semibold tracking-widest text-muted-foreground">OBSERVACIONES</p>
+          <div>
+            <DetalleSeccion icon={FileStack} titulo="Documentos de respaldo" />
 
-          <div className="rounded-lg border bg-muted/30 p-4">
-            {valuation.observacion_sistema ? (
-              <p className="text-sm">{valuation.observacion_sistema}</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-lg border bg-card px-3 py-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Empresa
+                  </p>
+                  <p className="truncate text-sm font-semibold">{valuation.client || "—"}</p>
+                </div>
+                <div className="rounded-lg border bg-card px-3 py-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Requeridos
+                  </p>
+                  <p className="text-sm font-semibold">
+                    {getCantidadDocumentosRequeridos(valuation.client)} documento(s)
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-card px-3 py-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Adjuntados
+                  </p>
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      getCantidadDocumentosRequeridos(valuation.client) > 0 &&
+                        (valuation.documentos?.length ?? valuation.documentos_adjuntos ?? 0) >=
+                          getCantidadDocumentosRequeridos(valuation.client)
+                        ? "text-green-500"
+                        : (valuation.documentos?.length ?? valuation.documentos_adjuntos ?? 0) > 0
+                          ? "text-yellow-500"
+                          : ""
+                    )}
+                  >
+                    {valuation.documentos?.length ?? valuation.documentos_adjuntos ?? 0}
+                  </p>
+                </div>
+              </div>
+
+              <DocumentosPreview documentos={valuation.documentos} />
+            </div>
+          </div>
+
+          <div>
+            <DetalleSeccion icon={GitBranch} titulo="Línea de aprobación" />
+
+            <div className="space-y-0 pl-1">
+              <div className="relative flex gap-4 pl-4 pb-6">
+                <span className="absolute left-[5px] top-1 h-px w-px rounded-full bg-primary/40 ring-4 ring-primary/10" />
+                <div className="absolute left-[7px] top-2 h-full w-px bg-border" />
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-semibold">
+                    {valuation.creado_por || "Sistema"}
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      Borrador
+                    </span>
+                  </p>
+                  <p className="text-sm text-muted-foreground">Creación de borrador</p>
+                  <p className="text-xs text-muted-foreground">{valuation.date || "—"}</p>
+                </div>
+              </div>
+
+              {valuation.status !== "draft" && (
+                <div className="relative flex gap-4 pl-4 pb-6">
+                  <span
+                    className={cn(
+                      "absolute left-[5px] top-1 h-px w-px rounded-full ring-4",
+                      valuation.status === "approved" || valuation.status === "invoiced"
+                        ? "bg-green-500 ring-green-500/15"
+                        : "bg-primary/40 ring-primary/10"
+                    )}
+                  />
+                  <div className={cn(
+                    "absolute left-[7px] top-2 h-full w-px",
+                    valuation.status === "approved" || valuation.status === "invoiced"
+                      ? "bg-green-500/40"
+                      : "bg-border"
+                  )} />
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 font-semibold">
+                      {valuation.enviado_revision_por || "Pendiente"}
+                      <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        En revisión
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">Envió a cliente para revisión</p>
+                  </div>
+                </div>
+              )}
+
+              {valuation.status === "approved" || valuation.status === "invoiced" ? (
+                <div className="relative flex gap-4 pl-4">
+                  <span className="absolute left-[5px] top-1 h-px w-px rounded-full bg-green-500 ring-4 ring-green-500/15" />
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 font-semibold">
+                      {valuation.aprobado_por || "Pendiente"}
+                      <span className="flex items-center gap-1 rounded-md bg-green-500/15 px-2 py-0.5 text-[11px] font-medium text-green-600">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Aprobada
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">Valorización aprobada</p>
+                    <p className="text-xs text-muted-foreground">{valuation.fecha_fin || "—"}</p>
+                  </div>
+                </div>
+              ) : valuation.status === "observed" ? (
+                <div className="relative flex gap-4 pl-4">
+                  <span className="absolute left-[5px] top-1 h-px w-px rounded-full bg-yellow-500 ring-4 ring-yellow-500/15" />
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 font-semibold">
+                      {valuation.observado_por || "Pendiente"}
+                      <span className="rounded-md bg-yellow-500/15 px-2 py-0.5 text-[11px] font-medium text-yellow-600">
+                        Observada
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">Corrección solicitada por el cliente</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div>
+            <DetalleSeccion icon={MessageSquare} titulo="Observaciones" />
+
+            {cargandoObservaciones ? (
+              <p className="text-sm text-muted-foreground">Cargando observaciones...</p>
+            ) : observacionesDetalle.length === 0 &&
+              !valuation.observacion_sistema ? (
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">No hay observaciones registradas.</p>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No hay observaciones registradas.</p>
+              <div className="space-y-2">
+                {observacionesDetalle.length === 0 && valuation.observacion_sistema && (
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <p className="text-sm">{valuation.observacion_sistema}</p>
+                  </div>
+                )}
+
+                {observacionesDetalle.map((obs) => (
+                  <div key={obs.id} className="rounded-lg border bg-muted/20 p-4">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                          obs.tipo === "SISTEMA"
+                            ? "bg-blue-500/15 text-blue-500"
+                            : "bg-amber-500/15 text-amber-600"
+                        )}
+                      >
+                        {obs.tipo || "SISTEMA"}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                          obs.estado === "RESUELTA"
+                            ? "bg-green-500/15 text-green-600"
+                            : obs.estado === "EN_PROGRESO"
+                              ? "bg-yellow-500/15 text-yellow-600"
+                              : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {obs.estado || "PENDIENTE"}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium">{obs.observacion}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                      <span>Registrada por {obs.usuario || "Sistema"}</span>
+                      <span>·</span>
+                      <span>{formatearFechaObservacion(obs.fecha)}</span>
+                      {obs.estado === "RESUELTA" && obs.fecha_resolucion && (
+                        <>
+                          <span>·</span>
+                          <span>Resuelta {formatearFechaObservacion(obs.fecha_resolucion)}</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
             )}
 
-            <div className="mt-4 flex gap-2">
+            {esAprobada && (
+              <p className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                Valorización aprobada: no puedes enviar comentarios ni solicitar correcciones.
+              </p>
+            )}
+
+            <div className="mt-3 flex gap-2">
               <Input
-                placeholder="Responder observación..."
+                placeholder="Comentario para el cliente..."
                 value={comentarioObservacion}
                 onChange={(e) => setComentarioObservacion(e.target.value)}
+                disabled={esAprobada}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !esAprobada) handleEnviarAObservado()
+                }}
               />
-
-              <Button variant="outline" onClick={handleEnviarAObservado}>
+              <Button variant="outline" onClick={handleEnviarAObservado} disabled={esAprobada}>
                 Enviar
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="sticky bottom-0 border-t bg-background pt-4">
-          <Button variant="outline" className="w-full" onClick={handleEnviarAObservado}>
-            Solicitar corrección
+        <DialogFooter className="border-t bg-muted/20 px-6 py-4 sm:items-center sm:justify-between">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cerrar
           </Button>
-        </div>
+          <Button
+            variant="outline"
+            onClick={handleEnviarAObservado}
+            disabled={esAprobada}
+            className="text-destructive"
+            title={
+              esAprobada
+                ? "No puedes solicitar una corrección en una valorización aprobada"
+                : undefined
+            }
+          >
+            {esAprobada ? (
+              <span className="flex items-center gap-1.5">
+                <Lock className="h-4 w-4" />
+                Solicitar corrección
+              </span>
+            ) : (
+              <>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Solicitar corrección
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -1485,12 +2080,14 @@ export function ValuationsContent() {
   const [mostrarImportador, setMostrarImportador] = useState(false)
   const [mostrarExportador, setMostrarExportador] = useState(false)
   const [empresaImportacion, setEmpresaImportacion] = useState("")
-  const [modoImportacion, setModoImportacion] = useState("individual")
   const [archivoImportacion, setArchivoImportacion] = useState<File | null>(null)
+  const [analizando, setAnalizando] = useState(false)
   const [importando, setImportando] = useState(false)
-
-  const [valorizacionesDetectadas, setValorizacionesDetectadas] = useState<string[]>([])
-const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<string[]>([])
+  const [itemsImportacion, setItemsImportacion] = useState<ItemDetectado[]>([])
+  const [seleccionImportacion, setSeleccionImportacion] = useState<string[]>([])
+  const [busquedaImportacion, setBusquedaImportacion] = useState("")
+  const [errorImportacion, setErrorImportacion] = useState<string | null>(null)
+  const [resultadoImportacion, setResultadoImportacion] = useState<number | null>(null)
   const [editingValuation, setEditingValuation] = useState<Valuation | null>(null)
 
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -1506,18 +2103,161 @@ const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<s
   }, [])
 
   const abrirEdicion = useCallback((item: Valuation) => {
+    if (item.status === "approved") {
+      toast.error("Ya no puedes editar una valorización aprobada")
+      return
+    }
     setEditingValuation(item)
     setIsFormOpen(true)
   }, [])
 
   const abrirDetalle = useCallback(
     async (item: Valuation) => {
-      const documentos = await fetchDocumentos(item.id)
+      const yaTieneDocumentos = Array.isArray(item.documentos) && item.documentos.length > 0
+      const documentos = yaTieneDocumentos ? item.documentos : await fetchDocumentos(item.id)
       setSelectedValuation({ ...item, documentos })
       setIsDetailOpen(true)
     },
     [fetchDocumentos]
   )
+
+  /* ==========================================================================
+   * Flujo de importación (Analizar archivo -> Seleccionar -> Importar)
+   * =========================================================================*/
+
+  const pasoImportacion: 1 | 2 | 3 = resultadoImportacion !== null ? 3 : itemsImportacion.length > 0 ? 2 : 1
+
+  const itemsImportacionFiltrados = useMemo(() => {
+    const termino = busquedaImportacion.trim().toLowerCase()
+    if (!termino) return itemsImportacion
+    return itemsImportacion.filter((item) => item.nombre.toLowerCase().includes(termino))
+  }, [itemsImportacion, busquedaImportacion])
+
+  const resetImportacion = useCallback(() => {
+    setEmpresaImportacion("")
+    setArchivoImportacion(null)
+    setItemsImportacion([])
+    setSeleccionImportacion([])
+    setBusquedaImportacion("")
+    setErrorImportacion(null)
+    setResultadoImportacion(null)
+  }, [])
+
+  const cerrarImportacion = useCallback(() => {
+    if (analizando || importando) return
+    setMostrarImportador(false)
+    resetImportacion()
+  }, [analizando, importando, resetImportacion])
+
+  const volverAArchivo = useCallback(() => {
+    setItemsImportacion([])
+    setSeleccionImportacion([])
+    setBusquedaImportacion("")
+    setErrorImportacion(null)
+  }, [])
+
+  const cambiarEmpresaImportacion = useCallback(
+    (empresa: string) => {
+      setEmpresaImportacion(empresa)
+      setArchivoImportacion(null)
+      setItemsImportacion([])
+      setSeleccionImportacion([])
+      setBusquedaImportacion("")
+      setErrorImportacion(null)
+      setResultadoImportacion(null)
+    },
+    []
+  )
+
+  const toggleValorizacionImportacion = useCallback((id: string) => {
+    setSeleccionImportacion((prev) =>
+      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
+    )
+  }, [])
+
+  const analizarArchivoImportacion = useCallback(async () => {
+    if (analizando || importando || !empresaImportacion || !archivoImportacion) return
+
+    setAnalizando(true)
+    setErrorImportacion(null)
+    setResultadoImportacion(null)
+
+    try {
+      const formData = new FormData()
+      formData.append("empresa", empresaImportacion)
+      formData.append("archivo", archivoImportacion)
+
+      const res = await fetch("/api/importar-valorizacion", { method: "POST", body: formData })
+      const data = (await parseJsonSeguro(res)) as
+        | { success?: boolean; items?: ItemDetectado[]; error?: string }
+        | null
+
+      if (!data?.success) {
+        setErrorImportacion(data?.error || "No se pudo analizar el archivo")
+        setItemsImportacion([])
+        setSeleccionImportacion([])
+        return
+      }
+
+      if (!data.items || data.items.length === 0) {
+        setErrorImportacion(
+          empresaImportacion === "REPSOL"
+            ? "No se encontraron hojas de valorización (VAL...) en el archivo Excel."
+            : "No se encontraron valorizaciones en el archivo."
+        )
+        setItemsImportacion([])
+        setSeleccionImportacion([])
+        return
+      }
+
+      setItemsImportacion(data.items)
+      setSeleccionImportacion(data.items.map((item) => item.id))
+      setBusquedaImportacion("")
+    } catch (error) {
+      console.error(error)
+      setErrorImportacion("Error al analizar el archivo")
+    } finally {
+      setAnalizando(false)
+    }
+  }, [analizando, importando, empresaImportacion, archivoImportacion])
+
+  const importarSeleccionadas = useCallback(async () => {
+    if (importando || analizando || seleccionImportacion.length === 0) return
+
+    setImportando(true)
+    setErrorImportacion(null)
+
+    try {
+      const formData = new FormData()
+      formData.append("empresa", empresaImportacion)
+      formData.append("archivo", archivoImportacion!)
+      formData.append("valorizaciones", JSON.stringify(seleccionImportacion))
+
+      const res = await fetch("/api/importar-valorizacion", { method: "POST", body: formData })
+      const data = (await parseJsonSeguro(res)) as
+        | { success?: boolean; creadas?: number; data?: unknown[]; error?: string }
+        | null
+
+      if (!data?.success) {
+        setErrorImportacion(data?.error || "Error al importar valorizaciones")
+        return
+      }
+
+      setResultadoImportacion(Number(data.creadas) || 0)
+      await cargarValorizaciones()
+    } catch (error) {
+      console.error(error)
+      setErrorImportacion("Error al importar valorizaciones")
+    } finally {
+      setImportando(false)
+    }
+  }, [importando, analizando, seleccionImportacion, empresaImportacion, archivoImportacion, cargarValorizaciones])
+
+  const pasosImportacion = [
+    { n: 1, etiqueta: "Archivo" },
+    { n: 2, etiqueta: "Selección" },
+    { n: 3, etiqueta: "Resultado" },
+  ] as const
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -1664,168 +2404,329 @@ const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<s
 <Dialog
   open={mostrarImportador}
   onOpenChange={(next) => {
-    if (!importando) {
-      setMostrarImportador(next)
-      if (!next) {
-        setValorizacionesDetectadas([])
-        setValorizacionesSeleccionadas([])
-        setArchivoImportacion(null)
-        setEmpresaImportacion("")
-      }
+    if (next) {
+      setMostrarImportador(true)
+      return
     }
+    cerrarImportacion()
   }}
 >
-  <DialogContent className="w-full sm:max-w-[40.625rem] max-h-[85vh] overflow-y-auto">
+  <DialogContent className="w-full sm:max-w-[42rem] max-h-[85vh] overflow-y-auto">
     <DialogHeader>
-      <DialogTitle className="text-xl">
+      <DialogTitle className="flex items-center gap-2 text-xl">
+        <FileStack className="h-5 w-5 text-primary" />
         Importar valorización
       </DialogTitle>
       <DialogDescription>
-        {valorizacionesDetectadas.length === 0
-          ? "Seleccione la empresa y el archivo a importar."
-          : `Se detectaron ${valorizacionesDetectadas.length} valorizaciones en el archivo.`}
+        {pasoImportacion === 1
+          ? "Seleccione la empresa y el archivo, luego analícelo para detectar las valorizaciones."
+          : pasoImportacion === 2
+            ? `Se detectaron ${itemsImportacion.length} valorizaciones en el archivo. Marque las que desea importar.`
+            : "Resumen de la importación."}
       </DialogDescription>
     </DialogHeader>
 
-    <div className="space-y-5 py-4">
-
-      {/* Selección de empresa */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="grid gap-2">
-            <Label>Empresa</Label>
-            <Select
-              value={empresaImportacion}
-              onValueChange={setEmpresaImportacion}
-              disabled={valorizacionesDetectadas.length > 0 || importando}
+    {/* Indicador de pasos */}
+    <div className="flex items-center gap-3 border-b border-border pb-4">
+      {pasosImportacion.map((paso, index) => (
+        <Fragment key={paso.n}>
+          <div className="flex items-center gap-2">
+            <div
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                paso.n < pasoImportacion
+                  ? "bg-primary/15 text-primary"
+                  : paso.n === pasoImportacion
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+              }`}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="REPSOL">REPSOL</SelectItem>
-                <SelectItem value="TDP">TERMINALES DEL PERÚ</SelectItem>
-                <SelectItem value="TRALZA">TRANSPORTES Y ALMACENAMIENTO DE LIQUIDOS S.A. - TRALSA</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Modo</Label>
-            <Select
-              value={modoImportacion}
-              onValueChange={setModoImportacion}
-              disabled={valorizacionesDetectadas.length > 0 || importando}
+              {paso.n < pasoImportacion ? (
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                paso.n
+              )}
+            </div>
+            <span
+              className={`text-xs font-medium ${
+                paso.n === pasoImportacion ? "text-foreground" : "text-muted-foreground"
+              }`}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="masivo">Masivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Archivo</Label>
-          <Input
-            type="file"
-            accept={
-              empresaImportacion === "REPSOL"
-                ? ".xlsx,.xls"
-                : ".pdf"  
-            }
-            disabled={importando}
-            onChange={(e) => {
-              const archivo = e.target.files?.[0]
-              if (archivo) {
-                setArchivoImportacion(archivo)
-                setValorizacionesDetectadas([])
-                setValorizacionesSeleccionadas([])
-              }
-            }}
-          />
-          {archivoImportacion && valorizacionesDetectadas.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              {archivoImportacion.name} ({(archivoImportacion.size / 1024).toFixed(1)} KB)
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Valorizaciones detectadas */}
-      {valorizacionesDetectadas.length > 0 && (
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <span className="text-sm font-medium">
-              {valorizacionesSeleccionadas.length} de {valorizacionesDetectadas.length} seleccionadas
+              {paso.etiqueta}
             </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs"
-                onClick={() => setValorizacionesSeleccionadas([...valorizacionesDetectadas])}
+          </div>
+          {index < pasosImportacion.length - 1 && (
+            <div className={`h-px flex-1 ${paso.n < pasoImportacion ? "bg-primary/40" : "bg-border"}`} />
+          )}
+        </Fragment>
+      ))}
+    </div>
+
+    <div className="space-y-5 py-4">
+      {/* Error */}
+      {errorImportacion && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{errorImportacion}</span>
+        </div>
+      )}
+
+      {/* PASO 1: Empresa + Archivo */}
+      {pasoImportacion === 1 && (
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-3">
+              <Building2 className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Empresa
+              </span>
+            </div>
+            <div className="p-4">
+              <Select
+                value={empresaImportacion}
+                onValueChange={cambiarEmpresaImportacion}
+                disabled={analizando || importando}
               >
-                Todas
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs"
-                onClick={() => setValorizacionesSeleccionadas([])}
-              >
-                Limpiar
-              </Button>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="REPSOL">REPSOL</SelectItem>
+                  <SelectItem value="TDP">TERMINALES DEL PERÚ</SelectItem>
+                  <SelectItem value="TRALZA">TRANSPORTES Y ALMACENAMIENTO DE LIQUIDOS S.A. - TRALSA</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {empresaImportacion === "REPSOL"
+                  ? "Formato Excel (.xlsx, .xls) con una hoja por valorización."
+                  : empresaImportacion
+                    ? "Archivo PDF de la valorización."
+                    : "Seleccione una empresa para ver el formato aceptado."}
+              </p>
             </div>
           </div>
 
-          <div className="max-h-48 overflow-y-auto p-2 space-y-1">
-            {valorizacionesDetectadas.map((valor) => (
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-3">
+              <FileText className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Archivo
+              </span>
+            </div>
+            <div className="p-4">
               <label
-  key={valor}
-  onClick={() => {
-    if (valorizacionesSeleccionadas.includes(valor)) {
-      setValorizacionesSeleccionadas(prev =>
-        prev.filter(v => v !== valor)
-      )
-    } else {
-      setValorizacionesSeleccionadas(prev => [
-        ...prev,
-        valor
-      ])
-    }
-  }}
-  className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
->
-                <div
-                  className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                    valorizacionesSeleccionadas.includes(valor)
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border"
-                  }`}
-                >
-                  {valorizacionesSeleccionadas.includes(valor) && (
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <span className="text-sm">{valor}</span>
+                htmlFor="archivo-importacion"
+                className={`group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 ${
+                  analizando || importando ? "pointer-events-none opacity-50" : ""
+                } ${archivoImportacion ? "border-primary/50 bg-primary/5" : ""}`}
+              >
+                {archivoImportacion ? (
+                  <>
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <FileText className="h-6 w-6" />
+                    </span>
+                    <span className="max-w-full truncate px-2 text-sm font-semibold">
+                      {archivoImportacion.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {(archivoImportacion.size / 1024).toFixed(1)} KB · haz clic para cambiar
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                      <UploadCloud className="h-6 w-6" />
+                    </span>
+                    <span className="text-sm font-semibold">Subir archivo</span>
+                    <span className="text-xs text-muted-foreground">
+                      Haz clic para seleccionar el archivo a importar
+                    </span>
+                  </>
+                )}
               </label>
-            ))}
+
+              <Input
+                id="archivo-importacion"
+                type="file"
+                className="hidden"
+                accept={empresaImportacion === "REPSOL" ? ".xlsx,.xls" : ".pdf"}
+                disabled={analizando || importando}
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0]
+                  if (archivo) {
+                    setArchivoImportacion(archivo)
+                    setItemsImportacion([])
+                    setSeleccionImportacion([])
+                    setBusquedaImportacion("")
+                    setErrorImportacion(null)
+                    setResultadoImportacion(null)
+                  }
+                  e.target.value = ""
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Indicador de carga */}
-      {importando && (
-        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 flex items-center gap-3">
+      {/* PASO 2: Selección de valorizaciones */}
+      {pasoImportacion === 2 && (
+        <>
+          {empresaImportacion === "REPSOL" && (
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar valorización por hoja..."
+                value={busquedaImportacion}
+                onChange={(e) => setBusquedaImportacion(e.target.value)}
+                disabled={analizando || importando}
+              />
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <ListChecks className="h-4 w-4 text-primary" />
+                {seleccionImportacion.length} de {itemsImportacion.length} seleccionadas
+              </span>
+              <div className="flex gap-1.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  disabled={analizando || importando || itemsImportacionFiltrados.length === 0}
+                  onClick={() => setSeleccionImportacion(itemsImportacionFiltrados.map((item) => item.id))}
+                >
+                  Todas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  disabled={analizando || importando || seleccionImportacion.length === 0}
+                  onClick={() => setSeleccionImportacion([])}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+
+            <div className="max-h-[13rem] space-y-1 overflow-y-auto p-2">
+              {itemsImportacionFiltrados.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  No se encontraron resultados para la búsqueda.
+                </p>
+              ) : (
+                itemsImportacionFiltrados.map((item) => {
+                  const seleccionada = seleccionImportacion.includes(item.id)
+                  return (
+                    <label
+                      key={item.id}
+                      onClick={() => toggleValorizacionImportacion(item.id)}
+                      className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50 ${
+                        seleccionada ? "bg-primary/5" : ""
+                      }`}
+                    >
+                      <div
+                        className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+                          seleccionada
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border"
+                        }`}
+                      >
+                        {seleccionada && (
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm">{item.nombre}</span>
+                    </label>
+                  )
+                })
+              )}
+            </div>
+
+            <div className="border-t border-border px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{
+                      width: `${
+                        itemsImportacion.length
+                          ? Math.round((seleccionImportacion.length / itemsImportacion.length) * 100)
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {itemsImportacion.length
+                    ? Math.round((seleccionImportacion.length / itemsImportacion.length) * 100)
+                    : 0}
+                  %
+                </span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* PASO 3: Resultado */}
+      {pasoImportacion === 3 && (
+        <div className="rounded-lg border border-border bg-card p-6 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-500/15 text-green-500">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <p className="text-base font-semibold">Importación completada</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Se importaron{" "}
+            <span className="font-medium text-foreground">{resultadoImportacion}</span> de{" "}
+            {seleccionImportacion.length} valorizaciones seleccionadas.
+          </p>
+          {resultadoImportacion !== null &&
+            resultadoImportacion < seleccionImportacion.length && (
+              <p className="mt-1 text-xs text-yellow-600">
+                Las restantes ya existían en el sistema y fueron omitidas.
+              </p>
+            )}
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => {
+              setResultadoImportacion(null)
+              setItemsImportacion([])
+              setSeleccionImportacion([])
+              setBusquedaImportacion("")
+              setArchivoImportacion(null)
+              setEmpresaImportacion("")
+            }}
+          >
+            Importar otro archivo
+          </Button>
+        </div>
+      )}
+
+      {/* Indicadores de carga */}
+      {analizando && (
+        <div className="flex items-center gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
           <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
           <div className="text-sm">
-            <p className="font-medium text-blue-400">Importando valorizaciones...</p>
+            <p className="font-medium text-blue-500">Analizando archivo...</p>
+            <p className="text-xs text-muted-foreground">Detectando valorizaciones en el documento</p>
+          </div>
+        </div>
+      )}
+      {importando && (
+        <div className="flex items-center gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
+          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+          <div className="text-sm">
+            <p className="font-medium text-blue-500">Importando valorizaciones...</p>
             <p className="text-xs text-muted-foreground">Subiendo archivo y guardando datos</p>
           </div>
         </div>
@@ -1833,109 +2734,53 @@ const [valorizacionesSeleccionadas, setValorizacionesSeleccionadas] = useState<s
     </div>
 
     <DialogFooter>
-      <Button
-        variant="outline"
-        onClick={() => {
-          setMostrarImportador(false)
-          setValorizacionesDetectadas([])
-          setValorizacionesSeleccionadas([])
-          setArchivoImportacion(null)
-          setEmpresaImportacion("")
-        }}
-        disabled={importando}
-      >
-        Cancelar
-      </Button>
-
-      <Button
-        disabled={
-          !empresaImportacion ||
-          !archivoImportacion ||
-          importando ||
-          (valorizacionesDetectadas.length > 0 && valorizacionesSeleccionadas.length === 0)
-        }
-        onClick={async () => {
-          setImportando(true)
-
-          try {
-            const formData = new FormData()
-            formData.append("empresa", empresaImportacion)
-            formData.append("modo", modoImportacion)
-            formData.append("archivo", archivoImportacion!)
-
-            // Fase 1: detectar valorizaciones
-            if (valorizacionesDetectadas.length === 0) {
-              const response = await fetch("/api/importar-valorizacion", {
-                method: "POST",
-                body: formData,
-              })
-
-              const data = await response.json()
-
-              if (!data.success) {
-                alert(data.error || "Error al detectar valorizaciones")
-                return
-              }
-
-              if (!data.items || data.items.length === 0) {
-                alert("No se encontraron valorizaciones en el archivo")
-                return
-              }
-
-              const ids = data.items.map((item: any) => item.id)
-              setValorizacionesDetectadas(ids)
-              setValorizacionesSeleccionadas(ids)
-              return
-            }
-
-            // Fase 2: importar valorizaciones seleccionadas
-            formData.append(
-              "valorizaciones",
-              JSON.stringify(valorizacionesSeleccionadas)
-            )
-
-            const response = await fetch("/api/importar-valorizacion", {
-              method: "POST",
-              body: formData,
-            })
-
-            const data = await response.json()
-
-            if (!data.success) {
-              alert(data.error || "Error al importar valorizaciones")
-              return
-            }
-
-            alert(
-              `Importación completada.\nSe importaron ${data.creadas} valorizaciones.`
-            )
-
-            setMostrarImportador(false)
-            setValorizacionesDetectadas([])
-            setValorizacionesSeleccionadas([])
-            setArchivoImportacion(null)
-            setEmpresaImportacion("")
-
-            await cargarValorizaciones()
-          } catch (error) {
-            console.error(error)
-            alert("Error al importar valorizaciones")
-          } finally {
-            setImportando(false)
-          }
-        }}
-      >
-        {importando ? (
-          <>
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            Importando...
-          </>
-        ) : valorizacionesDetectadas.length > 0 ? (
-          "Importar seleccionadas"
-        ) : (
-          "Importar"
-        )}
-      </Button>
+      {pasoImportacion === 1 ? (
+        <>
+          <Button variant="outline" onClick={cerrarImportacion} disabled={analizando || importando}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={!empresaImportacion || !archivoImportacion || analizando || importando}
+            onClick={analizarArchivoImportacion}
+          >
+            {analizando ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Analizando...
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4 mr-2" />
+                Analizar archivo
+              </>
+            )}
+          </Button>
+        </>
+      ) : pasoImportacion === 2 ? (
+        <>
+          <Button variant="outline" onClick={volverAArchivo} disabled={analizando || importando}>
+            Volver
+          </Button>
+          <Button
+            disabled={seleccionImportacion.length === 0 || analizando || importando}
+            onClick={importarSeleccionadas}
+          >
+            {importando ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <UploadCloud className="h-4 w-4 mr-2" />
+                Importar seleccionadas ({seleccionImportacion.length})
+              </>
+            )}
+          </Button>
+        </>
+      ) : (
+        <Button onClick={cerrarImportacion}>Listo</Button>
+      )}
     </DialogFooter>
   </DialogContent>
 </Dialog>
