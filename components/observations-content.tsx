@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Search, MessageSquare, Check, AlertTriangle, Clock, FileText } from "lucide-react"
+import { Search, MessageSquare, AlertTriangle, Clock, FileText } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,11 +34,7 @@ const statusStyles = {
     className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     icon: Clock,
   },
-  resolved: {
-    label: "Resuelto",
-    className: "bg-green-500/10 text-green-400 border-green-500/20",
-    icon: Check,
-  },
+
 }
 
 const detailStatusMap: Record<string, { label: string; className: string }> = {
@@ -60,7 +56,7 @@ function ValuacionDetailBadge({ status }: { status: string }) {
 export function ObservationsContent() {
   const [observations, setObservations] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("all")
+  const [activeTab, setActiveTab] = useState("pending")
   const [selectedObservation, setSelectedObservation] = useState<any | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
@@ -79,6 +75,7 @@ export function ObservationsContent() {
 
       const observedData = data
         .filter((v: any) => v.estado === "OBSERVADO")
+        .filter((v: any) => v.estado_observacion !== "RESUELTA")
         .map((v: any) => ({
           id: v.codigo,
           valuationId: v.id,
@@ -157,7 +154,6 @@ export function ObservationsContent() {
 
   const pendingCount = observations.filter((o) => o.status === "pending").length
   const inProgressCount = observations.filter((o) => o.status === "in_progress").length
-  const resolvedCount = observations.filter((o) => o.status === "resolved").length
 
   async function subirDocumentos(
     files: File[],
@@ -274,7 +270,7 @@ export function ObservationsContent() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-3 rounded-lg bg-red-500/10">
@@ -299,17 +295,7 @@ export function ObservationsContent() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <Check className="h-5 w-5 text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{resolvedCount}</p>
-                <p className="text-sm text-muted-foreground">Resueltas</p>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
 
         <div className="relative max-w-sm">
@@ -327,7 +313,7 @@ export function ObservationsContent() {
             <TabsTrigger value="all">Todas ({observations.length})</TabsTrigger>
             <TabsTrigger value="pending">Pendientes ({pendingCount})</TabsTrigger>
             <TabsTrigger value="in_progress">En progreso ({inProgressCount})</TabsTrigger>
-            <TabsTrigger value="resolved">Resueltas ({resolvedCount})</TabsTrigger>
+
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -428,9 +414,7 @@ export function ObservationsContent() {
   setIsDetailModalOpen(true)
 }}
                           >
-                            {observation.status === "resolved"
-                              ? "Ver detalles"
-                              : "Responder"}
+                            Responder
                           </Button>
                         </div>
                       </div>
@@ -446,9 +430,7 @@ export function ObservationsContent() {
           <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {selectedObservation?.status === "resolved"
-                  ? "Detalle de observación"
-                  : "Responder observación"}
+                Responder observación
               </DialogTitle>
               <DialogDescription>
                 {selectedObservation?.codigo || selectedObservation?.id}
@@ -536,72 +518,56 @@ export function ObservationsContent() {
                 </p>
               </div>
 
-              {selectedObservation?.status !== "resolved" ? (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="response">Tu respuesta</Label>
-                    <Textarea
-                      placeholder="Ingrese la respuesta a esta observación..."
-                      value={response}
-                      onChange={(e) => setResponse(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="response">Tu respuesta</Label>
+                  <Textarea
+                    placeholder="Ingrese la respuesta a esta observación..."
+                    value={response}
+                    onChange={(e) => setResponse(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="observation-file">Adjuntar documentos</Label>
-                    <Input
-                      id="observation-file"
-                      type="file"
-                      multiple
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) =>
-                        setAttachedFiles(Array.from(e.target.files || []))
-                      }
-                    />
-                    {attachedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <FileText className="h-3 w-3" />
-                        {file.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                  <p className="text-sm font-medium text-green-400 mb-1">Resolución</p>
-                  <p className="text-sm">{selectedObservation?.response}</p>
-                  {valuationDetail && valuationDetail.documentos.length > 0 && (
-                    <div className="mt-3">
-                      <DocumentosPreview documentos={valuationDetail.documentos} />
+                <div className="space-y-2">
+                  <Label htmlFor="observation-file">Adjuntar documentos</Label>
+                  <Input
+                    id="observation-file"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                    onChange={(e) =>
+                      setAttachedFiles(Array.from(e.target.files || []))
+                    }
+                  />
+                  {attachedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <FileText className="h-3 w-3" />
+                      {file.name}
                     </div>
-                  )}
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
-                {selectedObservation?.status === "resolved" ? "Cerrar" : "Cancelar"}
+                Cancelar
               </Button>
 
-              {selectedObservation?.status !== "resolved" && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleGuardarBorrador}
-                    disabled={saving || (!response.trim() && attachedFiles.length === 0)}
-                  >
-                    {saving ? "Guardando..." : "Guardar borrador"}
-                  </Button>
-                  <Button
-                    onClick={handleMarcarResuelto}
-                    disabled={saving || !response.trim()}
-                  >
-                    {saving ? "Guardando..." : "Marcar como resuelto"}
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                onClick={handleGuardarBorrador}
+                disabled={saving || (!response.trim() && attachedFiles.length === 0)}
+              >
+                {saving ? "Guardando..." : "Guardar borrador"}
+              </Button>
+              <Button
+                onClick={handleMarcarResuelto}
+                disabled={saving || !response.trim()}
+              >
+                {saving ? "Guardando..." : "Marcar como resuelto"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

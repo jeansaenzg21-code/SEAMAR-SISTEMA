@@ -520,27 +520,35 @@ const abrirDetalle = async (item: Approval) => {
 
 </div>
 
-    <ObservationHistory
-      observaciones={selectedApproval?.historial_observaciones || []}
-      variant="card"
-      titulo="OBSERVACIONES"
-    />
+    <div className="rounded-xl border border-border/50 bg-gradient-to-br from-background via-background to-red-500/5 p-4">
+      <ObservationHistory
+        observaciones={selectedApproval?.historial_observaciones || []}
+        variant="card"
+        titulo="OBSERVACIONES"
+      />
+    </div>
 
   {selectedApproval?.respuesta_observacion && (
-    <div className="mt-3 rounded-md border border-green-500/20 bg-green-500/10 p-3">
-      <p className="text-sm font-medium text-green-400">
-        Respuesta a observación
-      </p>
-
-      <p className="text-sm mt-1">
-        {selectedApproval.respuesta_observacion}
-      </p>
-
-      {selectedApproval.archivo_respuesta_nombre && (
-        <p className="text-xs text-muted-foreground mt-2">
-          Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
-        </p>
-      )}
+    <div className="rounded-xl border border-green-500/20 bg-gradient-to-br from-green-500/5 to-background p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500/10">
+          <CheckCircle2 className="h-4 w-4 text-green-400" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-medium text-green-400">
+            Respuesta a observación
+          </p>
+          <p className="text-sm leading-relaxed">
+            {selectedApproval.respuesta_observacion}
+          </p>
+          {selectedApproval.archivo_respuesta_nombre && (
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
+              Documento adjunto: {selectedApproval.archivo_respuesta_nombre}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )}
 
