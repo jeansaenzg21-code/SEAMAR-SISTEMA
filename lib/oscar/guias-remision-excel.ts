@@ -19,13 +19,14 @@ const COLUMNAS: { header: string; ancho: number }[] = [
   { header: "REF", ancho: 16 },
   { header: "N° PARTE", ancho: 14 },
   { header: "LOTE", ancho: 14 },
+  { header: "EXPIRA", ancho: 14 },
   { header: "ACCESORIOS", ancho: 34 },
   { header: "UNID.", ancho: 10 },
   { header: "CANT.", ancho: 10 },
 ];
 
 // Columnas que deben ajustar el texto en párrafo (wrap) dentro de la celda.
-const TEXTO_ENVOLVENTE = new Set(["D", "F", "H", "O"]);
+const TEXTO_ENVOLVENTE = new Set(["D", "F", "H", "P"]);
 
 const TOTAL_COLS = COLUMNAS.length;
 const ULTIMA_COL = String.fromCharCode(64 + TOTAL_COLS);
@@ -113,13 +114,15 @@ export async function buildGuiasRemisionExcel(
       worksheet.getCell(`L${fila}`).value = b?.ref ?? null;
       worksheet.getCell(`M${fila}`).value = b?.nroParte ?? null;
       worksheet.getCell(`N${fila}`).value = b?.lote ?? null;
-      worksheet.getCell(`O${fila}`).value = b?.accesorios ?? null;
-      worksheet.getCell(`P${fila}`).value = b?.unidadMedida ?? null;
-      worksheet.getCell(`Q${fila}`).value = numero(b?.cantidad);
+      worksheet.getCell(`O${fila}`).value = b?.expira ?? null;
+      worksheet.getCell(`P${fila}`).value = b?.accesorios ?? null;
+      worksheet.getCell(`Q${fila}`).value = b?.unidadMedida ?? null;
+      worksheet.getCell(`R${fila}`).value = numero(b?.cantidad);
 
       bordeCeldas(worksheet, fila);
 
       worksheet.getCell(`B${fila}`).numFmt = "dd/mm/yyyy";
+      worksheet.getCell(`O${fila}`).numFmt = "dd/mm/yyyy";
 
       // Ajuste en párrafo para las columnas de texto largo
       TEXTO_ENVOLVENTE.forEach((col) => {

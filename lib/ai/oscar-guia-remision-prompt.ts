@@ -31,8 +31,7 @@ Los números/códigos de este documento fueron impresos en una fuente tipográfi
 
 - serie: serie de la Guía de Remisión. Ej: en "N° EG07 - 00000596" la serie es "EG07".
 - numero: correlativo completo tal como aparece. Ej: "00000596".
-- fechaInicioTraslado: del campo "Fecha de inicio de Traslado" o "Fecha de inicio de Trastado". Si ese campo NO existe en el documento, usa la "Fecha y hora de emisión" como respaldo. Formato YYYY-MM-DD. Ej: "30/12/2025" → "2025-12-30". Si no hay ninguna fecha, null.
-- fechaEmision: la "Fecha y hora de emisión" del documento, en formato YYYY-MM-DD. Ej: "20/02/2024 04:09 PM" → "2024-02-20". Si no está visible, null.
+- fechaInicioTraslado: del campo "Fecha de inicio de Traslado" o "Fecha de inicio de Trastado". Si ese campo NO existe en el documento, usa la "Fecha y hora de emisión" como respaldo. Formato YYYY-MM-DD. Ej: "30/12/2025" → "2025-12-30", "20/02/2024 04:09 PM" → "2024-02-20". Si no hay ninguna fecha visible, null.
 - motivoTraslado: texto del campo "Motivo de Traslado". Ej: "Venta", "OTROS".
 - destinatario: nombre o razón social del destinatario. Ej: "GRUPO IMPORTADOR JUVAL E.I.R.L."
 - rucCliente: RUC (11 dígitos) del destinatario, indicado como "REGISTRO ÚNICO DE CONTRIBUYENTES N° XXXXXXXXXXX". Solo el número. IMPORTANTE: NO confundas el RUC del REMITENTE con el del DESTINATARIO (el remitente aparece en "RUC N° ..." junto a "REMITENTE"). Si el destinatario NO tiene RUC peruano de 11 dígitos pero sí un documento de identidad extranjero (aparece como "DOC.IDENT.PAIS.RESIDENCIA-NO.D N° XXXXXXXXXX" u otra etiqueta de documento), guarda en rucCliente el número de ese documento. Si no hay ningún documento identificable del destinatario, null.
@@ -53,10 +52,10 @@ C) Como líneas separadas debajo de la descripción del bien:
 NOTA: "RS", "R/S" y "RRSS" son la REFERENCIA del bien, NO el número de serie.
 
 Campos por bien (SOLO estos):
-- codigoBien: código de la columna "Código de Bien". EXCEPCIÓN IMPORTANTE: si el código es SOLO numérico con guiones (formato tipo "###-#######-##", ej. "115-056312-00", "120-004559-00"), NO lo coloques en codigoBien: ese número es parte del nombre del bien y debe ir al INICIO de la descripcion (ej. descripcion = "115-056312-00 Bandeja Rigida para Endoscopio") y codigoBien = null. Solo pon codigoBien con valores que NO sean de ese formato (ej. códigos alfanuméricos como "F04GB-PA00008"). Si no existe, null.
-- descripcion: SOLO el nombre/descripción del bien SIN las etiquetas ni sus valores. Ej: si la celda dice "INSUFLADOR ELECTRONICO DE CO2 MARCA: MINDRAY MODELO: HS-50F SERIE: FA1-4A001791 PROCEDENCIA: CHINA RRSS: DB6261E ACCESORIOS: 01 CABLE DE PODER", la descripcion debe ser SOLO "INSUFLADOR ELECTRONICO DE CO2". Cualquier valor etiquetado (MARCA, MODELO, SERIE, RS, RRSS, REF, ACCESORIOS, ORIGEN, etc.) va en su campo, NUNCA dentro de descripcion. EXCEPCIONES: el texto "INCLUYE: ..." se considera parte de la descripcion y se conserva en ella (ver regla de INCLUYE abajo); y un número de formato "###-#######-##" al inicio (ej. "115-056312-00 Bandeja Rigida para Endoscopio") SÍ se conserva en la descripcion.
+- codigoBien: código de la columna "Código de Bien". SIEMPRE coloca este código en codigoBien, sin importar si es puramente numérico con guiones (ej. "115-056312-00", "120-004559-00") o alfanumérico (ej. "F04GB-PA00008"). El código de bien NUNCA debe ir en la descripción: siempre en codigoBien. Si la columna "Código de Bien" no existe en el documento, null.
+- descripcion: SOLO el nombre/descripción del bien SIN las etiquetas ni sus valores. Ej: si la celda dice "INSUFLADOR ELECTRONICO DE CO2 MARCA: MINDRAY MODELO: HS-50F SERIE: FA1-4A001791 PROCEDENCIA: CHINA RRSS: DB6261E ACCESORIOS: 01 CABLE DE PODER", la descripcion debe ser SOLO "INSUFLADOR ELECTRONICO DE CO2". Cualquier valor etiquetado (MARCA, MODELO, SERIE, RS, RRSS, REF, ACCESORIOS, ORIGEN, etc.) va en su campo, NUNCA dentro de descripcion. EXCEPCIONES: (1) el texto "INCLUYE: ..." se considera parte de la descripcion y se conserva en ella (ver regla de INCLUYE abajo); (2) los códigos numéricos largos al inicio de la línea que NO tienen ninguna etiqueta que los identifique (ej. "100208649 8065753152") NO pertenecen a ningún campo específico: NO los borres, consérvalos tal cual al inicio de la descripcion del bien (ver "REGLAS PARA NO PERDER DATOS").
 - marca: valor de "MARCA:" o columna MARCA. Ej: MINDRAY. Si no, null.
-- modelo: valor de "MODELO:" o columna MODELO. Ej: HS-50F. Si no, null. TAMBIÉN extrae como modelo un CÓDIGO del bien que mezcle LETRAS y DÍGITOS (ej: en "BGP-FW-S1 OPAGUE LINE ; INFUSION SET." el modelo es "BGP-FW-S1"; en "Fuente de luz para endoscopio HB300L (CE, LED)" el modelo es "HB300L", y se quita de la descripción). Si el código al inicio es SOLO dígitos (ej: "115-056312-00 Bandeja Rigida para Endoscopio"), NO lo trates como modelo: se queda en la descripción.
+- modelo: valor de "MODELO:" o columna MODELO. Ej: HS-50F. Si no, null. TAMBIÉN extrae como modelo un CÓDIGO del bien que mezcle LETRAS y DÍGITOS (ej: en "BGP-FW-S1 OPAGUE LINE ; INFUSION SET." el modelo es "BGP-FW-S1"; en "Fuente de luz para endoscopio HB300L (CE, LED)" el modelo es "HB300L", y se quita de la descripción). Si el código al inicio es SOLO dígitos o dígitos con guiones (ej: "115-056312-00 Bandeja Rigida para Endoscopio"), NO lo trates como modelo: ese código va en codigoBien. IMPORTANTE: NUNCA trates una medida/dimensión como modelo (ej: "10mm", "4.8x3M", "4.8*3M", "30°", "2KVA", "31 pulgadas", "1.5L", "5cm"): esas medidas SIEMPRE pertenecen a la descripción y se mantienen en ella.
 - serie: valor de "SERIE:", "S/N", "N/S" o columna SERIE. Ej: FA1-4A001791. Si no, null.
 - ref: valor de "RS:", "R/S:", "RRSS:", "REF:", "REFERENCIA:" o columna REFERENCIA. Ej: DB6261E. Si no, null.
 - unidadMedida: unidad de medida (UNIDAD, KG, etc.). Si no, null.
@@ -66,19 +65,27 @@ Campos por bien (SOLO estos):
    Ej: "01 CABLE DE PODER, 01 PEDAL" → "01 CABLE DE PODER \n01 PEDAL". Ej con número de parte: "Cable de hilo caliente - N° de parte: 900MR751 \nCable adaptador de hilo caliente - N° de parte: 900MR858". Si el bien NO tiene accesorios, pon null.
 - nroParte: SOLO si el bien trae una etiqueta o línea "N° DE PARTE:", "NRO DE PARTE:", "Nº DE PARTE:" (o columna N° PARTE) referida AL BIEN MISMO (no a los accesorios ni a los números de parte de los accesorios). Transcribe su valor. Si el bien NO tiene, pon null.
 - lote: SOLO si el bien trae una etiqueta o línea "LOTE:" (o columna LOTE). Transcribe su valor. Si el bien NO tiene, pon null.
+- expira: SOLO si el bien trae una etiqueta o línea "EXPIRA:", "FECHA DE EXPIRACIÓN:", "EXPIRACIÓN:" o "VENCE:" (o columna de vencimiento/expiración). Transcribe la fecha de vencimiento/expiración del lote en formato YYYY-MM-DD. Ej: "EXPIRA: 15-12-2033" → "2033-12-15". En la gran mayoría de bienes este campo NO existe: entonces pon null. Solo lo rellenas cuando el documento realmente indique una fecha de expiración/vencimiento para ESE bien.
 
 Valores como "PROCEDENCIA:", "ORIGEN:", "PAÍS:", "OBSERVACIONES:", "NOTAS:" no corresponden a ningún campo: NO los guardes en marca, modelo, serie, ref, nroParte, lote ni accesorios. En cambio, cuando el bien lleve "INCLUYE:" (ej: "ACCESORIOS DE VENTILADOR MECANICO ADULTO-PEDIATRICO-NEONATAL INCLUYE: Cable de hilo caliente"), ese texto "INCLUYE: ..." SÍ debe permanecer DENTRO de la descripcion (no se descarta ni se separa).
+
+REGLAS PARA NO PERDER DATOS (CRÍTICO):
+1. NADA debe ser omitido de lo extraído en la descripción detallada. Cada letra, número y dato visible de la descripción del bien debe conservarse y registrarse en algún campo, porque omitir información produce pérdida de datos.
+2. Si un dato de la descripción no tiene un campo específico al que asignarlo (por ejemplo códigos internos del producto que no son MARCA/MODELO/SERIE/REF/LOTE/EXPIRA), déjalo DENTRO de la descripcion del bien. No lo borres ni lo omitas.
+3. Los códigos numéricos largos que aparecen al inicio de una línea, como "100208649 8065753152", no corresponden a marca, modelo, serie, ref, lote ni codigoBien cuando no hay ningún indicio (etiqueta) que lo indique: consérvalos tal cual dentro de la descripcion del bien.
+4. La fecha de "EXPIRA:" siempre se guarda en el campo expira (ver arriba), nunca se omite ni se mezcla con otro campo.
 
 Reglas para bienes:
 1. La descripcion es SOLO el nombre del bien, sin etiquetas ni valores (ver arriba).
 2. Las etiquetas SERIE:/N° SERIE:, RS:/R/S:/RRSS:/REF:, MODELO:/MOD.: y MARCA: que acompañan a una fila de bien (ya sea en la misma línea o en las líneas INMEDIATAMENTE SIGUIENTES debajo del nombre de ESE bien) pertenecen A ESE MISMO bien. NO las asignes a la fila anterior ni a la siguiente. Cada bien toma SOLO la serie, ref y modelo asociados a su propia fila/bloque.
-3. No uses un número de serie de otra fila como serie/ref de esta fila, ni desplaces las series/refs hacia arriba o abajo entre filas.
+3. NO DESPLACES NI REUTILICES VALORES ENTRE FILAS. Este es un error crítico a evitar: cada bien usa EXCLUSIVAMENTE los valores de SU PROPIA fila. Si una fila NO tiene serie, ese bien NO hereda ni repite la serie de la fila anterior ni posterior: deja serie = null y consigna únicamente su propio ref (si lo tiene). Del mismo modo, SIEMPRE respeta la correspondencia exacta codigo/descripcion/serie/ref de cada fila: nunca asignes la serie de una fila a la siguiente, ni el ref de una fila a la anterior. Observa cada fila como un bloque aislado e independiente.
 4. No incluyas filas de totales, "SON:", subtotales u otras filas que no sean bienes.
 5. No confundas encabezados de columna con datos de bienes.
 6. Si la imagen no contiene tabla de bienes, devuelve bienes: [].
-7. LISTA TODAS las filas de la tabla de bienes SIN OMITIR NINGUNA. Cuenta cuántas filas de bienes hay visibles y asegúrate de que el array "bienes" contenga exactamente esa cantidad. Es muy importante no dejar fuera ninguna fila aunque varias sean similares o se vean repetidas. Si la tabla ocupa más del cuadro visible, revisa fila por fila de arriba hacia abajo y transcribe TODAS las que existan.
+7. LISTA TODAS las filas de la tabla de bienes SIN OMITIR NINGUNA. Cuenta cuántas filas de bienes hay visibles y asegúrate de que el array "bienes" contenga exactamente esa cantidad. Es muy importante no dejar fuera ninguna fila aunque varias sean similares o se vean repetidas. Si la tabla ocupa más del cuadro visible, revisa fila por fila de arriba hacia abajo y transcribe TODAS las que existan. Respeta el ORDEN EXACTO de las filas en el array "bienes", de arriba hacia abajo, sin reordenarlas.
 8. No fusiones dos filas distintas en una sola ni deduzcas una fila por otra.
 9. UNA MISMA FILA puede contener DOS (o más) bienes unidos, con dos marcas, dos modelos y/o dos series en la misma línea o celdas (ej: "MONITOR LCD 32 MARCA: X SERIE: S1 / MONITOR LCD 32 MARCA: Y SERIE: S2" o dos modelos/series dentro de una sola celda). En ese caso NO crees filas separadas: mantienes UNA única fila y colocas los dos valores en el mismo campo separados con " / " (ej: modelo="A / B", serie="S1 / S2", marca="X / Y"). El campo nroParte puede tener también dos valores separados con " / ".
+10. Identifica el límite entre un bien y el siguiente usándolo por la DESCRIPCIÓN/código que inicia cada fila o bloque. No mezcles las SERIE/RS/MODELO que pertenecen a un bien con las de otro: verifica caracter a caracter que cada serie/ref empareje con el código/descripción de la MISMA fila.
 
 ## ESTRUCTURA DE SALIDA
 
@@ -87,7 +94,6 @@ Reglas para bienes:
     "serie": null,
     "numero": null,
     "fechaInicioTraslado": null,
-    "fechaEmision": null,
     "motivoTraslado": null,
     "destinatario": null,
     "rucCliente": null,
@@ -105,7 +111,8 @@ Reglas para bienes:
       "cantidad": null,
       "accesorios": null,
       "nroParte": null,
-      "lote": null
+      "lote": null,
+      "expira": null
     }
   ]
 }

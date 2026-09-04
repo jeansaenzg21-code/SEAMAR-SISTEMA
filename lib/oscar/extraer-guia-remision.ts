@@ -191,6 +191,14 @@ function normalizarFecha(valor: unknown): string | null {
   return null;
 }
 
+// Normaliza el valor de EXPIRA a YYYY-MM-DD (acepta "15-12-2033", "2033-12-15").
+function normalizarExpira(b: BienGuiaRemision): BienGuiaRemision {
+  if (b.expira) {
+    b.expira = normalizarFecha(b.expira);
+  }
+  return b;
+}
+
 function mapearBien(bien: any): BienGuiaRemision {
   return {
     codigoBien: texto(bien?.codigoBien ?? bien?.codigo_bien),
@@ -204,23 +212,35 @@ function mapearBien(bien: any): BienGuiaRemision {
     accesorios: texto(bien?.accesorios),
     nroParte: texto(bien?.nroParte ?? bien?.nro_parte ?? bien?.nro_parte_),
     lote: texto(bien?.lote),
+    expira: texto(bien?.expira ?? bien?.expiracion),
   };
 }
 
-// Los códigos de bien puramente numéricos con guiones (formato "###-#######-##",
-// ej. "115-056312-00", "120-004559-00") NO son un código de bien real, sino parte
-// del nombre del bien. Se mueven al inicio de la descripción y se limpia codigoBien.
-const RE_CODIGO_NUMERICO_CON_GUIONES = /^[\d-]+$/;
+// =============================================================================
+// Rescate de código de bien desde la descripción
+// =============================================================================
 
-function ponerCodigoNumericoEnDescripcion(b: BienGuiaRemision): BienGuiaRemision {
-  const cod = b.codigoBien?.trim();
-  if (!cod) return b;
-  if (!cod.includes("-")) return b;
-  if (!RE_CODIGO_NUMERICO_CON_GUIONES.test(cod)) return b;
+// Evalúa un código candidato separado del resto de la descripción (token inicial).
+function esCodigoBienCandidato(token: string): boolean {
+  // Código numérico con guiones (115-056312-00)
+  if (/^[\d]{2,4}(?:-[\d]{4,8}){1,2}$/.test(token)) return true;
+  // Código alfanumérico que mezcle letras y dígitos y NO sea una medida (ej F04GB-PA00008)
+  if (/^[A-Z][A-Z0-9]{2,20}(?:-[A-Z0-9]{2,12})$/.test(token)) return true;
+  // Código alfanumérico compacto, p.ej "ABC123", "HB300L"
+  if (/^[A-Z]{1,2}[0-9]{2,}[A-Z0-9]*$/.test(token)) return true;
+  return false;
+}
 
-  const desc = b.descripcion?.trim();
-  b.descripcion = desc ? `${cod} ${desc}` : cod;
-  b.codigoBien = null;
+function rescatarCodigoDeDescripcion(b: BienGuiaRemision): BienGuiaRemision {
+  if (b.codigoBien) return b;
+  if (!b.descripcion) return b;
+
+  const d = b.descripcion.trim();
+  const match = d.match(/^([^\s]+)\s+(.+)$/);
+  if (match && esCodigoBienCandidato(match[1])) {
+    b.codigoBien = match[1];
+    b.descripcion = match[2].trim() || null;
+  }
   return b;
 }
 
@@ -313,8 +333,18 @@ function esMarcaImplicitaEnDescripcion(desc: string | null): string | null {
 const RE_CODE_MODELO =
   /(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9][A-Za-z0-9.\-]*[A-Za-z0-9]/;
 
+// Medidas / dimensiones que NUNCA deben considerarse un código de modelo.
+// Ej: "10mm", "4.8x3M", "4.8*3M", "30°", "2KVA", "31 pulgadas", "1.5L",
+// "5x5", "10X2.5CM".
+function esMedida(token: string): boolean {
+  return /^\d+(?:[.,]\d+)?(?:[xX*]\d+(?:[.,]\d+)?)*\s*(?:mm|cm|m|mt|ml|l|lt|kg|g|gr|kva|w|kw|hz|khz|mhz|ghz|pulg|v|a|ma|°|º|grados|mmhg|psi|bar|unid|und|metros|metr|litros|pulgadas)?$/i.test(
+    token
+  );
+}
+
 function esCodeModelo(token: string): boolean {
-  return RE_CODE_MODELO.test(token);
+  if (!RE_CODE_MODELO.test(token)) return false;
+  return !esMedida(token);
 }
 
 function limpiarFragmento(fragmento: string): string {
@@ -368,7 +398,8 @@ type CampoBien =
   | "ref"
   | "accesorios"
   | "nroParte"
-  | "lote";
+  | "lote"
+  | "expira";
 
 const ETIQUETA_A_CAMPO: Array<{ patron: string; campo: CampoBien }> = [
   { patron: "NUMERO\\s+DE\\s+SERIE", campo: "serie" },
@@ -397,6 +428,11 @@ const ETIQUETA_A_CAMPO: Array<{ patron: string; campo: CampoBien }> = [
   { patron: "N\\s*DE\\s*PARTE", campo: "nroParte" },
   { patron: "PARTE", campo: "nroParte" },
   { patron: "LOTE", campo: "lote" },
+  // EXPIRA / FECHA DE EXPIRACIÓN (solo cuando aparece).
+  { patron: "FECHA\\s+DE\\s+EXPIRACION", campo: "expira" },
+  { patron: "EXPIRACION", campo: "expira" },
+  { patron: "EXPIRA", campo: "expira" },
+  { patron: "VENCE", campo: "expira" },
 ];
 
 // Etiquetas cuyo valor NO pertenece a ningún campo del bien: se descartan de
@@ -542,17 +578,13 @@ function normalizarPagina(raw: any): {
 
   if (g && (g.serie || g.numero)) {
     const fechaInicio = normalizarFecha(
-      g?.fechaInicioTraslado ?? g?.fecha_inicio_traslado
-    );
-    const fechaEmision = normalizarFecha(
-      g?.fechaEmision ?? g?.fecha_emision
+      g?.fechaInicioTraslado ?? g?.fechaInicio ?? g?.fecha_inicio_traslado ?? g?.fecha_emision
     );
 
     guia = {
       serie: texto(g?.serie)?.toUpperCase() ?? null,
       numero: normalizarNumero(g?.numero),
-      fechaInicioTraslado: fechaInicio || fechaEmision,
-      fechaEmision,
+      fechaInicioTraslado: fechaInicio,
       motivoTraslado: texto(g?.motivoTraslado ?? g?.motivo_traslado),
       destinatario: texto(g?.destinatario),
       rucCliente: normalizarNumero(g?.rucCliente ?? g?.ruc_cliente),
@@ -564,8 +596,9 @@ function normalizarPagina(raw: any): {
     .filter((b: any) => b && typeof b === "object")
     .map(mapearBien)
     .map((b: BienGuiaRemision) => {
-      b = ponerCodigoNumericoEnDescripcion(b);
+      b = rescatarCodigoDeDescripcion(b);
       b = parsearEtiquetasDescripcion(b);
+      b = normalizarExpira(b);
       b = inferirModelo(b);
       if (!b.marca) b.marca = inferirMarca(b.descripcion);
       if (!b.marca) b.marca = esMarcaImplicitaEnDescripcion(b.descripcion);

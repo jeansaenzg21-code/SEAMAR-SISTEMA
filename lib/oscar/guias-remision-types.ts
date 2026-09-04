@@ -9,14 +9,13 @@ export type EstadoGuiaRemision = "PENDIENTE" | "REVISADO";
 export type OrigenGuiaRemision = "PDF" | "IMAGEN";
 
 export interface GuiaRemisionDatos {
-  serie: string | null;
-  numero: string | null;
-  fechaInicioTraslado: string | null;
-  fechaEmision?: string | null;
-  motivoTraslado: string | null;
-  destinatario: string | null;
-  rucCliente: string | null;
-  direccion: string | null;
+  serie: string | null
+  numero: string | null
+  fechaInicioTraslado: string | null
+  motivoTraslado: string | null
+  destinatario: string | null
+  rucCliente: string | null
+  direccion: string | null
 }
 
 export interface BienGuiaRemision {
@@ -31,6 +30,7 @@ export interface BienGuiaRemision {
   accesorios: string | null;
   nroParte: string | null;
   lote: string | null;
+  expira: string | null;
 }
 
 export interface ResultadoExtraccionGuia {
@@ -94,6 +94,7 @@ export interface BienGuiaRemisionFila extends RowDataPacket {
   accesorios: string | null;
   nro_parte: string | null;
   lote: string | null;
+  expiracion: string | null;
   orden: number;
 }
 

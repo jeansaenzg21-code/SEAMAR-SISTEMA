@@ -142,6 +142,7 @@ type BienForm = {
   accesorios: string
   nroParte: string
   lote: string
+  expira: string
 }
 
 type ResultadoSubidaGuia = {
@@ -205,6 +206,7 @@ function bienVacio(): BienForm {
     accesorios: "",
     nroParte: "",
     lote: "",
+    expira: "",
   }
 }
 
@@ -222,6 +224,7 @@ function bienesDesdeLista(bienes: BienGuiaRemision[]): BienForm[] {
     accesorios: b.accesorios ?? "",
     nroParte: b.nroParte ?? "",
     lote: b.lote ?? "",
+    expira: b.expira?.slice(0, 10) ?? "",
   }))
 }
 
@@ -239,6 +242,7 @@ function bienesDesdeForm(bienes: BienForm[]): BienGuiaRemision[] {
       accesorios: b.accesorios.trim() || null,
       nroParte: b.nroParte.trim() || null,
       lote: b.lote.trim() || null,
+      expira: b.expira || null,
     }))
     .filter(
       (b) => b.descripcion || b.codigoBien || b.cantidad !== null
@@ -282,6 +286,8 @@ function UploadGuiaDialog({
   guiasRevisadas,
   onSeleccionarGuia,
   onRegistrarTodas,
+  carpetas,
+  carpetaInicial,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -289,7 +295,9 @@ function UploadGuiaDialog({
   resultadoExterno?: ResultadoSubidaMultiGuia | null
   guiasRevisadas?: Set<number>
   onSeleccionarGuia?: (resultado: ResultadoSubidaMultiGuia, indice: number, meta: MetaGuia) => void
-  onRegistrarTodas?: (resultado: ResultadoSubidaMultiGuia, metas: MetaGuia[]) => Promise<void>
+  onRegistrarTodas?: (resultado: ResultadoSubidaMultiGuia, metas: MetaGuia[], carpetaId: number | null) => Promise<void>
+  carpetas?: GuiaRemisionCarpeta[]
+  carpetaInicial?: FiltroCarpetaGuia
 }) {
   const [archivos, setArchivos] = useState<File[]>([])
   const [procesando, setProcesando] = useState(false)
@@ -301,6 +309,7 @@ function UploadGuiaDialog({
   const [guiasGuardadas, setGuiasGuardadas] = useState<Set<number>>(new Set())
   const [metas, setMetas] = useState<MetaGuia[]>([])
   const [registrandoTodas, setRegistrandoTodas] = useState(false)
+  const [carpetaId, setCarpetaId] = useState<number | string>("")
   const archivoRef = useRef<HTMLInputElement>(null)
   const galeriaRef = useRef<HTMLInputElement>(null)
   const camaraRef = useRef<HTMLInputElement>(null)
@@ -320,8 +329,13 @@ function UploadGuiaDialog({
       setIndiceActual(0)
       setError(null)
       setDuplicados([])
+      if (carpetaInicial && carpetaInicial !== "TODAS" && carpetaInicial !== "SIN_CARPETA") {
+        setCarpetaId(String(carpetaInicial))
+      } else {
+        setCarpetaId("")
+      }
     }
-  }, [open, resultadoExterno])
+  }, [open, resultadoExterno, carpetaInicial])
 
   useEffect(() => {
     if (!procesando) return
@@ -779,22 +793,43 @@ function UploadGuiaDialog({
           </Button>
 
           {resultado && guiasPendientes.length > 0 && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setRegistrandoTodas(true)
-                onRegistrarTodas?.(resultado, metas).finally(() => setRegistrandoTodas(false))
-              }}
-              disabled={registrandoTodas}
-              className="w-full sm:w-auto"
-            >
-              {registrandoTodas ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="mr-2 h-4 w-4" />
+            <>
+              {carpetas && carpetas.length > 0 && (
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                  <Folder className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Registrar en:</span>
+                  <select
+                    value={String(carpetaId)}
+                    onChange={(e) => setCarpetaId(e.target.value)}
+                    className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs"
+                  >
+                    <option value="">Sin carpeta</option>
+                    {carpetas.map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
-              Registrar todas ({guiasPendientes.length})
-            </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setRegistrandoTodas(true)
+                  const carpetaIdFinal = carpetaId === "" ? null : Number(carpetaId)
+                  onRegistrarTodas?.(resultado, metas, carpetaIdFinal).finally(() => setRegistrandoTodas(false))
+                }}
+                disabled={registrandoTodas}
+                className="w-full sm:w-auto"
+              >
+                {registrandoTodas ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                Registrar todas ({guiasPendientes.length})
+              </Button>
+            </>
           )}
 
           {!resultado && !error && (
@@ -863,6 +898,7 @@ function RevisarGuiaDialog({
 
   const hayNroParteF = bienes.some((b) => b.nroParte.trim() !== "")
   const hayLoteF = bienes.some((b) => b.lote.trim() !== "")
+  const hayExpiraF = bienes.some((b) => b.expira.trim() !== "")
   const hayAccesoriosF = bienes.some((b) => b.accesorios.trim() !== "")
 
   useEffect(() => {
@@ -1231,6 +1267,17 @@ function RevisarGuiaDialog({
                           />
                         </div>
                       )}
+                      {hayExpiraF && (
+                        <div>
+                          <Label className="text-xs">Expira</Label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={b.expira}
+                            onChange={(e) => actualizarBien(i, "expira", e.target.value)}
+                          />
+                        </div>
+                      )}
                       {hayAccesoriosF && (
                         <div className="col-span-2">
                           <Label className="text-xs">Accesorios</Label>
@@ -1259,6 +1306,7 @@ function RevisarGuiaDialog({
                       <TableHead className="min-w-20">REF</TableHead>
                       {hayNroParteF && <TableHead className="min-w-20">N° PARTE</TableHead>}
                       {hayLoteF && <TableHead className="min-w-20">LOTE</TableHead>}
+                      {hayExpiraF && <TableHead className="min-w-24">EXPIRA</TableHead>}
                       {hayAccesoriosF && <TableHead className="min-w-32">ACCESORIOS</TableHead>}
                       <TableHead className="min-w-20">UNID.</TableHead>
                       <TableHead className="text-center">CANT.</TableHead>
@@ -1319,6 +1367,15 @@ function RevisarGuiaDialog({
                             <Input
                               value={b.lote}
                               onChange={(e) => actualizarBien(i, "lote", e.target.value)}
+                            />
+                          </TableCell>
+                        )}
+                        {hayExpiraF && (
+                          <TableCell>
+                            <Input
+                              type="date"
+                              value={b.expira}
+                              onChange={(e) => actualizarBien(i, "expira", e.target.value)}
                             />
                           </TableCell>
                         )}
@@ -1434,9 +1491,10 @@ function DetalleGuiaDialog({
   const nro = numeroGuia(datos.serie, datos.numero)
   const hayNroParte = guia.bienes.some((b) => !!b.nroParte?.trim())
   const hayLote = guia.bienes.some((b) => !!b.lote?.trim())
+  const hayExpira = guia.bienes.some((b) => !!b.expira?.trim())
   const hayAccesorios = guia.bienes.some((b) => !!b.accesorios?.trim())
   // offset de columna para el case de "Sin bienes"
-  const colSpanBase = 8 + (hayNroParte ? 1 : 0) + (hayLote ? 1 : 0) + (hayAccesorios ? 1 : 0)
+  const colSpanBase = 8 + (hayNroParte ? 1 : 0) + (hayLote ? 1 : 0) + (hayExpira ? 1 : 0) + (hayAccesorios ? 1 : 0)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1494,6 +1552,7 @@ function DetalleGuiaDialog({
                 <TableHead>REF</TableHead>
                 {hayNroParte && <TableHead>N° PARTE</TableHead>}
                 {hayLote && <TableHead>LOTE</TableHead>}
+                {hayExpira && <TableHead>EXPIRA</TableHead>}
                 {hayAccesorios && <TableHead>ACCESORIOS</TableHead>}
                 <TableHead>UNID.</TableHead>
                 <TableHead className="text-center">CANT.</TableHead>
@@ -1519,6 +1578,7 @@ function DetalleGuiaDialog({
                     <TableCell>{b.ref || "-"}</TableCell>
                     {hayNroParte && <TableCell>{b.nroParte || "-"}</TableCell>}
                     {hayLote && <TableCell>{b.lote || "-"}</TableCell>}
+                    {hayExpira && <TableCell>{fechaLegible(b.expira) || "-"}</TableCell>}
                     {hayAccesorios && (
                       <TableCell className="whitespace-normal break-words align-top">
                         {accesoriosComoLista(b.accesorios).length > 0 ? (
@@ -1662,6 +1722,10 @@ export function OscarGuiasRemisionContent() {
   const procesarResultado = (resultado: ResultadoSubidaGuia) => {
     setModoRevisar("crear")
     setGuiaIdEditar(undefined)
+    const carpetaId =
+      carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
+        ? carpetaSeleccionada
+        : null
     setDatosRevisar({
       guia: resultado.guia,
       bienes: resultado.bienes,
@@ -1670,6 +1734,7 @@ export function OscarGuiasRemisionContent() {
       onedriveItemId: resultado.archivo.itemId,
       onedriveWebUrl: resultado.archivo.webUrl,
       hashArchivo: resultado.hashArchivo,
+      carpetaId,
     })
     setUploadOpen(false)
     setRevisarOpen(true)
@@ -1682,6 +1747,10 @@ export function OscarGuiasRemisionContent() {
   ) => {
     setModoRevisar("crear")
     setGuiaIdEditar(undefined)
+    const carpetaId =
+      carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
+        ? carpetaSeleccionada
+        : null
     const item = resultado.guias[indice]
     setDatosRevisar({
       guia: item.guia,
@@ -1691,6 +1760,7 @@ export function OscarGuiasRemisionContent() {
       onedriveItemId: meta?.itemId ?? resultado.archivo.itemId,
       onedriveWebUrl: meta?.webUrl ?? resultado.archivo.webUrl,
       hashArchivo: meta?.hashArchivo || resultado.hashArchivo,
+      carpetaId,
     })
     setResultadoUpload(resultado)
     setUploadOpen(false)
@@ -1722,7 +1792,8 @@ export function OscarGuiasRemisionContent() {
 
   const registrarTodas = async (
     resultado: ResultadoSubidaMultiGuia,
-    metas: MetaGuia[]
+    metas: MetaGuia[],
+    carpetaId?: number | null
   ) => {
     let ok = 0
     let duplicadas = 0
@@ -1738,6 +1809,7 @@ export function OscarGuiasRemisionContent() {
             guia: item.guia,
             bienes: item.bienes,
             estado: "REVISADO",
+            carpetaId: carpetaId ?? null,
             nombreArchivo: meta?.nombreArchivo || resultado.archivo.nombre,
             onedriveItemId: meta?.itemId ?? resultado.archivo.itemId,
             onedriveWebUrl: meta?.webUrl ?? resultado.archivo.webUrl,
@@ -2373,6 +2445,8 @@ export function OscarGuiasRemisionContent() {
         guiasRevisadas={guiasRevisadas}
         onSeleccionarGuia={procesarGuiaDelUpload}
         onRegistrarTodas={registrarTodas}
+        carpetas={carpetas}
+        carpetaInicial={carpetaSeleccionada}
       />
 
       <RevisarGuiaDialog

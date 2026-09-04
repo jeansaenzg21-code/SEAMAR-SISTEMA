@@ -77,6 +77,7 @@ function mapearBien(bien: any): BienGuiaRemision {
     accesorios: textoSeguro(bien?.accesorios),
     nroParte: textoSeguro(bien?.nroParte ?? bien?.nro_parte),
     lote: textoSeguro(bien?.lote),
+    expira: textoSeguro(bien?.expira),
   };
 }
 

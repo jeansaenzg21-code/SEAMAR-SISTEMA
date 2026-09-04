@@ -69,6 +69,7 @@ function mapearBien(fila: BienGuiaRemisionFila): BienGuiaRemision {
     accesorios: fila.accesorios,
     nroParte: fila.nro_parte,
     lote: fila.lote,
+    expira: fila.expiracion,
   };
 }
 
@@ -80,7 +81,7 @@ export async function cargarBienes(guiaId: number): Promise<BienGuiaRemision[]> 
   const [filas] = await pool.query<BienGuiaRemisionFila[]>(
     `
     SELECT id, guia_id, codigo_bien, descripcion, marca, modelo, serie, ref,
-           unidad_medida, cantidad, accesorios, nro_parte, lote, orden
+           unidad_medida, cantidad, accesorios, nro_parte, lote, expiracion, orden
     FROM guias_remision_oscar_bienes
     WHERE guia_id = ?
     ORDER BY orden ASC, id ASC
@@ -299,9 +300,10 @@ export async function insertarGuiaRemision(
           accesorios,
           nro_parte,
           lote,
+          expiracion,
           orden
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           guiaId,
@@ -316,6 +318,7 @@ export async function insertarGuiaRemision(
           bien?.accesorios ?? null,
           bien?.nroParte ?? null,
           bien?.lote ?? null,
+          bien?.expira ? fechaValida(bien.expira) : null,
           i,
         ]
       );
@@ -407,9 +410,10 @@ export async function actualizarGuiaRemision(
           accesorios,
           nro_parte,
           lote,
+          expiracion,
           orden
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           guiaId,
@@ -424,6 +428,7 @@ export async function actualizarGuiaRemision(
           bien?.accesorios ?? null,
           bien?.nroParte ?? null,
           bien?.lote ?? null,
+          bien?.expira ? fechaValida(bien.expira) : null,
           i,
         ]
       );
