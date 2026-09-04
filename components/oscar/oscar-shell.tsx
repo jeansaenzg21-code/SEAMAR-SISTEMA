@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { ChevronDown, FileSpreadsheet, LogOut, Menu, Receipt } from "lucide-react"
+import { ChevronDown, FileSpreadsheet, LogOut, Menu, Receipt, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -19,12 +19,17 @@ import { NOMBRE_MODULO_OSCAR } from "@/lib/oscar/oscar"
 
 const NAV_OSCAR = [
   { name: NOMBRE_MODULO_OSCAR, href: "/oscar", icon: Receipt },
+  { name: "Guías de Remisión", href: "/oscar/guias-remision", icon: Truck },
 ]
 
 export function OscarShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const sesion = useUser()
+
+  const tituloSeccion = pathname.startsWith("/oscar/guias-remision")
+    ? "Guías de Remisión"
+    : NOMBRE_MODULO_OSCAR
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -200,7 +205,7 @@ export function OscarShell({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </Button>
             <h1 className="oscar-text-gradient text-lg font-semibold tracking-tight md:text-xl">
-              {NOMBRE_MODULO_OSCAR}
+              {tituloSeccion}
             </h1>
           </div>
         </header>

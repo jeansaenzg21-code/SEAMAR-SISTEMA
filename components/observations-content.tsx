@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Search, MessageSquare, AlertTriangle, Clock, FileText } from "lucide-react"
+import { Search, MessageSquare, AlertTriangle, Clock, FileText, CheckCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +23,7 @@ import { formatCurrency } from "@/lib/utils"
 
 type ObservationStatus = "pending" | "in_progress" | "resolved"
 
-const statusStyles = {
+const statusStyles: Record<ObservationStatus, { label: string; className: string; icon: typeof AlertTriangle }> = {
   pending: {
     label: "Pendiente",
     className: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -34,7 +34,11 @@ const statusStyles = {
     className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     icon: Clock,
   },
-
+  resolved: {
+    label: "Resuelta",
+    className: "bg-green-500/10 text-green-400 border-green-500/20",
+    icon: CheckCircle,
+  },
 }
 
 const detailStatusMap: Record<string, { label: string; className: string }> = {
@@ -101,8 +105,8 @@ export function ObservationsContent() {
             v.estado_observacion === "EN_PROGRESO"
               ? "in_progress"
               : v.estado_observacion === "RESUELTA"
-              ? "resolved"
-              : "pending",
+                ? "resolved"
+                : "pending",
           assignedTo: v.encargado || "-",
           response: v.respuesta_observacion,
           documentos_respuesta: v.documentos_respuesta || [],
@@ -318,7 +322,7 @@ export function ObservationsContent() {
 
           <TabsContent value={activeTab} className="space-y-4">
             {filteredObservations.map((observation) => {
-              const statusConfig = statusStyles[observation.status as ObservationStatus]
+              const statusConfig = statusStyles[observation.status as ObservationStatus] ?? statusStyles.pending
               const StatusIcon = statusConfig.icon
 
               return (
@@ -381,38 +385,38 @@ export function ObservationsContent() {
                           </p>
 
                           <Button
-                            variant="outline" 
+                            variant="outline"
                             size="sm"
-                           onClick={async () => {
-  if (observation.status === "pending") {
-    await fetch(
-  `/api/valorizaciones/${observation.valuationId}/estado`,
-  {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      observation_status: "in_progress",
-    }),
-  }
-)
-    setObservations((prev) =>
-      prev.map((o) =>
-        o.id === observation.id
-          ? { ...o, status: "in_progress" }
-          : o
-      )
-    )
-  }
+                            onClick={async () => {
+                              if (observation.status === "pending") {
+                                await fetch(
+                                  `/api/valorizaciones/${observation.valuationId}/estado`,
+                                  {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                      observation_status: "in_progress",
+                                    }),
+                                  }
+                                )
+                                setObservations((prev) =>
+                                  prev.map((o) =>
+                                    o.id === observation.id
+                                      ? { ...o, status: "in_progress" }
+                                      : o
+                                  )
+                                )
+                              }
 
-  setSelectedObservation({
-  ...observation,
-  status: "in_progress",
-})
-  setResponse(observation.response || "")
-  setIsDetailModalOpen(true)
-}}
+                              setSelectedObservation({
+                                ...observation,
+                                status: "in_progress",
+                              })
+                              setResponse(observation.response || "")
+                              setIsDetailModalOpen(true)
+                            }}
                           >
                             Responder
                           </Button>

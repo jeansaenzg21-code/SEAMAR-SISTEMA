@@ -11,6 +11,11 @@ const nextConfig = {
       bodySizeLimit: "20mb",
     },
   },
+  serverExternalPackages: [
+    "@napi-rs/canvas",
+    "@napi-rs/canvas-win32-x64-msvc",
+    "pdfjs-dist",
+  ],
 }
 
 export default nextConfig
