@@ -77,8 +77,17 @@ function mapearBien(bien: any): BienGuiaRemision {
     accesorios: textoSeguro(bien?.accesorios),
     nroParte: textoSeguro(bien?.nroParte ?? bien?.nro_parte),
     lote: textoSeguro(bien?.lote),
-    expira: textoSeguro(bien?.expira),
+    expira: normalizarFechaExpira(bien?.expira),
   };
+}
+
+function normalizarFechaExpira(fecha: string | null | undefined): string | null {
+  const t = textoSeguro(fecha);
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  return null;
 }
 
 function construirInput(body: any): {

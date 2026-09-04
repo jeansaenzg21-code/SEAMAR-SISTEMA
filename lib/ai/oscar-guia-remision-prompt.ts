@@ -65,7 +65,7 @@ Campos por bien (SOLO estos):
    Ej: "01 CABLE DE PODER, 01 PEDAL" → "01 CABLE DE PODER \n01 PEDAL". Ej con número de parte: "Cable de hilo caliente - N° de parte: 900MR751 \nCable adaptador de hilo caliente - N° de parte: 900MR858". Si el bien NO tiene accesorios, pon null.
 - nroParte: SOLO si el bien trae una etiqueta o línea "N° DE PARTE:", "NRO DE PARTE:", "Nº DE PARTE:" (o columna N° PARTE) referida AL BIEN MISMO (no a los accesorios ni a los números de parte de los accesorios). Transcribe su valor. Si el bien NO tiene, pon null.
 - lote: SOLO si el bien trae una etiqueta o línea "LOTE:" (o columna LOTE). Transcribe su valor. Si el bien NO tiene, pon null.
-- expira: SOLO si el bien trae una etiqueta o línea "EXPIRA:", "FECHA DE EXPIRACIÓN:", "EXPIRACIÓN:" o "VENCE:" (o columna de vencimiento/expiración). Transcribe la fecha de vencimiento/expiración del lote en formato YYYY-MM-DD. Ej: "EXPIRA: 15-12-2033" → "2033-12-15". En la gran mayoría de bienes este campo NO existe: entonces pon null. Solo lo rellenas cuando el documento realmente indique una fecha de expiración/vencimiento para ESE bien.
+- expira: es OBLIGATORIO llenarlo cuando el bien trae una etiqueta o línea "EXPIRA:", "FECHA DE EXPIRACIÓN:", "EXPIRACIÓN:" o "VENCE:" (o columna de vencimiento/expiración). Transcribe la fecha de vencimiento/expiración del lote en formato YYYY-MM-DD. Ej: "EXPIRA: 15-12-2033" → "2033-12-15". Es MUY IMPORTANTE que NO lo omitas: en cuanto veas "EXPIRA:" seguido de una fecha en la descripción detallada de un bien, escribe aquí la fecha YYYY-MM-DD. Solo deja null cuando ese bien REALMENTE no muestre ninguna fecha de expiración/vencimiento.
 
 Valores como "PROCEDENCIA:", "ORIGEN:", "PAÍS:", "OBSERVACIONES:", "NOTAS:" no corresponden a ningún campo: NO los guardes en marca, modelo, serie, ref, nroParte, lote ni accesorios. En cambio, cuando el bien lleve "INCLUYE:" (ej: "ACCESORIOS DE VENTILADOR MECANICO ADULTO-PEDIATRICO-NEONATAL INCLUYE: Cable de hilo caliente"), ese texto "INCLUYE: ..." SÍ debe permanecer DENTRO de la descripcion (no se descarta ni se separa).
 
@@ -73,7 +73,8 @@ REGLAS PARA NO PERDER DATOS (CRÍTICO):
 1. NADA debe ser omitido de lo extraído en la descripción detallada. Cada letra, número y dato visible de la descripción del bien debe conservarse y registrarse en algún campo, porque omitir información produce pérdida de datos.
 2. Si un dato de la descripción no tiene un campo específico al que asignarlo (por ejemplo códigos internos del producto que no son MARCA/MODELO/SERIE/REF/LOTE/EXPIRA), déjalo DENTRO de la descripcion del bien. No lo borres ni lo omitas.
 3. Los códigos numéricos largos que aparecen al inicio de una línea, como "100208649 8065753152", no corresponden a marca, modelo, serie, ref, lote ni codigoBien cuando no hay ningún indicio (etiqueta) que lo indique: consérvalos tal cual dentro de la descripcion del bien.
-4. La fecha de "EXPIRA:" siempre se guarda en el campo expira (ver arriba), nunca se omite ni se mezcla con otro campo.
+4. La fecha de "EXPIRA:" (o "FECHA DE EXPIRACIÓN:", "EXPIRACIÓN:", "VENCE:") SIEMPRE se guarda en el campo expira en formato YYYY-MM-DD. NUNCA se omite, nunca se deja en la descripción y nunca se mezcla con otro campo. Es un error grave no llenar expira cuando el bien lo indica: si la descripción detallada de un bien contiene "EXPIRA:" + fecha, ese bien DEBE tener expira relleno, sin excepciones.
+5. La etiqueta "LOTE:" va SIEMPRE en el campo lote (nunca se omite, nunca se mezcla con otro campo). Igual que expira: si la descripción detallada de un bien contiene "LOTE:" + valor, el campo lote DEBE quedar relleno.
 
 Reglas para bienes:
 1. La descripcion es SOLO el nombre del bien, sin etiquetas ni valores (ver arriba).

@@ -271,7 +271,11 @@ function esCodigoBienFalso(codigo: string): boolean {
 function limpiarCodigoBienFalso(b: BienGuiaRemision): BienGuiaRemision {
   if (b.codigoBien && esCodigoBienFalso(b.codigoBien)) {
     const limpio = b.codigoBien.trim();
-    b.descripcion = [limpio, b.descripcion].filter(Boolean).join(" ");
+    // Evita duplicar si la descripción ya empieza con los mismos números.
+    const desc = (b.descripcion ?? "").trim();
+    const yaPrecede = new RegExp(`^${limpio.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s`).test(desc)
+      || new RegExp(`^${limpio.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`).test(desc);
+    b.descripcion = yaPrecede ? desc : [limpio, desc].filter(Boolean).join(" ");
     b.codigoBien = null;
   }
   return b;
@@ -345,6 +349,16 @@ function esMarcaImplicitaEnDescripcion(desc: string | null): string | null {
   if (!desc) return null;
   const d = desc.toUpperCase();
   for (const [key, val] of Object.entries(MARCA_VARIANTES)) {
+    // "system" (y similares más genéricos) NO son marcas cuando forman parte del
+    // nombre de un equipo al FINAL de la descripción (ej. "INTEGRATED 1 MOS
+    // CAMERA SYSTEM", "COMPUTADORA DE VIDEO SYSTEM"). Solo se asignan como marca
+    // cuando van al INICIO o precedidas por "MARCA:"/"MOD.".
+    if (key === "system") {
+      if (new RegExp(`\\bMARCA:?\\s+SYSTEM\\b|\\bSYSTEM\\s+(?:MOD\\.?|MODELO)`, "i").test(desc)) {
+        return "System";
+      }
+      continue;
+    }
     if (d.includes(key.toUpperCase())) return val;
   }
   return null;
