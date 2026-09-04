@@ -191,10 +191,22 @@ function normalizarFecha(valor: unknown): string | null {
   return null;
 }
 
-// Normaliza el valor de EXPIRA a YYYY-MM-DD (acepta "15-12-2033", "2033-12-15").
+// Normaliza el valor de EXPIRA a YYYY-MM-DD. El valor puede venir con texto
+// adicional después (ej. "15-12-2033 1 NO UNIDAD (NIU) 1.00"): extrae la
+// PRIMERA fecha dd-mm-yyyy / yyyy-mm-dd que aparezca al inicio.
 function normalizarExpira(b: BienGuiaRemision): BienGuiaRemision {
   if (b.expira) {
-    b.expira = normalizarFecha(b.expira);
+    const t = String(b.expira).trim();
+    // Primera fecha en formato d/m/a delante del string (acepta espacios/guiones).
+    const match = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (match) {
+      const [, d, m, y] = match;
+      b.expira = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(t)) {
+      b.expira = t.slice(0, 10);
+    } else {
+      b.expira = null;
+    }
   }
   return b;
 }
@@ -240,6 +252,27 @@ function rescatarCodigoDeDescripcion(b: BienGuiaRemision): BienGuiaRemision {
   if (match && esCodigoBienCandidato(match[1])) {
     b.codigoBien = match[1];
     b.descripcion = match[2].trim() || null;
+  }
+  return b;
+}
+
+// Un "código de bien" falso es un número largo puramente numérico SIN guiones
+// (ej. "100208649", "8065753152", o "100208649 8065753152") que la IA a veces
+// confunde con el código de la columna "Código de Bien" pero en realidad
+// pertenece a la descripción. Si codigoBien parece uno o más números sueltos
+// así, lo devolvemos a la descripción y dejamos codigoBien en null.
+function esCodigoBienFalso(codigo: string): boolean {
+  const t = codigo.trim();
+  // Uno o más números puros largos separados por espacios, sin letras ni guiones.
+  if (/^\d{6,}(\s+\d{6,})*$/.test(t)) return true;
+  return false;
+}
+
+function limpiarCodigoBienFalso(b: BienGuiaRemision): BienGuiaRemision {
+  if (b.codigoBien && esCodigoBienFalso(b.codigoBien)) {
+    const limpio = b.codigoBien.trim();
+    b.descripcion = [limpio, b.descripcion].filter(Boolean).join(" ");
+    b.codigoBien = null;
   }
   return b;
 }
@@ -596,6 +629,7 @@ function normalizarPagina(raw: any): {
     .filter((b: any) => b && typeof b === "object")
     .map(mapearBien)
     .map((b: BienGuiaRemision) => {
+      b = limpiarCodigoBienFalso(b);
       b = rescatarCodigoDeDescripcion(b);
       b = parsearEtiquetasDescripcion(b);
       b = normalizarExpira(b);
