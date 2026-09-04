@@ -15,6 +15,7 @@ node_modules
 .DS_Store
 
 # Generated files and local runtime data
+next-env.d.ts
 tsconfig.tsbuildinfo
 logs/*.log
 python/__pycache__/

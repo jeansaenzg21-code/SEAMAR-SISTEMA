@@ -233,48 +233,38 @@ function mapearBien(bien: any): BienGuiaRemision {
 // =============================================================================
 
 // Evalúa un código candidato separado del resto de la descripción (token inicial).
-function esCodigoBienCandidato(token: string): boolean {
-  // Código numérico con guiones (115-056312-00)
-  if (/^[\d]{2,4}(?:-[\d]{4,8}){1,2}$/.test(token)) return true;
-  // Código alfanumérico que mezcle letras y dígitos y NO sea una medida (ej F04GB-PA00008)
-  if (/^[A-Z][A-Z0-9]{2,20}(?:-[A-Z0-9]{2,12})$/.test(token)) return true;
-  // Código alfanumérico compacto, p.ej "ABC123", "HB300L"
-  if (/^[A-Z]{1,2}[0-9]{2,}[A-Z0-9]*$/.test(token)) return true;
-  return false;
-}
-
-function rescatarCodigoDeDescripcion(b: BienGuiaRemision): BienGuiaRemision {
-  if (b.codigoBien) return b;
-  if (!b.descripcion) return b;
-
-  const d = b.descripcion.trim();
-  const match = d.match(/^([^\s]+)\s+(.+)$/);
-  if (match && esCodigoBienCandidato(match[1])) {
-    b.codigoBien = match[1];
-    b.descripcion = match[2].trim() || null;
-  }
-  return b;
-}
-
-// Un "código de bien" falso es un número largo puramente numérico SIN guiones
-// (ej. "100208649", "8065753152", o "100208649 8065753152") que la IA a veces
-// confunde con el código de la columna "Código de Bien" pero en realidad
-// pertenece a la descripción. Si codigoBien parece uno o más números sueltos
-// así, lo devolvemos a la descripción y dejamos codigoBien en null.
-function esCodigoBienFalso(codigo: string): boolean {
+// Un "código de bien" espurio es cualquier código que la IA asignó erróneamente
+// al campo codigoBien pero que en realidad pertenece a la descripción del bien:
+//  - números largos puros SIN guiones (ej. "100208649", "8065753152"), o
+//  - códigos numéricos con guiones tipo "115-056312-00", o
+//  - códigos alfanuméricos con guiones tipo "F04GB-PA00008", o
+//  - códigos alfanuméricos compactos tipo "HB300L".
+// En las guías de remisión SUNAT de este módulo, el campo "Código de Bien" se
+// usa SOLO cuando el PDF trae una columna explícita titulada "Código de Bien".
+// Cuando el código aparece al INICIO de la descripción (algo muy frecuente),
+// NO debe ir a codigoBien: se conserva al inicio de la descripción y codigoBien
+// queda en null.
+function esCodigoEspurio(codigo: string): boolean {
   const t = codigo.trim();
+  if (!t) return false;
   // Uno o más números puros largos separados por espacios, sin letras ni guiones.
   if (/^\d{6,}(\s+\d{6,})*$/.test(t)) return true;
+  // Código numérico con guiones (115-056312, 115-056312-00)
+  if (/^[\d]{1,4}(?:-[\d]{2,8}){1,2}$/.test(t)) return true;
+  // Código alfanumérico que mezcle letras y dígitos y NO sea una medida (ej F04GB-PA00008)
+  if (/^[A-Z][A-Z0-9]{2,20}(?:-[A-Z0-9]{2,12})$/.test(t)) return true;
+  // Código alfanumérico compacto, p.ej "ABC123", "HB300L"
+  if (/^[A-Z]{1,2}[0-9]{2,}[A-Z0-9]*$/.test(t)) return true;
   return false;
 }
 
-function limpiarCodigoBienFalso(b: BienGuiaRemision): BienGuiaRemision {
-  if (b.codigoBien && esCodigoBienFalso(b.codigoBien)) {
-    const limpio = b.codigoBien.trim();
-    // Evita duplicar si la descripción ya empieza con los mismos números.
+function limpiarCodigoBienEspurio(b: BienGuiaRemision): BienGuiaRemision {
+  if (b.codigoBien && esCodigoEspurio(b.codigoBien)) {
+    const limpio = b.codigoBien.trim().replace(/\s+/g, " ");
     const desc = (b.descripcion ?? "").trim();
-    const yaPrecede = new RegExp(`^${limpio.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s`).test(desc)
-      || new RegExp(`^${limpio.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`).test(desc);
+    const esc = limpio.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const yaPrecede =
+      new RegExp(`^${esc}(?:\\s|$)`).test(desc);
     b.descripcion = yaPrecede ? desc : [limpio, desc].filter(Boolean).join(" ");
     b.codigoBien = null;
   }
@@ -643,8 +633,7 @@ function normalizarPagina(raw: any): {
     .filter((b: any) => b && typeof b === "object")
     .map(mapearBien)
     .map((b: BienGuiaRemision) => {
-      b = limpiarCodigoBienFalso(b);
-      b = rescatarCodigoDeDescripcion(b);
+      b = limpiarCodigoBienEspurio(b);
       b = parsearEtiquetasDescripcion(b);
       b = normalizarExpira(b);
       b = inferirModelo(b);
