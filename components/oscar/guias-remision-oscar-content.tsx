@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -291,10 +292,10 @@ function UploadGuiaDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onProcesada: (resultado: ResultadoSubidaGuia) => void
+  onProcesada: (resultado: ResultadoSubidaGuia, carpetaId?: number | null) => void
   resultadoExterno?: ResultadoSubidaMultiGuia | null
   guiasRevisadas?: Set<number>
-  onSeleccionarGuia?: (resultado: ResultadoSubidaMultiGuia, indice: number, meta: MetaGuia) => void
+  onSeleccionarGuia?: (resultado: ResultadoSubidaMultiGuia, indice: number, meta: MetaGuia, carpetaId?: number | null) => void
   onRegistrarTodas?: (resultado: ResultadoSubidaMultiGuia, metas: MetaGuia[], carpetaId: number | null) => Promise<void>
   carpetas?: GuiaRemisionCarpeta[]
   carpetaInicial?: FiltroCarpetaGuia
@@ -487,6 +488,24 @@ function UploadGuiaDialog({
             <>
               {!procesando && (
                 <>
+                  {carpetas && carpetas.length > 0 && (
+                    <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                      <Folder className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Registrar en:</span>
+                      <select
+                        value={String(carpetaId)}
+                        onChange={(e) => setCarpetaId(e.target.value)}
+                        className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="">Sin carpeta</option>
+                        {carpetas.map((c) => (
+                          <option key={c.id} value={String(c.id)}>
+                            {c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     <button
                       type="button"
@@ -737,10 +756,11 @@ function UploadGuiaDialog({
                                 webUrl: meta.webUrl || resultado!.archivo.webUrl,
                               },
                             }
+                            const carpetaIdFinal = carpetaId === "" ? null : Number(carpetaId)
                             if (onSeleccionarGuia && totalGuias > 1) {
-                              onSeleccionarGuia(resultado!, i, meta)
+                              onSeleccionarGuia(resultado!, i, meta, carpetaIdFinal)
                             } else {
-                              onProcesada(datosParaRevisar)
+                              onProcesada(datosParaRevisar, carpetaIdFinal)
                               onOpenChange(false)
                             }
                           }}
@@ -794,24 +814,6 @@ function UploadGuiaDialog({
 
           {resultado && guiasPendientes.length > 0 && (
             <>
-              {carpetas && carpetas.length > 0 && (
-                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
-                  <Folder className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Registrar en:</span>
-                  <select
-                    value={String(carpetaId)}
-                    onChange={(e) => setCarpetaId(e.target.value)}
-                    className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs"
-                  >
-                    <option value="">Sin carpeta</option>
-                    {carpetas.map((c) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -1645,6 +1647,8 @@ export function OscarGuiasRemisionContent() {
   const [nombreCarpeta, setNombreCarpeta] = useState("")
   const [moverGuia, setMoverGuia] = useState<GuiaRemisionOscar | null>(null)
   const [carpetaMoverTarget, setCarpetaMoverTarget] = useState<string>("")
+  const [guiasSeleccionadas, setGuiasSeleccionadas] = useState<Set<number>>(new Set())
+  const [carpetaMoverMasiva, setCarpetaMoverMasiva] = useState(false)
 
   const [uploadOpen, setUploadOpen] = useState(false)
   const [revisarOpen, setRevisarOpen] = useState(false)
@@ -1719,11 +1723,13 @@ export function OscarGuiasRemisionContent() {
     setDetalleOpen(true)
   }, [])
 
-  const procesarResultado = (resultado: ResultadoSubidaGuia) => {
+  const procesarResultado = (resultado: ResultadoSubidaGuia, carpetaPicker?: number | null) => {
     setModoRevisar("crear")
     setGuiaIdEditar(undefined)
     const carpetaId =
-      carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
+      carpetaPicker !== undefined
+        ? carpetaPicker
+        : carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
         ? carpetaSeleccionada
         : null
     setDatosRevisar({
@@ -1743,12 +1749,15 @@ export function OscarGuiasRemisionContent() {
   const procesarGuiaDelUpload = (
     resultado: ResultadoSubidaMultiGuia,
     indice: number,
-    meta?: MetaGuia
+    meta?: MetaGuia,
+    carpetaPicker?: number | null
   ) => {
     setModoRevisar("crear")
     setGuiaIdEditar(undefined)
     const carpetaId =
-      carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
+      carpetaPicker !== undefined
+        ? carpetaPicker
+        : carpetaSeleccionada && carpetaSeleccionada !== "TODAS" && carpetaSeleccionada !== "SIN_CARPETA"
         ? carpetaSeleccionada
         : null
     const item = resultado.guias[indice]
@@ -2017,6 +2026,59 @@ export function OscarGuiasRemisionContent() {
     ...carpetas.map((c) => ({ value: String(c.id), label: c.nombre })),
   ]
 
+  const alternarSeleccion = (id: number) => {
+    setGuiasSeleccionadas((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const alternarSeleccionTodas = () => {
+    const visibles = guias.map((g) => g.id)
+    setGuiasSeleccionadas((prev) => {
+      const next = new Set(prev)
+      const todasSeleccionadas = visibles.length > 0 && visibles.every((id) => next.has(id))
+      if (todasSeleccionadas) {
+        visibles.forEach((id) => next.delete(id))
+      } else {
+        visibles.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const confirmarMoverSeleccionadas = async () => {
+    const ids = Array.from(guiasSeleccionadas)
+    if (ids.length === 0) return
+    const objetivo =
+      carpetaMoverTarget === "" || carpetaMoverTarget === "SIN_CARPETA"
+        ? null
+        : Number(carpetaMoverTarget)
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/oscar/guias-remision/${id}/carpeta`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ carpetaId: objetivo }),
+          })
+        )
+      )
+      toast.success(`${ids.length} guía${ids.length === 1 ? "" : "s"} movida${ids.length === 1 ? "" : "s"}.`)
+      setGuiasSeleccionadas(new Set())
+      setCarpetaMoverMasiva(false)
+      await cargarCarpetas()
+      cargar()
+    } catch {
+      toast.error("No se pudieron mover las guías.")
+    }
+  }
+
+  const carpetaActualViewModel = (carpetaId: number | null): string =>
+    carpetaId ? String(carpetaId) : ""
+
   return (
     <div className="w-full space-y-6">
       {/* Encabezado */}
@@ -2238,6 +2300,57 @@ export function OscarGuiasRemisionContent() {
         </div>
       ) : (
         <>
+          {guiasSeleccionadas.size > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                {guiasSeleccionadas.size} guía{guiasSeleccionadas.size === 1 ? "" : "s"} seleccionada{guiasSeleccionadas.size === 1 ? "" : "s"}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const visibles = guias.map((g) => g.id)
+                    setGuiasSeleccionadas((prev) => {
+                      const next = new Set(prev)
+                      const todasSeleccionadas = visibles.length > 0 && visibles.every((id) => next.has(id))
+                      if (todasSeleccionadas) {
+                        visibles.forEach((id) => next.delete(id))
+                      } else {
+                        visibles.forEach((id) => next.add(id))
+                      }
+                      return next
+                    })
+                  }}
+                >
+                  <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                  {guias.map((g) => g.id).every((id) => guiasSeleccionadas.has(id))
+                    ? "Quitar todas"
+                    : "Seleccionar todas"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGuiasSeleccionadas(new Set())}
+                >
+                  <X className="mr-1 h-3.5 w-3.5" />
+                  Limpiar
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setCarpetaMoverTarget("")
+                    setCarpetaMoverMasiva(true)
+                  }}
+                >
+                  <FolderUp className="mr-1 h-3.5 w-3.5" />
+                  Mover a carpeta
+                </Button>
+              </div>
+            </div>
+          )}
           {/* Vista móvil: lista de tarjetas */}
           <div className="space-y-2.5 md:hidden">
                   {guias.map((g) => (
@@ -2248,6 +2361,13 @@ export function OscarGuiasRemisionContent() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={guiasSeleccionadas.has(g.id)}
+                        onCheckedChange={() => alternarSeleccion(g.id)}
+                        aria-label={`Seleccionar ${numeroGuia(g.guia.serie, g.guia.numero) || g.id}`}
+                      />
+                    </div>
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <FileSpreadsheet className="h-4 w-4" />
                     </div>
@@ -2333,6 +2453,13 @@ export function OscarGuiasRemisionContent() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={guias.length > 0 && guias.filter((g) => guiasSeleccionadas.has(g.id)).length === guias.length}
+                        onCheckedChange={alternarSeleccionTodas}
+                        aria-label="Seleccionar todas"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Guía</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Fecha de traslado</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Motivo</TableHead>
@@ -2350,6 +2477,13 @@ export function OscarGuiasRemisionContent() {
                       className="cursor-pointer border-border transition-colors hover:bg-muted/40"
                       onClick={() => abrirDetalle(g)}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={guiasSeleccionadas.has(g.id)}
+                          onCheckedChange={() => alternarSeleccion(g.id)}
+                          aria-label={`Seleccionar ${numeroGuia(g.guia.serie, g.guia.numero) || g.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="whitespace-nowrap font-medium">
                         {numeroGuia(g.guia.serie, g.guia.numero) || "-"}
                       </TableCell>
@@ -2576,6 +2710,46 @@ export function OscarGuiasRemisionContent() {
               Cancelar
             </Button>
             <Button onClick={confirmarMoverGuia}>Mover</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo mover guías seleccionadas */}
+      <Dialog
+        open={carpetaMoverMasiva}
+        onOpenChange={(o) => !o && setCarpetaMoverMasiva(false)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderUp className="h-5 w-5 text-primary" />
+              Mover {guiasSeleccionadas.size} guía{guiasSeleccionadas.size === 1 ? "" : "s"} a carpeta
+            </DialogTitle>
+            <DialogDescription>
+              Elige la carpeta destino. Las guías seleccionadas se moverán todas a la vez.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label>Destino</Label>
+            <select
+              value={carpetaMoverTarget}
+              onChange={(e) => setCarpetaMoverTarget(e.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {opcionesCarpetaMover.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCarpetaMoverMasiva(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarMoverSeleccionadas}>
+              Mover {guiasSeleccionadas.size} guía{guiasSeleccionadas.size === 1 ? "" : "s"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
