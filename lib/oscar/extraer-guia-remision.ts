@@ -397,23 +397,19 @@ function inferirModelo(b: BienGuiaRemision): BienGuiaRemision {
   const d = b.descripcion.trim();
   if (!d) return b;
 
-  // 1) Código de modelo al INICIO: primer token seguido de más texto.
-  const inicial = d.match(/^([A-Za-z0-9][A-Za-z0-9.\-]*[A-Za-z0-9])\s+(.+)$/);
-  if (inicial && esCodeModelo(inicial[1])) {
-    const resto = limpiarFragmento(inicial[2]);
-    if (resto) {
-      b.modelo = inicial[1];
-      b.descripcion = resto;
-      return b;
-    }
-  }
+  // NUNCA se toma el código que está al INICIO de la descripción como modelo:
+  // ese token inicial es siempre la REFERENCIA/PARTE del bien (ej. "F23CB-PA00034",
+  // "115-056312-00", "120-004559-00"). El modelo va DENTRO del nombre del bien,
+  // después de que ya se mencionó el producto (ej: "Fuente de luz para endoscopio
+  // HB300L (CE, LED)" → modelo HB300L), nunca al inicio.
 
-  // 2) Código de modelo al FINAL: token corto (con dígitos) justo antes de un
-  //    paréntesis de apertura o al final de la cadena.
+  // 2) Código de modelo en el NOMBRE del bien: un token corto (con dígitos y
+  //    letras) que aparece dentro de la descripción, justo antes de un paréntesis
+  //    final o al final de la cadena (ej. "... HB300L (CE, LED)" o "... U1").
   const mFinal = d.match(
-    /^(.+?)\s+([A-Za-z0-9][A-Za-z0-9.\-]*[A-Za-z0-9])(?=(?:\s*\([^)]*\)\s*)?$)\)?/
+    /^(.+?)\s+([A-Za-z0-9]+[A-Za-z0-9.\-]*[A-Za-z0-9]?)(?=(?:\s*\([^)]*\)\s*)?$)\)?/
   );
-  if (mFinal && esCodeModelo(mFinal[2]) && mFinal[2].length <= 10) {
+  if (mFinal && esCodeModelo(mFinal[2]) && mFinal[2].length <= 12) {
     const base = limpiarFragmento(mFinal[1]);
     const palabraAnterior = (base.match(/([A-Za-zÁÉÍÓÚÑ]+)$/) || [])[1]?.toLowerCase();
     const esPreposicion = ["de", "del", "la", "el", "las", "los", "en", "al", "y", "e", "con", "para", "por", "su", "un", "una"].includes(palabraAnterior || "");
