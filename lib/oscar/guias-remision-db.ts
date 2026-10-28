@@ -30,6 +30,13 @@ function fechaValida(fecha: string | null | undefined): string | null {
   return null;
 }
 
+// Limita el largo de un texto para no exceder el tamaño de la columna MySQL
+// (evita ER_DATA_TOO_LONG al guardar valores largos extraídos por la IA).
+function textoLimitado(valor: string | null | undefined, max: number): string | null {
+  if (!valor) return null;
+  return valor.length > max ? valor.slice(0, max) : valor;
+}
+
 function mapearGuia(fila: GuiaRemisionFila): GuiaRemisionOscar {
   return {
     id: fila.id,
@@ -265,17 +272,17 @@ export async function insertarGuiaRemision(
       `,
       [
         usuarioId,
-        input.guia.serie,
-        input.guia.numero,
+        textoLimitado(input.guia.serie, 80),
+        textoLimitado(input.guia.numero, 80),
         fechaValida(input.guia.fechaInicioTraslado),
-        input.guia.motivoTraslado,
-        input.guia.destinatario,
-        input.guia.rucCliente,
-        input.guia.direccion,
-        input.nombreArchivo,
-        input.onedriveItemId,
+        textoLimitado(input.guia.motivoTraslado, 255),
+        textoLimitado(input.guia.destinatario, 255),
+        textoLimitado(input.guia.rucCliente, 20),
+        textoLimitado(input.guia.direccion, 255),
+        textoLimitado(input.nombreArchivo, 255),
+        textoLimitado(input.onedriveItemId, 255),
         input.onedriveWebUrl,
-        input.hashArchivo,
+        textoLimitado(input.hashArchivo, 64),
         input.estado,
         input.carpetaId ?? null,
       ]
@@ -307,17 +314,17 @@ export async function insertarGuiaRemision(
         `,
         [
           guiaId,
-          bien?.codigoBien ?? null,
+          textoLimitado(bien?.codigoBien ?? null, 255),
           bien?.descripcion ?? null,
-          bien?.marca ?? null,
-          bien?.modelo ?? null,
-          bien?.serie ?? null,
-          bien?.ref ?? null,
-          bien?.unidadMedida ?? null,
+          textoLimitado(bien?.marca ?? null, 150),
+          textoLimitado(bien?.modelo ?? null, 150),
+          textoLimitado(bien?.serie ?? null, 1000),
+          textoLimitado(bien?.ref ?? null, 1000),
+          textoLimitado(bien?.unidadMedida ?? null, 50),
           bien?.cantidad ?? null,
           bien?.accesorios ?? null,
-          bien?.nroParte ?? null,
-          bien?.lote ?? null,
+          textoLimitado(bien?.nroParte ?? null, 1000),
+          textoLimitado(bien?.lote ?? null, 1000),
           bien?.expira ? fechaValida(bien.expira) : null,
           i,
         ]
@@ -370,17 +377,17 @@ export async function actualizarGuiaRemision(
       WHERE usuario_id = ? AND id = ?
       `,
       [
-        input.guia.serie,
-        input.guia.numero,
+        textoLimitado(input.guia.serie, 80),
+        textoLimitado(input.guia.numero, 80),
         fechaValida(input.guia.fechaInicioTraslado),
-        input.guia.motivoTraslado,
-        input.guia.destinatario,
-        input.guia.rucCliente,
-        input.guia.direccion,
-        input.nombreArchivo ?? existente.nombreArchivo,
-        input.onedriveItemId ?? existente.onedriveItemId,
+        textoLimitado(input.guia.motivoTraslado, 255),
+        textoLimitado(input.guia.destinatario, 255),
+        textoLimitado(input.guia.rucCliente, 20),
+        textoLimitado(input.guia.direccion, 255),
+        textoLimitado(input.nombreArchivo ?? existente.nombreArchivo, 255),
+        textoLimitado(input.onedriveItemId ?? existente.onedriveItemId, 255),
         input.onedriveWebUrl ?? existente.onedriveWebUrl,
-        input.hashArchivo ?? existente.hashArchivo,
+        textoLimitado(input.hashArchivo ?? existente.hashArchivo, 64),
         input.estado,
         input.carpetaId === undefined ? (existente.carpetaId ?? null) : input.carpetaId,
         usuarioId,
@@ -417,17 +424,17 @@ export async function actualizarGuiaRemision(
         `,
         [
           guiaId,
-          bien?.codigoBien ?? null,
+          textoLimitado(bien?.codigoBien ?? null, 255),
           bien?.descripcion ?? null,
-          bien?.marca ?? null,
-          bien?.modelo ?? null,
-          bien?.serie ?? null,
-          bien?.ref ?? null,
-          bien?.unidadMedida ?? null,
+          textoLimitado(bien?.marca ?? null, 150),
+          textoLimitado(bien?.modelo ?? null, 150),
+          textoLimitado(bien?.serie ?? null, 1000),
+          textoLimitado(bien?.ref ?? null, 1000),
+          textoLimitado(bien?.unidadMedida ?? null, 50),
           bien?.cantidad ?? null,
           bien?.accesorios ?? null,
-          bien?.nroParte ?? null,
-          bien?.lote ?? null,
+          textoLimitado(bien?.nroParte ?? null, 1000),
+          textoLimitado(bien?.lote ?? null, 1000),
           bien?.expira ? fechaValida(bien.expira) : null,
           i,
         ]
